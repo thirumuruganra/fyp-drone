@@ -1,0 +1,9 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Overall System Architecture: Two-Tier Payload-Aware UAV Route Planner. Tier~1 pre-computes the Pareto front once; Tier~2 selects the optimal route for each new payload tag using the stored front.}}{13}{figure.caption.32}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Tier~1 Activity Flow: Multi-Objective A* Pareto Front Construction. The open set is explored in order of estimated total cost until no further non-dominated routes exist.}}{16}{figure.caption.42}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Tier~2 Activity Flow: Payload-Driven Pareto Selection. Payload tags are algebraically mapped to weights, which score every Pareto point via a utility function; the argmax is selected as the mission route.}}{21}{figure.caption.60}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Project Gantt Chart (July 2026 -- March 2027), generated with PlantUML (see \texttt {diagrams/gantt.puml}). Orange diamonds mark review milestones.}}{35}{figure.caption.93}%

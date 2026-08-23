@@ -1,0 +1,41 @@
+@startuml tier1
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #444444
+skinparam ActivityBackgroundColor #DDEEFF
+skinparam ArrowColor #333333
+
+title Tier 1 — Multi-Objective A* Pareto Front Construction
+
+start
+
+:Load airspace graph G from OpenStreetMap\n(nodes = waypoints, edges = flight segments);
+
+:Assign 3-objective cost vector to each edge:\nc(e) = [distance(e), energy(e), risk(e)];
+
+:Initialise:\nOPEN = {(source_node, g=[0,0,0], path=[source])}\nPareto set P = ∅;
+
+repeat
+  :Extract node (u, g, path) from OPEN\nwith minimum f = ||g||₂ + h(u, target);
+
+  if (g is DOMINATED by any route in P?) then (YES — prune)
+    :Discard this partial path;
+  else (NO — explore)
+    if (u == destination node t?) then (YES)
+      :Route complete.\nAdd (g, path) to P.\nRemove from P any route\nnow dominated by g;
+    else (NO)
+      :Expand each neighbour v of u;
+      :Compute: g_new = g + c(u, v);
+      if (g_new NOT dominated\nby any route in P?) then (YES)
+        :Insert (v, g_new, extended path)\ninto OPEN;
+      else (NO — skip)
+      endif
+    endif
+  endif
+repeat while (OPEN ≠ ∅?) is (YES)
+->NO;
+
+:Serialise Pareto-optimal route set P\nto disk for Tier 2 re-use;
+
+stop
+@enduml
