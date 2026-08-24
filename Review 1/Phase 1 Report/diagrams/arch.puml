@@ -1,0 +1,64 @@
+@startuml arch
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontSize 13
+skinparam padding 4
+skinparam ArrowThickness 1.5
+skinparam ArrowColor #555555
+skinparam componentBorderColor #444444
+skinparam componentBackgroundColor #FFFFFF
+
+title Payload-Aware Two-Tier UAV Route Planning — System Architecture
+
+package "INPUTS" #EEEEEE {
+  [Airspace Graph\n(OpenStreetMap / osmnx)] as AG
+  [Payload Metadata Tags\nFragility · Temperature\nUrgency · Priority] as PMT
+}
+
+package "TIER 1: Pareto Front Construction\n(Run ONCE per delivery region)" #DDEEFF {
+  [Edge Cost Assignment\n(distance, energy, risk)] as OCA
+  [Multi-Objective A* / Dijkstra\nVector-Cost Graph Search] as MOA
+  [Pareto Dominance Pruning] as PDF
+  database "Pareto Front Storage\n(persisted, reused across missions)" as PFS
+}
+
+package "TIER 2: Payload-Driven Selection\n(Runs per mission — near-instantaneous)" #DDFFDD {
+  [Payload Metadata Interpreter] as PMI
+  [Weight Derivation Formula\nw_risk = F×2/Σ  w_dist = U×3/Σ\nw_energy = T×2/Σ] as WDF
+  [Utility Scoring\nscore(p_i) = Σ w_k · (1 − obj̃_k)\nfor all Pareto points] as US
+  [argmax Route Selection] as RS
+}
+
+package "OUTPUT" #FFEECC {
+  [ArduPilot Mission File\n(.waypoints format)] as MF
+  [Ground-Station Dashboard\n(Operator UI)] as GSD
+  [MAVLink Upload\nto Pixhawk] as ML
+}
+
+AG --> OCA
+OCA --> MOA : "3-objective\ncost vectors"
+MOA --> PDF
+PDF --> PFS : "Non-dominated\nroutes"
+
+PMT --> PMI
+PFS --> US : "Stored\nPareto front"
+PMI --> WDF
+WDF --> US : "w_risk, w_dist,\nw_energy"
+US --> RS
+RS --> MF : "Selected\nmission route"
+MF --> GSD
+MF --> ML
+ML --> GSD : "Upload confirmed"
+
+note right of PFS
+  Computed ONCE.
+  Reused for all future
+  missions in this region.
+end note
+
+note right of US
+  Scores EVERY Pareto point.
+  Selects non-extreme points
+  for mixed-priority payloads.
+end note
+@enduml

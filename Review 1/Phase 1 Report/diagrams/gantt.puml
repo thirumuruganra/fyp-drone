@@ -1,0 +1,44 @@
+@startgantt
+title Project Gantt Chart (Jul 2026 -- Mar 2027)
+
+printscale monthly zoom 1
+language en
+
+Project starts 2026-07-01
+today is 2026-08-23
+
+' ── Q1: Jul - Sep 2026 (Phase I -- Foundations) ─────────────────────────────
+-- Q1 (Phase I -- Foundations) --
+[Literature review & problem formalisation] starts 2026-07-01 and ends 2026-08-15
+[Airspace graph model design (osmnx)] starts 2026-08-01 and ends 2026-09-15
+[Tier 1: A*/Dijkstra implementation] starts 2026-09-01 and ends 2026-09-30
+[Unit tests for Tier 1 (non-dominance)] starts 2026-09-01 and ends 2026-09-30
+
+' ── Q2: Oct - Nov 2026 (Phase I -- Core Algorithm) ──────────────────────────
+-- Q2 (Phase I -- Core Algorithm) --
+[Pareto front construction module] starts 2026-10-01 and ends 2026-11-30
+[Objective normalisation scheme] starts 2026-10-01 and ends 2026-10-31
+[Payload metadata schema design] starts 2026-10-01 and ends 2026-11-30
+[Tier 2: weight derivation & utility scoring] starts 2026-11-01 and ends 2026-11-30
+
+[Review 1] happens 2026-08-15
+[Review 1] is colored in Orange/Orange
+
+' ── Q3: Dec 2026 - Jan 2027 (Phase I -- Integration & Benchmark) ────────────
+-- Q3 (Phase I -- Integration & Benchmark) --
+[Ground-station dashboard (Tkinter/React)] starts 2026-12-01 and ends 2027-01-31
+[ArduPilot mission file generator] starts 2026-12-01 and ends 2026-12-31
+[ArduPilot SITL integration & validation] starts 2026-12-01 and ends 2027-01-31
+[Baseline comparison: A* & MOPSO] starts 2027-01-01 and ends 2027-01-31
+
+' ── Q4: Feb - Mar 2027 (Phase II -- Hardware & Report) ──────────────────────
+-- Q4 (Phase II -- Hardware & Report) --
+[Raspberry Pi 5 & Pixhawk integration] starts 2027-02-01 and ends 2027-02-28
+[Real outdoor flight tests] starts 2027-02-01 and ends 2027-03-31
+[Results analysis & documentation] starts 2027-03-01 and ends 2027-03-31
+[Final thesis report] starts 2027-03-01 and ends 2027-03-31
+
+[Final Submission] happens 2027-03-31
+[Final Submission] is colored in Orange/Orange
+
+@endgantt

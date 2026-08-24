@@ -1,0 +1,68 @@
+\begin{thebibliography}{8}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Chokkalingam and Ganesan(2026)]{chokkalingam2026}
+M.~Chokkalingam and K.~Ganesan.
+\newblock Multi-objective {UAV} path planning using adaptive constraint
+  handling with entropy-based criteria for {Pareto} front solution selection.
+\newblock \emph{RAIRO -- Operations Research}, 2026.
+\newblock \doi{10.1051/ro/2025159}.
+
+\bibitem[Datsko et~al.(2024)Datsko, Kholiavchenko, Ivanov, and
+  Kholiavchenko]{datsko2024}
+O.~Datsko, M.~Kholiavchenko, O.~Ivanov, and S.~Kholiavchenko.
+\newblock Diversity-driven {Pareto} selection for multi-objective {UAV} route
+  planning.
+\newblock \emph{IEEE Robotics and Automation Letters}, 2024.
+\newblock \doi{10.1109/LRA.2024.10414185}.
+\newblock Verify full author list and exact title on IEEE Xplore.
+
+\bibitem[Ntakolia et~al.(2023)Ntakolia, Deva, and Asaro]{ntakolia2023}
+C.~Ntakolia, A.~Deva, and F.~Asaro.
+\newblock A crowding-distance-based multi-objective evolutionary algorithm for
+  {UAV} path planning under multiple constraints.
+\newblock \emph{Journal of Intelligent \& Robotic Systems}, 107, 2023.
+\newblock \doi{10.1007/s10846-023-01945-9}.
+\newblock Verify full author list and exact title via the DOI link.
+
+\bibitem[Boeing(2017)]{osmnx}
+Geoff Boeing.
+\newblock {OSMnx}: New methods for acquiring, constructing, analyzing, and
+  visualizing complex street networks.
+\newblock \emph{Computers, Environment and Urban Systems}, 65:\penalty0
+  126--139, 2017.
+\newblock \doi{10.1016/j.compenvurbsys.2017.05.004}.
+
+\bibitem[Hagberg et~al.(2008)Hagberg, Schult, and Swart]{networkx}
+Aric~A. Hagberg, Daniel~A. Schult, and Pieter~J. Swart.
+\newblock Exploring network structure, dynamics, and function using {NetworkX}.
+\newblock In \emph{Proceedings of the 7th Python in Science Conference
+  (SciPy2008)}, pages 11--15, Pasadena, CA, USA, 2008.
+\newblock URL \url{https://networkx.org}.
+
+\bibitem[Coello et~al.(2004)Coello, Pulido, and Lechuga]{mopso}
+Carlos A.~Coello Coello, Gregorio~Toscano Pulido, and Maximino~Salazar Lechuga.
+\newblock Handling multiple objectives with particle swarm optimization.
+\newblock \emph{IEEE Transactions on Evolutionary Computation}, 8\penalty0
+  (3):\penalty0 256--279, 2004.
+\newblock \doi{10.1109/TEVC.2004.826067}.
+
+\bibitem[Meier et~al.(2026)Meier, Camacho, Godbolt, Usher, Goppert, Castillo,
+  and Leffly]{mavlink}
+Lorenz Meier, Julian Camacho, Ben Godbolt, Kevin Usher, James Goppert, Pablo
+  Castillo, and John Leffly.
+\newblock {MAVLink}: Micro air vehicle communication protocol.
+\newblock \url{https://mavlink.io/en/}, 2026.
+\newblock Accessed: August 2026.
+
+\bibitem[{ArduPilot Development Team}(2026)]{ardupilot}
+{ArduPilot Development Team}.
+\newblock {ArduPilot} -- open source autopilot.
+\newblock \url{https://ardupilot.org}, 2026.
+\newblock Accessed: August 2026.
+
+\end{thebibliography}

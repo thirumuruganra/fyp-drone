@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pareto Front - Payload-Aware UAV Route Selection</title>
+<style>
+  :root {
+    --surface-0: #f1efe8;
+    --surface-1: #ffffff;
+    --surface-2: #f5f4f0;
+    --border: rgba(11,11,11,0.10);
+    --border-strong: rgba(11,11,11,0.17);
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --radius: 8px;
+    --fill-accent: #2a78d6;
+    --on-accent: #ffffff;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 28px 24px;
+    max-width: 760px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    letter-spacing: -0.01em;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .pbtn {
+    flex: 1;
+    font-size: 13px;
+    font-family: var(--font);
+    padding: 8px 14px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .pbtn:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
+
+  .pbtn.sel {
+    background: var(--fill-accent);
+    color: var(--on-accent);
+    border-color: var(--fill-accent);
+  }
+
+  .card {
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .legend-row {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #D3D1C7;
+    border: 0.5px solid #888780;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  #legDot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #0F6E56;
+    display: inline-block;
+    flex-shrink: 0;
+    transition: background 0.25s;
+  }
+
+  .legend-note {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .info-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+  }
+
+  .tags-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .mtag {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--surface-0);
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 3px 10px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .mcard {
+    background: var(--surface-0);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    text-align: center;
+  }
+
+  .mcard .mlabel { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .mcard .mval   { font-size: 20px; font-weight: 500; color: var(--text-primary); }
+
+  .info-why {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    line-height: 1.6;
+  }
+
+  .chart-wrap { position: relative; width: 100%; height: 280px; }
+</style>
+</head>
+<body>
+
+<h1>Pareto front - Payload-aware UAV route selection</h1>
+
+<div class="btn-group">
+  <button id="b0" class="pbtn" onclick="sel('fragile')">Fragile medical sample</button>
+  <button id="b1" class="pbtn" onclick="sel('emergency')">Emergency medicine</button>
+  <button id="b2" class="pbtn" onclick="sel('disaster')">Disaster relief supplies</button>
+</div>
+
+<div class="card">
+  <div class="chart-wrap">
+    <canvas id="pc" role="img"
+      aria-label="Pareto front scatter plot. X-axis: route distance. Y-axis: flight risk. Selected point changes with payload type.">
+      12 non-dominated UAV routes from shortest-riskiest to longest-safest.
+    </canvas>
+  </div>
+  <div class="legend-row">
+    <span class="legend-item"><span class="legend-dot"></span>Pareto-optimal route</span>
+    <span class="legend-item"><span id="legDot"></span>Selected by payload metadata</span>
+    <span class="legend-note">No route dominates another on both axes</span>
+  </div>
+</div>
+
+<div class="card">
+  <p id="iT" class="info-title"></p>
+  <div id="iM" class="tags-row"></div>
+  <div id="iS" class="stats-grid"></div>
+  <p id="iW" class="info-why"></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+  const F = [
+    {x:2.8,y:.91},{x:3.3,y:.78},{x:3.9,y:.65},{x:4.5,y:.54},
+    {x:5.1,y:.43},{x:5.8,y:.33},{x:6.4,y:.24},{x:7.0,y:.17},
+    {x:7.7,y:.11},{x:8.3,y:.06},{x:8.9,y:.03},{x:9.5,y:.01}
+  ];
+
+  const P = {
+    fragile: {
+      b:'b0', i:11, h:'#0F6E56',
+      t:'Fragile medical sample - safest route selected',
+      m:['Fragility: HIGH','Temp-sensitive: YES','Time-window: 4 hr','Priority: STANDARD'],
+      s:[{l:'Distance',v:'9.5 km'},{l:'Flight risk',v:'1%'},{l:'Battery used',v:'75%'}],
+      w:'High fragility and temperature-sensitive tags → system maximises the safety weight → selects the lowest-risk point on the Pareto front.'
+    },
+    emergency: {
+      b:'b1', i:0, h:'#993C1D',
+      t:'Emergency medicine - shortest route selected',
+      m:['Fragility: LOW','Temp-sensitive: NO','Time-window: 15 min','Priority: CRITICAL'],
+      s:[{l:'Distance',v:'2.8 km'},{l:'Flight risk',v:'91%'},{l:'Battery used',v:'72%'}],
+      w:'Critical priority and 15-minute time-window → system minimises distance → selects the shortest point on the Pareto front.'
+    },
+    disaster: {
+      b:'b2', i:5, h:'#854F0B',
+      t:'Disaster relief supplies - energy-efficient route selected',
+      m:['Fragility: LOW','Temp-sensitive: NO','Time-window: 2 hr','Priority: STANDARD'],
+      s:[{l:'Distance',v:'5.8 km'},{l:'Flight risk',v:'33%'},{l:'Battery used',v:'36%'}],
+      w:'Standard priority and heavy payload → system minimises energy consumption → selects the most energy-efficient point on the Pareto front.'
+    }
+  };
+
+  const gc = '#e8e7e0';
+  const tc = '#73726c';
+  const lc = '#B4B2A9';
+  const gF = '#D3D1C7';
+  const gB = '#888780';
+
+  let chart;
+
+  chart = new Chart(document.getElementById('pc'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          type: 'line',
+          data: F,
+          borderColor: lc,
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.35,
+          order: 3
+        },
+        {
+          type: 'scatter',
+          data: F,
+          backgroundColor: gF,
+          borderColor: gB,
+          borderWidth: 0.5,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          order: 2
+        },
+        {
+          type: 'scatter',
+          data: [F[11]],
+          backgroundColor: '#0F6E56',
+          borderColor: '#0F6E56',
+          borderWidth: 2,
+          pointRadius: 13,
+          pointHoverRadius: 15,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 6, right: 10, bottom: 20, left: 4 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(11,11,11,0.15)',
+          borderWidth: 0.5,
+          titleColor: '#0b0b0b',
+          bodyColor: '#52514e',
+          callbacks: {
+            label: c => c.datasetIndex === 0 ? null
+              : ` Distance: ${c.parsed.x} km  ·  Risk: ${Math.round(c.parsed.y * 100)}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Route distance (km)', color: tc, font: { size: 12 } },
+          min: 2, max: 10.5,
+          grid: { color: gc },
+          border: { color: gc },
+          ticks: { color: tc, font: { size: 11 } }
+        },
+        y: {
+          title: { display: true, text: 'Flight risk', color: tc, font: { size: 12 } },
+          min: -0.15,
+          max: 1.05,
+          grid: { color: gc },
+          border: { color: gc },
+          ticks: {
+            color: tc,
+            font: { size: 11 },
+            callback: v => Math.round(v * 100) + '%'
+          }
+        }
+      }
+    }
+  });
+
+  function sel(type) {
+    const p = P[type];
+
+    chart.data.datasets[2].data = [F[p.i]];
+    chart.data.datasets[2].backgroundColor = p.h;
+    chart.data.datasets[2].borderColor = p.h;
+    chart.update('none');
+
+    document.getElementById('legDot').style.background = p.h;
+
+    Object.values(P).forEach(q => document.getElementById(q.b).classList.remove('sel'));
+    document.getElementById(p.b).classList.add('sel');
+
+    document.getElementById('iT').textContent = p.t;
+    document.getElementById('iM').innerHTML =
+      p.m.map(m => `<span class="mtag">${m}</span>`).join('');
+    document.getElementById('iS').innerHTML =
+      p.s.map(s => `<div class="mcard"><p class="mlabel">${s.l}</p><p class="mval">${s.v}</p></div>`).join('');
+    document.getElementById('iW').textContent = p.w;
+  }
+
+  sel('fragile');
+</script>
+</body>
+</html>

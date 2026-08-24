@@ -1,0 +1,7 @@
+# FYP B28 — Phase I Software Simulation
+# Install with:  pip install -r requirements.txt
+
+networkx>=3.1        # Graph data structure and algorithms
+numpy>=1.24          # Numerical operations
+matplotlib>=3.7      # Plotting and visualisation
+osmnx>=1.6           # OpenStreetMap graph extraction (optional — falls back to synthetic)

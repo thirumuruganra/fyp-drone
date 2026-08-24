@@ -1,0 +1,51 @@
+@startuml tier2
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #444444
+skinparam ActivityBackgroundColor #DDFFDD
+skinparam ArrowColor #333333
+
+title Tier 2 — Payload-Driven Pareto Route Selection
+
+start
+
+:Operator enters 4 payload tags on dashboard:\n  • Fragility class    F ∈ {1..5}\n  • Temperature sensitivity T ∈ {1..3}\n  • Delivery urgency    U ∈ {1..3}\n  • Priority level      P_lvl ∈ {1..5};
+
+:Compute raw objective scores:\n  r_raw = F × 2    (fragility → risk weight)\n  d_raw = U × 3    (urgency  → distance weight)\n  e_raw = T × 2    (temp     → energy weight)\n  total = r_raw + d_raw + e_raw;
+
+:Normalise to routing objective weights:\n  w_risk   = r_raw / total\n  w_dist   = d_raw / total\n  w_energy = e_raw / total;
+
+note right
+  These weights form the
+  ALGEBRAIC BRIDGE between
+  payload metadata (Tier 2)
+  and routing objectives (Tier 1).
+end note
+
+:Load pre-computed Pareto front P\nfrom Tier 1 storage (no re-planning needed);
+
+:Min-max normalise Pareto objectives:\nFor each point pᵢ = (dᵢ, εᵢ, ρᵢ):\n  d̃ᵢ = (dᵢ − d_min) / (d_max − d_min)\n  ε̃ᵢ = (εᵢ − ε_min) / (ε_max − ε_min)\n  ρ̃ᵢ = (ρᵢ − ρ_min) / (ρ_max − ρ_min);
+
+:Compute utility score for EVERY Pareto point:\nscore(pᵢ) = w_dist×(1 − d̃ᵢ)\n           + w_energy×(1 − ε̃ᵢ)\n           + w_risk×(1 − ρ̃ᵢ);
+
+if (Priority P_lvl ≥ 4\n(HIGH-priority mission)?) then (YES)
+  :Amplify dominant weight:\nw_max = max(w_dist, w_energy, w_risk)\nscore += 0.1 × w_max;
+else (NO)
+endif
+
+:Select mission route:\np* = argmax score(pᵢ)  over all pᵢ ∈ P;
+
+note right
+  p* is a NON-EXTREME point
+  for mixed-priority payloads.
+  Only extreme payloads
+  (e.g. pure urgency) pick
+  the front endpoint.
+end note
+
+:Generate ArduPilot-compatible\nmission file (.waypoints);
+
+:Upload mission to Pixhawk\nvia MAVLink protocol;
+
+stop
+@enduml
