@@ -24,11 +24,14 @@ What this module does:
 
   3. Min-max normalises each Pareto point's objectives (Eq. 3.8).
 
-  4. Computes a utility score for every Pareto point (Eq. 3.9):
-         score(p_i) = w_dist × (1 − d̃_i) + w_energy × (1 − ẽ_i) + w_risk × (1 − ρ̃_i)
-         If P ≥ 4 (high-priority):  score_i += 0.1 × max(w_dist, w_energy, w_risk)
+  4. High-priority amplification: if P ≥ 4, the dominant weight (whichever
+     of w_risk / w_dist / w_energy is largest) is amplified by 0.1× itself,
+     then all three weights are renormalised back to sum to 1.0.
 
-  5. Returns p* = argmax score(p_i) — the mission route.
+  5. Computes a utility score for every Pareto point (Eq. 3.9):
+         score(p_i) = w_dist × (1 − d̃_i) + w_energy × (1 − ẽ_i) + w_risk × (1 − ρ̃_i)
+
+  6. Returns p* = argmax score(p_i) — the mission route.
 
 NO re-planning is done.  The Pareto front from Tier 1 is loaded once and
 re-used across ALL mission types instantly.
@@ -183,6 +186,21 @@ class TierTwoSelector:
         # Step 1–2: derive weights via algebraic bridge (Eqs. 3.2–3.7)
         w_risk, w_dist, w_energy = derive_weights(F, T, U)
 
+        # High-priority amplification (P ≥ 4, Algorithm 2 lines 17–19):
+        # the dominant weight is amplified by 0.1 × w_max, then all three
+        # weights are renormalised so they still sum to 1.0.
+        if P >= 4:
+            w_max = max(w_risk, w_dist, w_energy)
+            bonus = 0.1 * w_max
+            if w_risk == w_max:
+                w_risk += bonus
+            elif w_dist == w_max:
+                w_dist += bonus
+            else:
+                w_energy += bonus
+            total = w_risk + w_dist + w_energy
+            w_risk, w_dist, w_energy = w_risk / total, w_dist / total, w_energy / total
+
         # Step 3: min-max normalise all Pareto objectives
         # (precomputed from __init__)
 
@@ -190,14 +208,9 @@ class TierTwoSelector:
         scores = np.empty(len(self.pareto_front))
         for i, (g, _) in enumerate(self.pareto_front):
             d_t, e_t, r_t = self._normalise(g)
-            score = (w_dist   * (1.0 - d_t) +
-                     w_energy * (1.0 - e_t) +
-                     w_risk   * (1.0 - r_t))
-            # High-priority amplification (P ≥ 4, Algorithm 2 lines 17–19)
-            if P >= 4:
-                w_max  = max(w_dist, w_energy, w_risk)
-                score += 0.1 * w_max
-            scores[i] = score
+            scores[i] = (w_dist   * (1.0 - d_t) +
+                         w_energy * (1.0 - e_t) +
+                         w_risk   * (1.0 - r_t))
 
         # argmax → selected mission route (Algorithm 2, lines 21–22)
         best_idx       = int(np.argmax(scores))
