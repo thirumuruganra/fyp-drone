@@ -1,6 +1,5 @@
 % Payload-Aware Two-Tier UAV Route Planning — Review I Presentation
 % Compile with: pdflatex Review1_Presentation.tex  (run twice)
-% Required files in the same folder: arch.png, tier1.png, tier2.png, ssn-logo.png
 
 \documentclass[aspectratio=169,11pt]{beamer}
 
@@ -25,6 +24,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{graphicx}
+\graphicspath{{../Phase 1 Report/diagrams/}{./}}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{tabularx}
@@ -34,7 +34,10 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{colortbl}
+\usepackage{microtype}
 \usepackage{hyperref}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 
 % ---------- General settings ----------
 \setbeamertemplate{navigation symbols}{}
@@ -65,9 +68,11 @@
   Payload-Aware Two-Tier UAV Route Planning\\for Last-Mile Delivery}
 \subtitle{Review Report -- I}
 \author[Thirumurugan $\cdot$ Shrika $\cdot$ Meghna]{%
-  Thirumurugan R A \hfill (3122235001149)\\[1mm]
-  Shrika S P Thota \hfill (3122235001125)\\[1mm]
-  Meghna Manimaran \hfill (3122235001079)%
+  \texorpdfstring{%
+    Thirumurugan RA \hfill (3122235001149)\\[1mm]
+    Shrika SP Thota \hfill (3122235001125)\\[1mm]
+    Meghna Manimaran \hfill (3122235001079)%
+  }{Thirumurugan RA, Shrika SP Thota, Meghna Manimaran}%
 }
 \institute[SSN College of Engineering]{%
   Guided by: Sujaudeen N, Assistant Professor\\[2mm]
@@ -75,6 +80,10 @@
   Sri Sivasubramaniya Nadar College of Engineering%
 }
 \date{Academic Year 2026--2027}
+\hypersetup{
+  pdftitle={Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery},
+  pdfauthor={Thirumurugan RA, Shrika SP Thota, Meghna Manimaran}
+}
 
 \begin{document}
 
@@ -266,7 +275,7 @@
 % ── 9. Existing vs Proposed ─────────────────────────────────────────────────
 \begin{frame}{Existing System vs.\ Proposed System}
   \small
-  \begin{tabularx}{\textwidth}{>{\bfseries}p{2.9cm}XX}
+  \begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{2.9cm}YY}
     \toprule
     Criterion & Existing Routing Systems & Proposed Two-Tier System\\
     \midrule
@@ -377,7 +386,7 @@
 % ── 14. Technology stack ────────────────────────────────────────────────────
 \begin{frame}{Technology Stack and Resources}
   \small
-  \begin{tabularx}{\textwidth}{>{\bfseries}p{3.1cm}X}
+  \begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{3.1cm}Y}
     \toprule
     Category & Selected Technology / Resource\\
     \midrule
@@ -403,7 +412,7 @@
 % ── 15. Implementation status ───────────────────────────────────────────────
 \begin{frame}{Implementation Status}
   \small
-  \begin{tabularx}{\textwidth}{X>{\centering\arraybackslash}p{2.5cm}X}
+  \begin{tabularx}{\textwidth}{Y>{\centering\arraybackslash}p{2.5cm}Y}
     \toprule
     \textbf{Component} & \textbf{Status} & \textbf{Evidence / Remarks}\\
     \midrule
@@ -467,7 +476,7 @@
 % ── 18. Testing ─────────────────────────────────────────────────────────────
 \begin{frame}{Testing and Validation Plan}
   \scriptsize
-  \begin{tabularx}{\textwidth}{p{1.2cm} X X p{1.8cm}}
+  \begin{tabularx}{\textwidth}{p{1.2cm} Y Y p{1.8cm}}
     \toprule
     \textbf{Test ID} & \textbf{Test Scenario} &
     \textbf{Expected Result} & \textbf{Status}\\
@@ -504,7 +513,7 @@
 % ── 19. Timeline ────────────────────────────────────────────────────────────
 \begin{frame}{Project Timeline (Aug\,2026 -- Mar\,2027)}
   \scriptsize
-  \begin{tabularx}{\textwidth}{X*{8}{>{\centering\arraybackslash}p{0.66cm}}}
+  \begin{tabularx}{\textwidth}{Y*{8}{>{\centering\arraybackslash}p{0.66cm}}}
     \toprule
     \textbf{Activity} &
     \textbf{Aug} & \textbf{Sep} & \textbf{Oct} & \textbf{Nov} &
@@ -537,15 +546,15 @@
 % ── 20. Responsibilities ────────────────────────────────────────────────────
 \begin{frame}{Team Responsibilities}
   \small
-  \begin{tabularx}{\textwidth}{>{\bfseries}p{3.3cm}X p{2.3cm}}
+  \begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{3.3cm}Y p{2.3cm}}
     \toprule
     Team Member & Responsibilities & Current Status\\
     \midrule
-    Thirumurugan R A &
+    Thirumurugan RA &
       System architecture design, Tier~1 multi-objective A* engine,
       airspace graph construction (OSMnx) &
       In progress\\
-    Shrika S P Thota &
+    Shrika SP Thota &
       Algebraic bridge design, Tier~2 payload selector implementation,
       documentation &
       In progress\\
@@ -564,7 +573,7 @@
 % ── 21. Challenges ──────────────────────────────────────────────────────────
 \begin{frame}{Challenges, Risks, and Mitigation}
   \small
-  \begin{tabularx}{\textwidth}{X X X}
+  \begin{tabularx}{\textwidth}{Y Y Y}
     \toprule
     \textbf{Risk / Challenge} & \textbf{Possible Impact} &
     \textbf{Mitigation}\\
@@ -625,25 +634,30 @@
       \emph{Journal of Computer Science}, 2023.
 
     \bibitem{r4}
-      F.\ Wu, A.\ Souza, T.\ Zhang, C.\ Fifty, T.\ Yu, and
-      K.\ Weinberger,
-      ``Simplifying Graph Convolutional Networks,''
-      \emph{Proc.\ ICML}, pp.~6861--6871, 2019.
-      Available: \url{https://proceedings.mlr.press/v97/wu19e.html}
+      G.\ Boeing,
+      ``OSMnx: New methods for acquiring, constructing, analysing, and
+      visualising complex street networks,''
+      \emph{Computers, Environment and Urban Systems}, vol.~65,
+      pp.~126--139, 2017.
+      DOI: \url{https://doi.org/10.1016/j.compenvurbsys.2017.05.004}
 
     \bibitem{r5}
-      Z.\ Zhang and O.\ Fink,
-      ``Algorithm-informed graph neural networks for leakage detection
-      in water distribution networks,''
-      \emph{Reliability Engineering \& System Safety}, 2025.
-      DOI: \url{https://doi.org/10.1016/j.ress.2025.111494}
+      A.\ Hagberg, P.\ Swart, and D.\ Chult,
+      ``Exploring network structure, dynamics, and function using
+      NetworkX,'' in \emph{Proc.\ 7th Python in Science Conf.\ (SciPy)},
+      pp.~11--15, 2008.
 
     \bibitem{r6}
-      F.\ Zhao et al.,
-      ``A novel method for detecting leakage duration of water pipe
-      networks based on anchor box mechanism,''
-      \emph{IEEE EEE Conference}, 2025.
-      DOI: \url{https://doi.org/10.1109/eee64897.2025.11162744}
+      C.\ A.\ C.\ Coello, G.\ T.\ Pulido, and M.\ S.\ Lechuga,
+      ``Handling multiple objectives with particle swarm optimization,''
+      \emph{IEEE Trans.\ Evolutionary Computation}, vol.~8, no.~3,
+      pp.~256--279, 2004.
+      DOI: \url{https://doi.org/10.1109/TEVC.2004.826067}
+
+    \bibitem{r7}
+      L.\ Meier et al.,
+      ``MAVLink: Micro air vehicle communication protocol,'' 2013.
+      [Online]. Available: \url{https://mavlink.io}
 
   \end{thebibliography}
 \end{frame}
@@ -657,8 +671,8 @@
   {\Large Questions and Discussion}\par
   \vspace{0.8cm}
   {\normalsize
-    Thirumurugan R A\quad$\cdot$\quad
-    Shrika S P Thota\quad$\cdot$\quad
+    Thirumurugan RA\quad$\cdot$\quad
+    Shrika SP Thota\quad$\cdot$\quad
     Meghna Manimaran}\par
   \vspace{0.3cm}
   {\small Guide: Sujaudeen N, Assistant Professor}

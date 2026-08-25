@@ -24,6 +24,10 @@
 \RequirePackage{enumitem}
 \RequirePackage{titlesec}
 \RequirePackage[hidelinks]{hyperref}
+\RequirePackage{microtype}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 
 \onehalfspacing
 \setlength{\parindent}{0.5in}

@@ -1,15 +1,15 @@
-% Compile twice with: pdflatex reviewreport.tex
-% Keep ssnreview.cls, ssn-logo.png, arch.png, tier1.png, tier2.png in same folder.
+% Compile twice with: pdflatex Review1_Report.tex
 \documentclass{ssnreview}
 
 \usepackage{amsmath}
 \usepackage{amsfonts}
+\graphicspath{{../Phase 1 Report/diagrams/}}
 
 \projecttitle{PAYLOAD-AWARE TWO-TIER UAV ROUTE PLANNING FOR LAST-MILE DELIVERY}
 \reviewnumber{REVIEW REPORT -- I}
 \students{%
-  Thirumurugan R A \hfill (3122235001149)\\
-  Shrika S P Thota \hfill (3122235001125)\\
+  Thirumurugan RA \hfill (3122235001149)\\
+  Shrika SP Thota \hfill (3122235001125)\\
   Meghna Manimaran \hfill (3122235001079)}
 \supervisor{Sujaudeen N, Assistant Professor}
 \department{Department of Computer Science and Engineering}
@@ -179,7 +179,7 @@ comparison.
 
 \begin{table}[H]
 \centering\caption{Summary of related work}\label{tab:related-work}\small
-\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{0.65cm} p{2.9cm} X X X}
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{1.1cm} L{2.9cm} Y Y Y}
 \toprule
 \textbf{S.No.} & \textbf{Author/Year} & \textbf{Proposed Method} & \textbf{Key Findings} & \textbf{Limitations}\\
 \midrule
@@ -344,8 +344,9 @@ $\arg\max$ as the selected mission route along with an ArduPilot-compatible
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.88\textwidth]{arch.png}
-\caption{Overall system architecture: Two-Tier Payload-Aware UAV Route Planner. Tier~1
+\includegraphics[width=0.78\textwidth]{arch.png}
+\caption[Overall system architecture: Two-Tier Payload-Aware UAV Route Planner]{Overall
+system architecture: Two-Tier Payload-Aware UAV Route Planner. Tier~1
 pre-computes the Pareto front once per delivery region; Tier~2 selects the optimal route
 for each new payload tag using the stored front.}\label{fig:architecture}
 \end{figure}
@@ -372,7 +373,7 @@ one Tier~1 routing objective as shown in Table~\ref{tab:semantic-mapping}.
 
 \begin{table}[H]
 \centering\caption{Semantic mapping: payload metadata tags to Tier~1 routing objectives}\label{tab:semantic-mapping}\small
-\begin{tabularx}{\textwidth}{p{2.8cm} p{1.4cm} X p{4.2cm}}
+\begin{tabularx}{\textwidth}{L{2.8cm} L{1.4cm} Y L{4.2cm}}
 \toprule
 \textbf{Payload Tag} & \textbf{Range} & \textbf{Maps to Tier~1 Objective} & \textbf{Reasoning}\\
 \midrule
@@ -412,7 +413,8 @@ The Tier~1 and Tier~2 activity flows are shown in Figures~\ref{fig:tier1} and
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.82\textwidth]{tier1.png}
-\caption{Tier~1 activity flow: Multi-Objective A* Pareto Front Construction. The open
+\caption[Tier~1 activity flow: Multi-Objective A* Pareto Front Construction]{Tier~1
+activity flow: Multi-Objective A* Pareto Front Construction. The open
 set is explored in order of estimated total cost until no further non-dominated routes
 exist.}\label{fig:tier1}
 \end{figure}
@@ -420,7 +422,8 @@ exist.}\label{fig:tier1}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.82\textwidth]{tier2.png}
-\caption{Tier~2 activity flow: Payload-Driven Pareto Selection. Payload tags are
+\caption[Tier~2 activity flow: Payload-Driven Pareto Selection]{Tier~2 activity flow:
+Payload-Driven Pareto Selection. Payload tags are
 algebraically mapped to weights, which score every Pareto point via a utility function;
 the $\arg\max$ is selected as the mission route.}\label{fig:tier2}
 \end{figure}
