@@ -15,12 +15,6 @@ Code/commits/PRs: normal. Off: "stop caveman" / "normal mode".
 
 Semantic commits for all git commits.
 
-After code change, AskUserQuestion. Print exact choices:
-1. Commit + push
-2. Commit only
-3. Neither
-Wait for user pick 1, 2, or 3.
-
 ## Project Overview
 
 FYP (B28) repo. **"Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery"** — Thirumurugan RA, Shrika SP Thota, Meghna Manimaran (Guide: Sujaudeen N), SSN College of Engineering, Dept. of CSE.
