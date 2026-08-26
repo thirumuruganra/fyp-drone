@@ -9,7 +9,7 @@ Implements Algorithm 2 from Section 3.4 of the report.
 What this module does:
   1. Reads the four operator-assigned payload metadata tags:
        F  — Fragility class        {1..5}
-       T  — Temperature sensitivity {1..3}
+       W  — Payload weight class   {1..3}
        U  — Delivery urgency        {1..3}
        P  — Priority level          {1..5}
 
@@ -17,7 +17,7 @@ What this module does:
      (Eqs. 3.2 – 3.7, Section 3.3.2):
          r_raw    = F × 2
          d_raw    = U × 3
-         e_raw    = T × 2
+         e_raw    = W × 2
          w_risk   = r_raw  / (r_raw + d_raw + e_raw)
          w_dist   = d_raw  / (r_raw + d_raw + e_raw)
          w_energy = e_raw  / (r_raw + d_raw + e_raw)
@@ -64,13 +64,13 @@ from mpl_toolkits.mplot3d import Axes3D   # needed for 3D projection
 # ─────────────────────────────────────────────────────────────────────────────
 
 PAYLOAD_PRESETS = {
-    "fragile_medical":     {"F": 5, "T": 1, "U": 1, "P": 3,
+    "fragile_medical":     {"F": 5, "W": 1, "U": 1, "P": 3,
                             "label": "Fragile\nMedical"},
-    "emergency_medicine":  {"F": 1, "T": 1, "U": 3, "P": 5,
+    "emergency_medicine":  {"F": 1, "W": 1, "U": 3, "P": 5,
                             "label": "Emergency\nMedicine"},
-    "disaster_relief":     {"F": 1, "T": 2, "U": 1, "P": 2,
+    "disaster_relief":     {"F": 1, "W": 2, "U": 1, "P": 2,
                             "label": "Disaster\nRelief"},
-    "mixed_cargo":         {"F": 3, "T": 2, "U": 2, "P": 3,
+    "mixed_cargo":         {"F": 3, "W": 2, "U": 2, "P": 3,
                             "label": "Mixed\nCargo"},
 }
 
@@ -87,21 +87,24 @@ PRESET_COLOURS = {
 #  Weight derivation  (Algebraic Bridge — Section 3.3.2)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def derive_weights(F: int, T: int, U: int) -> tuple:
+def derive_weights(F: int, W: int, U: int) -> tuple:
     """
     Algebraic Bridge: payload tags → routing objective weights.
 
     Equations 3.2 – 3.7:
-        r_raw    = F × 2   (fragility  → risk weight)
-        d_raw    = U × 3   (urgency    → distance weight)
-        e_raw    = T × 2   (temp. sens → energy weight)
+        r_raw    = F × 2   (fragility     → risk weight)
+        d_raw    = U × 3   (urgency       → distance weight)
+        e_raw    = W × 2   (payload weight → energy weight)
         w_risk   = r_raw  / total
         w_dist   = d_raw  / total
         w_energy = e_raw  / total
 
-    The multipliers (2 for fragility/temperature, 3 for urgency) reflect the
+    The multipliers (2 for fragility/payload weight, 3 for urgency) reflect the
     domain insight that urgency has a higher penalty sensitivity in UAV medical
-    delivery (Section 3.3.2).
+    delivery (Section 3.3.2). Payload weight maps to the energy objective
+    because heavier payload directly increases hover/lift power draw
+    (rotorcraft power scales with weight), unlike risk or distance, which are
+    not physically driven by payload mass.
 
     Returns
     -------
@@ -109,7 +112,7 @@ def derive_weights(F: int, T: int, U: int) -> tuple:
     """
     r_raw = F * 2
     d_raw = U * 3
-    e_raw = T * 2
+    e_raw = W * 2
     total = r_raw + d_raw + e_raw
     return r_raw / total, d_raw / total, e_raw / total
 
@@ -166,14 +169,14 @@ class TierTwoSelector:
     #  Algorithm 2 — single selection
     # ------------------------------------------------------------------
 
-    def select(self, F: int, T: int, U: int, P: int) -> tuple:
+    def select(self, F: int, W: int, U: int, P: int) -> tuple:
         """
         Algorithm 2 — Payload-Driven Pareto Route Selection.
 
         Parameters
         ----------
         F : Fragility class         {1..5}
-        T : Temperature sensitivity {1..3}
+        W : Payload weight class    {1..3}
         U : Delivery urgency        {1..3}
         P : Priority level          {1..5}
 
@@ -184,7 +187,7 @@ class TierTwoSelector:
         scores : np.ndarray of all utility scores
         """
         # Step 1–2: derive weights via algebraic bridge (Eqs. 3.2–3.7)
-        w_risk, w_dist, w_energy = derive_weights(F, T, U)
+        w_risk, w_dist, w_energy = derive_weights(F, W, U)
 
         # High-priority amplification (P ≥ 4, Algorithm 2 lines 17–19):
         # the dominant weight is amplified by 0.1 × w_max, then all three
@@ -233,7 +236,7 @@ class TierTwoSelector:
         print("\n" + "="*88)
         print("  MODULE 4 — Tier 2 Payload-Aware Route Selection  (all presets)")
         print("="*88)
-        header = (f"{'Preset':<26} {'F':>2} {'T':>2} {'U':>2} {'P':>2}"
+        header = (f"{'Preset':<26} {'F':>2} {'W':>2} {'U':>2} {'P':>2}"
                   f"  {'w_risk':>7} {'w_dist':>7} {'w_enrg':>7}"
                   f"  {'Dist(km)':>9} {'Energy':>8} {'Risk':>7}")
         print(header)
@@ -241,11 +244,11 @@ class TierTwoSelector:
 
         results = {}
         for name, tags in PAYLOAD_PRESETS.items():
-            F, T, U, Plvl = tags["F"], tags["T"], tags["U"], tags["P"]
-            selected, wr, wd, we, scores = self.select(F, T, U, Plvl)
+            F, W, U, Plvl = tags["F"], tags["W"], tags["U"], tags["P"]
+            selected, wr, wd, we, scores = self.select(F, W, U, Plvl)
             g, path = selected
             results[name] = (g, path, wr, wd, we, scores)
-            print(f"  {name:<24} {F:>2} {T:>2} {U:>2} {Plvl:>2}"
+            print(f"  {name:<24} {F:>2} {W:>2} {U:>2} {Plvl:>2}"
                   f"  {wr:>7.3f} {wd:>7.3f} {we:>7.3f}"
                   f"  {g[0]:>9.4f} {g[1]:>8.4f} {g[2]:>7.4f}")
 

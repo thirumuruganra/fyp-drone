@@ -233,7 +233,7 @@ of what is being carried.
 Existing multi-objective planners---including entropy-based, diversity-driven,
 and crowding-distance Pareto selection methods---encode objective weights as a
 fixed scalar before path search begins. Payload properties such as fragility
-class, temperature sensitivity, and delivery urgency have no influence over
+class, payload weight class, and delivery urgency have no influence over
 which Pareto-optimal route is chosen. When the payload changes, operators must
 re-tune weights manually and re-run the planner---an intervention that is
 infeasible under field conditions.
@@ -246,7 +246,7 @@ delivery airspace graph sourced from OpenStreetMap, producing a Pareto-optimal
 route set across distance, energy consumption, and flight risk. Tier~2 reads
 four operator-assigned payload tags and derives objective weights through a
 fixed formula: fragility class scales $w_{\mathrm{risk}}$, delivery urgency
-scales $w_{\mathrm{dist}}$, and temperature sensitivity scales
+scales $w_{\mathrm{dist}}$, and payload weight class scales
 $w_{\mathrm{energy}}$. These weights score every Pareto point through a utility
 function; the $\arg\max$ is selected as the mission route.
 

@@ -38,7 +38,7 @@ Existing UAV route planners encode distance, energy, and flight risk into a **si
 
 When payload context changes from fragile diagnostic samples requiring vibration-minimal routing to time-critical emergency medicine requiring shortest-path routing, an expert must manually re-tune planner weights and re-run the search from scratch — an intervention that is **infeasible in field conditions**.
 
-The proposed system resolves this by separating Pareto front generation from mission-context-driven route selection. Payload metadata (fragility class, temperature sensitivity, delivery urgency) has never been used as the sole input to autonomous Pareto point selection in the UAV delivery literature, leaving a structural gap this project directly addresses.
+The proposed system resolves this by separating Pareto front generation from mission-context-driven route selection. Payload metadata (fragility class, payload weight class, delivery urgency) has never been used as the sole input to autonomous Pareto point selection in the UAV delivery literature, leaving a structural gap this project directly addresses.
 
 ---
 
@@ -49,7 +49,7 @@ The proposed system resolves this by separating Pareto front generation from mis
 **DOI:** https://doi.org/10.1051/ro/2025159
 
 - **Technique:** Multi-objective UAV path planning using adaptive constraint handling with entropy-based criteria to select solutions from the Pareto front.
-- **Limitation:** Entropy criterion selects solutions based on front diversity alone. Payload metadata (fragility, urgency, thermal sensitivity) is never incorporated into the selection process.
+- **Limitation:** Entropy criterion selects solutions based on front diversity alone. Payload metadata (fragility, urgency, payload weight) is never incorporated into the selection process.
 
 ### Datsko et al. (2024)
 **Journal:** IEEE RA-L
@@ -63,7 +63,7 @@ The proposed system resolves this by separating Pareto front generation from mis
 **DOI:** https://doi.org/10.1007/s10846-023-01945-9
 
 - **Technique:** Crowding-distance-based Pareto point selection within a multi-objective UAV path planner to maximise solution spread across objective space.
-- **Limitation:** Crowding distance cannot encode mission-specific requirements. Payload fragility, temperature sensitivity, or urgency class cannot influence route selection at any stage.
+- **Limitation:** Crowding distance cannot encode mission-specific requirements. Payload fragility, payload weight, or urgency class cannot influence route selection at any stage.
 
 ### Common Gap Across All Three Papers
 
@@ -108,7 +108,7 @@ Implements a structured payload metadata interpreter that reads four operator-as
 
 **Four Payload Tags:**
 1. Fragility class (1–5): How fragile the payload is
-2. Temperature sensitivity (1–3): How sensitive the payload is to heat/cold exposure
+2. Payload weight class (1–3): How heavy the payload is
 3. Delivery time-window / urgency (1–3): How time-critical the delivery is
 4. Priority level (1–5): Mission priority for tie-breaking
 
@@ -131,7 +131,7 @@ The solution introduces a **formula-driven mapping from payload metadata to rout
 | Payload Metadata Tag | Maps To (Tier 1 Objective) | Reasoning |
 |---|---|---|
 | Fragility class (F, 1–5) | `w_risk` | Fragile items need low-vibration, low-turbulence corridors → minimize flight risk |
-| Temperature sensitivity (T, 1–3) | `w_energy` | Temp-sensitive items need shortest exposure time → minimize battery drain / flight duration |
+| Payload weight class (W, 1–3) | `w_energy` | Heavier payload directly increases hover/lift power draw → minimize energy consumption |
 | Delivery urgency (U, 1–3) | `w_distance` | Time-critical deliveries need the shortest path → minimize route distance |
 | Priority level (P, 1–5) | Tie-breaker amplifier | Scales the dominant weight when scores are close |
 
@@ -140,7 +140,7 @@ The solution introduces a **formula-driven mapping from payload metadata to rout
 ```
 r_raw = F × 2        (fragility heavily penalizes risk)
 d_raw = U × 3        (urgency heavily penalizes distance)
-e_raw = T × 2        (temperature sensitivity penalizes energy)
+e_raw = W × 2        (payload weight penalizes energy)
 
 w_risk     = r_raw / (r_raw + d_raw + e_raw)
 w_distance = d_raw / (r_raw + d_raw + e_raw)
@@ -170,11 +170,11 @@ Where:
 
 The utility scoring approach selects **different, non-extreme points** for most real payloads:
 
-| Payload Preset | F | T | U | w_risk | w_dist | w_energy | Expected Selected Point |
+| Payload Preset | F | W | U | w_risk | w_dist | w_energy | Expected Selected Point |
 |---|---|---|---|---|---|---|---|
 | Fragile medical sample | 5 | 1 | 1 | 0.667 | 0.200 | 0.133 | Long, low-risk — but NOT the extreme lowest-risk point |
-| Emergency medicine | 1 | 1 | 3 | 0.154 | 0.692 | 0.154 | Shortest distance (extreme — correct for this case) |
-| Disaster relief supplies | 1 | 2 | 1 | 0.222 | 0.333 | 0.444 | Middle — energy-optimal non-extreme point |
+| Emergency medicine | 1 | 1 | 3 | 0.144 | 0.712 | 0.144 | Shortest distance (extreme — correct for this case) |
+| Disaster relief supplies | 1 | 3 | 1 | 0.182 | 0.273 | 0.545 | Near-lowest energy, non-extreme, distinct from emergency medicine |
 | Mixed cargo | 3 | 2 | 2 | 0.375 | 0.375 | 0.250 | Middle — balanced trade-off, non-extreme |
 
 Only emergency medicine selects an extreme — and that is the **correct** answer for that payload. All other mixed-priority payload types select intermediate non-extreme points that neither single-objective A* nor MOPSO can find.
@@ -238,7 +238,7 @@ Each stochastic scenario (MOPSO) runs **30 times** for mean ± std dev.
 
 1. **Tier 1 — Deterministic Pareto Front Construction:** Implement a multi-objective A*/Dijkstra graph-search that pre-computes and stores a well-distributed Pareto-optimal set of routes across route distance, energy consumption, and flight risk for a defined delivery region. The front is refreshed on a periodic cadence and reused across successive missions within that window, without re-running the planner per mission.
 
-2. **Tier 2 — Payload-Driven Pareto Selection:** Implement a structured payload metadata interpreter that reads four operator-assigned tags (fragility class, temperature sensitivity, delivery time-window, priority level) and maps them to a single Pareto-front point autonomously — no weight re-tuning at any stage.
+2. **Tier 2 — Payload-Driven Pareto Selection:** Implement a structured payload metadata interpreter that reads four operator-assigned tags (fragility class, payload weight class, delivery time-window, priority level) and maps them to a single Pareto-front point autonomously — no weight re-tuning at any stage.
 
 3. **Ground-Station Dashboard:** Build an operator interface where a payload tag is entered once and a ready-to-fly mission file (compatible with ArduPilot Mission Planner) is generated without further manual input.
 
@@ -248,7 +248,7 @@ Each stochastic scenario (MOPSO) runs **30 times** for mean ± std dev.
 
 1. Formulate multi-objective UAV route planning as a structured **Pareto front pre-computation** problem over a delivery airspace graph, theoretically distinguishing the deterministic graph-search approach from stochastic population-based alternatives.
 
-2. Design a **payload metadata schema** and a principled rule-based mapping that translates mission context (fragility, urgency, thermal constraints) into Pareto point selection without any expert weight tuning.
+2. Design a **payload metadata schema** and a principled rule-based mapping that translates mission context (fragility, urgency, payload weight) into Pareto point selection without any expert weight tuning.
 
 3. **Benchmark Tier 1** route quality and Pareto front coverage against single-objective A* and MOPSO baselines on identical delivery scenarios, measuring hypervolume and Pareto spread.
 
@@ -319,10 +319,10 @@ All algorithm validation and baseline benchmarking is completed through **ArduPi
 **Comment 1 — "No correlation"**
 Resolved by introducing the explicit algebraic mapping:
 - Fragility class (Tier 2 tag) → scales `w_risk` (Tier 1 objective)
-- Temperature sensitivity (Tier 2 tag) → scales `w_energy` (Tier 1 objective)
+- Payload weight class (Tier 2 tag) → scales `w_energy` (Tier 1 objective)
 - Delivery urgency (Tier 2 tag) → scales `w_distance` (Tier 1 objective)
 
-The formula `w_risk = (F×2) / (F×2 + U×3 + T×2)` and equivalents create an explicit, deterministic connection between every Tier 2 input and every Tier 1 objective.
+The formula `w_risk = (F×2) / (F×2 + U×3 + W×2)` and equivalents create an explicit, deterministic connection between every Tier 2 input and every Tier 1 objective.
 
 **Comment 2 — "Criteria are not considered to map together"**
 Resolved by the same algebraic mapping. The mapping is not a lookup table or rule — it is a continuous formula where all four metadata tags simultaneously influence all three objective weights. Each weight is a function of all three raw scores, so a change in any single tag affects all three weights proportionally.
@@ -360,7 +360,7 @@ The principal contribution is a formula-driven mapping from payload metadata to 
 |---|---|
 | Deterministic A*/Dijkstra for Tier 1 (not NSGA-II or MOPSO) | Produces reproducible, deterministic Pareto front; pre-computable once; no stochastic variance between runs |
 | Utility scoring over full Pareto front (not rule-based extreme selection) | Enables non-extreme point selection for mixed-priority payloads; addresses panel critique |
-| Four-tag payload schema (fragility, temperature, urgency, priority) | Maps directly to three routing objectives; priority used as tie-breaker; sufficient to cover all three mission types |
+| Four-tag payload schema (fragility, payload weight, urgency, priority) | Maps directly to three routing objectives; priority used as tie-breaker; sufficient to cover all three mission types |
 | OpenStreetMap for airspace graph | Reproducible, publicly available; allows real-geography testing while keeping benchmarks controlled |
 | ArduPilot SITL before real flight | Validates algorithm before hardware risk; simulation serves as primary evaluation, real tests as confirmation |
 | No GPU or cloud dependency | Tier 1 runs on standard laptop; Tier 2 is near-instantaneous; field-deployable with minimal hardware |
@@ -369,7 +369,7 @@ The principal contribution is a formula-driven mapping from payload metadata to 
 
 ## Novelty Statement (Final)
 
-The principal contribution is a formula-driven mapping from payload metadata to routing objective weights, where fragility class scales w_risk, delivery urgency scales w_distance, and temperature sensitivity scales w_energy. This connection between mission context and Pareto point selection replaces context-blind diversity criteria with a direct algebraic link from payload description to route choice, with the Pareto front refreshed on a periodic cadence and reused across all mission types within that window, without re-running the planner per mission.
+The principal contribution is a formula-driven mapping from payload metadata to routing objective weights, where fragility class scales w_risk, delivery urgency scales w_distance, and payload weight class scales w_energy. This connection between mission context and Pareto point selection replaces context-blind diversity criteria with a direct algebraic link from payload description to route choice, with the Pareto front refreshed on a periodic cadence and reused across all mission types within that window, without re-running the planner per mission.
 
 ---
 

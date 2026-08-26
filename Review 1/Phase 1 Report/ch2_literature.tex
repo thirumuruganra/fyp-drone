@@ -40,7 +40,7 @@ select routes that span a wider range of objective combinations than random or
 distance-ranked selection.
 
 \textbf{Limitation.} The entropy criterion selects solutions based on front diversity
-alone. Payload metadata---fragility class, delivery urgency, thermal sensitivity---is
+alone. Payload metadata---fragility class, delivery urgency, payload weight class---is
 never incorporated into the selection process. An operator carrying fragile biological
 samples and an operator carrying emergency insulin would receive the same selected route
 from the same Pareto front, because the entropy of the front is independent of what is
@@ -78,8 +78,8 @@ UAV routing problems and compares favourably against NSGA-II and $\epsilon$-cons
 methods on grid-world airspace environments.
 
 \textbf{Limitation.} Crowding distance is a purely geometric measure of front density.
-It cannot encode mission-specific requirements. Payload fragility, temperature
-sensitivity, or urgency class cannot influence route selection at any stage. Like entropy
+It cannot encode mission-specific requirements. Payload fragility, payload weight
+class, or urgency class cannot influence route selection at any stage. Like entropy
 and geometric-spread methods, crowding distance maximises front diversity without any
 awareness of what is actually being delivered.
 
@@ -121,7 +121,7 @@ Ntakolia et al.\ (2023) \cite{ntakolia2023} &
 J.\ Intell.\ Robot.\ Syst. &
 Crowding-distance Pareto selection in multi-objective UAV planner &
 Crowding distance (NSGA-II style) &
-Crowding distance cannot encode urgency, fragility, or thermal sensitivity;
+Crowding distance cannot encode urgency, fragility, or payload weight;
 mission context is absent from selection \\
 \bottomrule
 \end{tabular}

@@ -118,7 +118,7 @@
               parcel travel the \emph{same} route.
         \item Payload-specific risk, energy, and safety constraints are
               completely ignored by current approaches.
-        \item Payload metadata (urgency, fragility, thermal sensitivity)
+        \item Payload metadata (urgency, fragility, payload weight)
               encodes routing priorities, but no system exploits this
               information at query time.
       \end{itemize}
@@ -136,7 +136,7 @@
   \begin{alertblock}{Problem}
     Existing UAV routing systems apply \textbf{static, cargo-agnostic
     objective weights}, resulting in \textbf{suboptimal or unsafe routes}
-    for payloads with differing fragility, urgency, and thermal sensitivity.
+    for payloads with differing fragility, urgency, and payload weight.
   \end{alertblock}
   \vspace{0.35cm}
   \begin{itemize}
@@ -159,7 +159,7 @@
           constructs a Pareto-efficient route set over a weighted airspace
           graph, balancing risk, distance, and energy objectives.
     \item To design an \textbf{algebraic bridge} that translates payload
-          metadata tags (urgency~$U$, fragility~$F$, thermal~$T$) into
+          metadata tags (urgency~$U$, fragility~$F$, weight~$W$) into
           normalised routing objective weights in real time.
     \item To implement a \textbf{Tier~2 payload-driven selector} that scores
           each Pareto route using derived weights and returns the
@@ -247,7 +247,7 @@
           \item No unified end-to-end pipeline for payload-aware UAV
                 routing exists
           \item All cargo types receive identical routing weights
-          \item No work maps fragility / urgency / thermal sensitivity
+          \item No work maps fragility / urgency / payload weight
                 to Pareto utility scores
           \item Most approaches are simulation-only; none validate on real
                 drone hardware
@@ -601,7 +601,7 @@
     proposing a two-tier payload-aware pipeline.  Tier~1 builds a
     Pareto-efficient route set via multi-objective A*; Tier~2 selects the
     optimal route using an algebraic bridge that maps fragility, urgency, and
-    thermal sensitivity into routing objective weights.  System design is
+    payload weight into routing objective weights.  System design is
     complete and Tier~1 implementation is underway.
   \end{block}
   \begin{block}{Future Work}

@@ -9,9 +9,9 @@ title Tier 2 — Payload-Driven Pareto Route Selection
 
 start
 
-:Operator enters 4 payload tags on dashboard:\n  • Fragility class    F ∈ {1..5}\n  • Temperature sensitivity T ∈ {1..3}\n  • Delivery urgency    U ∈ {1..3}\n  • Priority level      P_lvl ∈ {1..5};
+:Operator enters 4 payload tags on dashboard:\n  • Fragility class    F ∈ {1..5}\n  • Payload weight class W ∈ {1..3}\n  • Delivery urgency    U ∈ {1..3}\n  • Priority level      P_lvl ∈ {1..5};
 
-:Compute raw objective scores:\n  r_raw = F × 2    (fragility → risk weight)\n  d_raw = U × 3    (urgency  → distance weight)\n  e_raw = T × 2    (temp     → energy weight)\n  total = r_raw + d_raw + e_raw;
+:Compute raw objective scores:\n  r_raw = F × 2    (fragility → risk weight)\n  d_raw = U × 3    (urgency  → distance weight)\n  e_raw = W × 2    (weight   → energy weight)\n  total = r_raw + d_raw + e_raw;
 
 :Normalise to routing objective weights:\n  w_risk   = r_raw / total\n  w_dist   = d_raw / total\n  w_energy = e_raw / total;
 

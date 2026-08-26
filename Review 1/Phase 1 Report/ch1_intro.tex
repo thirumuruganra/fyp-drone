@@ -57,8 +57,8 @@ routing---an expert must manually re-tune the planner weights and re-run the sea
 scratch. This intervention is \textbf{infeasible in field conditions}.
 
 The proposed system resolves this by separating Pareto front generation from
-mission-context-driven route selection. Payload metadata (fragility class, temperature
-sensitivity, delivery urgency) has never been used as the sole input to autonomous Pareto
+mission-context-driven route selection. Payload metadata (fragility class, payload
+weight class, delivery urgency) has never been used as the sole input to autonomous Pareto
 point selection in the UAV delivery literature, leaving a structural gap this project
 directly addresses.
 
@@ -100,8 +100,8 @@ The following objectives guide this project:
         population-based alternatives.
 
   \item Design a \textbf{payload metadata schema} and a principled rule-based mapping
-        that translates mission context (fragility class, delivery urgency, temperature
-        sensitivity) into Pareto point selection objective weights without any expert
+        that translates mission context (fragility class, delivery urgency, payload
+        weight class) into Pareto point selection objective weights without any expert
         weight tuning.
 
   \item \textbf{Benchmark Tier~1} route quality and Pareto front coverage against

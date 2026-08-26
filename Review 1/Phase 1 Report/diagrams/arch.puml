@@ -11,7 +11,7 @@ title Payload-Aware Two-Tier UAV Route Planning — System Architecture
 
 package "INPUTS" #EEEEEE {
   [Airspace Graph\n(OpenStreetMap / osmnx)] as AG
-  [Payload Metadata Tags\nFragility · Temperature\nUrgency · Priority] as PMT
+  [Payload Metadata Tags\nFragility · Payload Weight\nUrgency · Priority] as PMT
 }
 
 package "TIER 1: Pareto Front Construction\n(Refreshed on a periodic cadence per delivery region)" #DDEEFF {
@@ -23,7 +23,7 @@ package "TIER 1: Pareto Front Construction\n(Refreshed on a periodic cadence per
 
 package "TIER 2: Payload-Driven Selection\n(Runs per mission — near-instantaneous)" #DDFFDD {
   [Payload Metadata Interpreter] as PMI
-  [Weight Derivation Formula\nw_risk = F×2/Σ  w_dist = U×3/Σ\nw_energy = T×2/Σ] as WDF
+  [Weight Derivation Formula\nw_risk = F×2/Σ  w_dist = U×3/Σ\nw_energy = W×2/Σ] as WDF
   [Utility Scoring\nscore(p_i) = Σ w_k · (1 − obj̃_k)\nfor all Pareto points] as US
   [argmax Route Selection] as RS
 }
