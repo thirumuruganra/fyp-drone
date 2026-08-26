@@ -71,7 +71,7 @@ computed once and reused across all mission types without re-running the planner
 \end{reviewabstract}
 
 % ============================================================
-\chapter{Introduction}
+\chapter{Introduction}\label{cha:intro}
 
 Unmanned aerial vehicles (UAVs) are a useful platform for last-mile delivery in
 scenarios where ground transport is impractical: medical supply chains to remote
@@ -82,7 +82,14 @@ obstacles, regulated no-fly zones, and variable wind corridors. A good route bal
 three conflicting physical objectives simultaneously: minimising total flight distance,
 minimising battery energy expenditure, and avoiding high-risk segments.
 
-The standard engineering response to such a conflict is to form a weighted sum of the
+This three-way conflict is exactly what multi-objective UAV path planning is built to
+handle. Rather than collapsing distance, energy, and risk into one score before the
+search runs, a multi-objective planner keeps all three objectives separate through the
+search and returns a Pareto-optimal front: a set of routes where none can be improved on
+one objective without giving up ground on another \cite{r9}. The front tells the
+operator what trade-offs are available; it does not, by itself, say which route to fly.
+
+One common way to sidestep the trade-off question is to form a weighted sum of the
 three objectives into a single scalar cost function and then run a conventional path
 planner such as A* on it. This scalar collapses the multi-objective problem into a
 single-objective one, and the operator adjusts the three weights to express the
@@ -94,13 +101,10 @@ operationally impractical in time-critical field conditions.
 
 \section{Background}
 
-Multi-objective UAV path planning has drawn sustained research attention because no
-single route can minimise distance, energy, and flight risk at once: these objectives
-conflict by construction. The usual approach is to build a Pareto-optimal front of
-non-dominated routes, each a different trade-off across the objective space, and then
-pick one route from that front as the mission route.
-
-The question that decides whether any such system is useful in practice is how the
+Building the Pareto front, as introduced in Chapter~\ref{cha:intro}, is well studied:
+the field has produced graph-search and population-based methods that generate
+well-spread, non-dominated route sets efficiently. The question that decides whether
+any such system is useful in practice is how the
 final route gets picked from the front. Chapter~\ref{cha:relatedwork} reviews three
 directly relevant papers and finds the same answer in each: delivery context plays no
 role. None of them let what the UAV is carrying influence route choice, or even ask
