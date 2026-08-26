@@ -77,16 +77,16 @@ All three papers select Pareto-optimal routes based on **front diversity metrics
 
 The core architectural decision is to **separate Pareto front construction (Tier 1) from route selection (Tier 2)**. This means:
 
-- The Pareto front is computed once for a delivery region and stored.
-- For each new mission, only Tier 2 runs — reading the payload tag and selecting the appropriate route from the pre-computed front.
-- No re-running the planner between missions.
+- The Pareto front is built for a delivery region and refreshed on a periodic cadence (or when environmental drift, e.g. a wind-condition shift, exceeds a threshold) — not rebuilt per mission.
+- For each new mission arriving within a refresh window, only Tier 2 runs — reading the payload tag and selecting the appropriate route from the current front.
+- No re-running the planner between missions within a refresh window.
 
 ---
 
 ## Tier 1 — Deterministic Pareto Front Construction
 
 **What it does:**
-Implements a multi-objective A*/Dijkstra graph-search that pre-computes and stores a well-distributed Pareto-optimal set of routes across three objectives for a defined delivery region. The front is reused across successive missions without re-running the planner.
+Implements a multi-objective A*/Dijkstra graph-search that pre-computes and stores a well-distributed Pareto-optimal set of routes across three objectives for a defined delivery region. The front is refreshed on a periodic cadence and reused across successive missions within that window, without re-running the planner per mission.
 
 **Three Objectives:**
 - Route distance (km)
@@ -236,7 +236,7 @@ Each stochastic scenario (MOPSO) runs **30 times** for mean ± std dev.
 
 ### Project (Implementation) Objectives
 
-1. **Tier 1 — Deterministic Pareto Front Construction:** Implement a multi-objective A*/Dijkstra graph-search that pre-computes and stores a well-distributed Pareto-optimal set of routes across route distance, energy consumption, and flight risk for a defined delivery region. The front is reused across successive missions without re-running the planner.
+1. **Tier 1 — Deterministic Pareto Front Construction:** Implement a multi-objective A*/Dijkstra graph-search that pre-computes and stores a well-distributed Pareto-optimal set of routes across route distance, energy consumption, and flight risk for a defined delivery region. The front is refreshed on a periodic cadence and reused across successive missions within that window, without re-running the planner per mission.
 
 2. **Tier 2 — Payload-Driven Pareto Selection:** Implement a structured payload metadata interpreter that reads four operator-assigned tags (fragility class, temperature sensitivity, delivery time-window, priority level) and maps them to a single Pareto-front point autonomously — no weight re-tuning at any stage.
 
@@ -254,7 +254,7 @@ Each stochastic scenario (MOPSO) runs **30 times** for mean ± std dev.
 
 4. **Quantify Tier 2 selection accuracy** by measuring alignment between selected route characteristics and payload tag requirements across diverse mission types (medical sample, emergency medicine, disaster relief supplies).
 
-5. **Novelty:** The system uses payload metadata as the sole input to Pareto point selection, replacing entropy and diversity-based criteria that are blind to delivery context, with a deterministic graph-search Pareto front pre-computed once and reused across all missions.
+5. **Novelty:** The system uses payload metadata as the sole input to Pareto point selection, replacing entropy and diversity-based criteria that are blind to delivery context, with a deterministic graph-search Pareto front refreshed on a periodic cadence and reused across all missions within that window.
 
 ---
 
@@ -369,7 +369,7 @@ The principal contribution is a formula-driven mapping from payload metadata to 
 
 ## Novelty Statement (Final)
 
-The principal contribution is a formula-driven mapping from payload metadata to routing objective weights, where fragility class scales w_risk, delivery urgency scales w_distance, and temperature sensitivity scales w_energy. This connection between mission context and Pareto point selection replaces context-blind diversity criteria with a direct algebraic link from payload description to route choice, with the Pareto front computed once and reused across all mission types without re-running the planner.
+The principal contribution is a formula-driven mapping from payload metadata to routing objective weights, where fragility class scales w_risk, delivery urgency scales w_distance, and temperature sensitivity scales w_energy. This connection between mission context and Pareto point selection replaces context-blind diversity criteria with a direct algebraic link from payload description to route choice, with the Pareto front refreshed on a periodic cadence and reused across all mission types within that window, without re-running the planner per mission.
 
 ---
 

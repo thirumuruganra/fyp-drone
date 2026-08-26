@@ -2,7 +2,6 @@
 !theme plain
 skinparam componentStyle rectangle
 skinparam defaultFontSize 13
-skinparam padding 4
 skinparam ArrowThickness 1.5
 skinparam ArrowColor #555555
 skinparam componentBorderColor #444444
@@ -15,11 +14,11 @@ package "INPUTS" #EEEEEE {
   [Payload Metadata Tags\nFragility · Temperature\nUrgency · Priority] as PMT
 }
 
-package "TIER 1: Pareto Front Construction\n(Run ONCE per delivery region)" #DDEEFF {
+package "TIER 1: Pareto Front Construction\n(Refreshed on a periodic cadence per delivery region)" #DDEEFF {
   [Edge Cost Assignment\n(distance, energy, risk)] as OCA
   [Multi-Objective A* / Dijkstra\nVector-Cost Graph Search] as MOA
   [Pareto Dominance Pruning] as PDF
-  database "Pareto Front Storage\n(persisted, reused across missions)" as PFS
+  database "Pareto Front Storage\n(persisted, reused across missions\nwithin a refresh window)" as PFS
 }
 
 package "TIER 2: Payload-Driven Selection\n(Runs per mission — near-instantaneous)" #DDFFDD {
@@ -51,9 +50,11 @@ MF --> ML
 ML --> GSD : "Upload confirmed"
 
 note right of PFS
-  Computed ONCE.
-  Reused for all future
-  missions in this region.
+  Refreshed on a periodic cadence,
+  or on environmental drift
+  (e.g. wind-condition shift).
+  Reused across missions
+  within that refresh window.
 end note
 
 note right of US
