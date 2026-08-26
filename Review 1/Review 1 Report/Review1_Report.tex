@@ -5,6 +5,8 @@
 \usepackage{amsfonts}
 \usepackage[numbers]{natbib}
 \usepackage{xltabular}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \bibliographystyle{unsrtnat}
 \graphicspath{{../Phase 1 Report/diagrams/}}
 \newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{#1}}
@@ -481,9 +483,53 @@ weighted graph $G$ stored as a serialised NetworkX object ready for Tier~1 searc
 Implements the multi-objective A* algorithm maintaining a cost vector $\mathbf{g}$ (not
 a scalar) for each partial path. Paths dominated by already-discovered routes are pruned
 early. The \texttt{UpdateParetoFront} subroutine adds a new route and removes any
-previously stored routes it dominates. Output: a deterministic, reproducible Pareto
-front $\mathcal{P}$ serialised to disk for Tier~2 re-use across all future missions in
-the same delivery region.
+previously stored routes it dominates. A node-level label-dominance check (NAMOA*)
+additionally discards any partial path whose cost vector is already dominated by a
+previously seen label at the same node, before it enters the open set, which avoids the
+exponential blow-up of naive MO-A* on dense graphs. Output: a deterministic, reproducible
+Pareto front $\mathcal{P}$ serialised to disk for Tier~2 re-use across all future
+missions in the same delivery region.
+
+\begin{algorithm}[H]
+\caption{NAMOA* -- Multi-Objective A*/Dijkstra Pareto Front Construction (Tier~1)}\label{alg:tier1}
+\begin{algorithmic}[1]
+\Require Airspace graph $G=(V,E)$, source $s$, target $t$, edge cost $c(u,v)=[d,\varepsilon,\rho]$
+\Ensure Pareto-optimal route set $\mathcal{P}$
+\State $\mathcal{P} \gets \emptyset$; \quad $\mathit{labels}[v] \gets \emptyset$ for all $v \in V$
+\State $g_0 \gets [0,0,0]$; \quad push $(f(g_0,s), g_0, s, \{s\})$ onto priority queue $\mathit{Open}$
+\State $\mathit{labels}[s] \gets \{g_0\}$
+\While{$\mathit{Open} \neq \emptyset$}
+    \State $(f, g, u, \mathit{visited}) \gets$ \Call{PopMin}{$\mathit{Open}$}
+    \If{$\exists\, g' \in \mathcal{P}$ such that $g' \prec g$} \Comment{dominated by global front}
+        \State \textbf{continue}
+    \EndIf
+    \If{$u = t$}
+        \State \Call{UpdateParetoFront}{$\mathcal{P}, g, \mathrm{path}(u)$}
+        \State \textbf{continue}
+    \EndIf
+    \For{each successor $v$ of $u$ with $v \notin \mathit{visited}$}
+        \State $g_{\mathrm{new}} \gets g + c(u,v)$
+        \If{$\exists\, \ell \in \mathit{labels}[v]$ such that $\ell \prec g_{\mathrm{new}}$}
+            \State \textbf{continue} \Comment{node-level label dominance -- NAMOA* pruning}
+        \EndIf
+        \State $\mathit{labels}[v] \gets \{\ell \in \mathit{labels}[v] : g_{\mathrm{new}} \not\prec \ell\} \cup \{g_{\mathrm{new}}\}$
+        \If{$\exists\, g' \in \mathcal{P}$ such that $g' \prec g_{\mathrm{new}}$}
+            \State \textbf{continue}
+        \EndIf
+        \State $f_{\mathrm{new}} \gets \lVert g_{\mathrm{new}} \rVert + h(v,t)$
+        \State push $(f_{\mathrm{new}}, g_{\mathrm{new}}, v, \mathit{visited} \cup \{v\})$ onto $\mathit{Open}$
+    \EndFor
+\EndWhile
+\State \Return $\mathcal{P}$
+\Statex
+\Procedure{UpdateParetoFront}{$\mathcal{P}, g_{\mathrm{new}}, \mathrm{path}_{\mathrm{new}}$}
+    \If{$\exists\, g' \in \mathcal{P}$ such that $g' \prec g_{\mathrm{new}}$} \Return \textbf{false} \EndIf
+    \State $\mathcal{P} \gets \{(g,p) \in \mathcal{P} : g_{\mathrm{new}} \not\prec g\}$
+    \State $\mathcal{P} \gets \mathcal{P} \cup \{(g_{\mathrm{new}}, \mathrm{path}_{\mathrm{new}})\}$
+    \State \Return \textbf{true}
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Module 3: Payload Metadata Interpreter (Tier~2)}
 Implements the payload-driven route selection algorithm: reads the four payload tags,
@@ -492,6 +538,31 @@ min-max normalisation to Pareto objectives, computes a utility score for every P
 point via Equation~(\ref{eq:score}), and returns the $\arg\max$ route. Optionally
 amplifies the dominant weight for high-priority missions ($P_\mathrm{lvl} \geq 4$).
 Generates an ArduPilot-compatible \texttt{.waypoints} mission file for upload.
+
+\begin{algorithm}[H]
+\caption{Payload-Driven Pareto Route Selection (Tier~2)}\label{alg:tier2}
+\begin{algorithmic}[1]
+\Require Pareto front $\mathcal{P} = \{(d_i,\varepsilon_i,\rho_i)\}$, payload tags $F, T, U, P_\mathrm{lvl}$
+\Ensure Selected mission route $p^*$
+\State $r_\mathrm{raw} \gets F \times 2$; \quad $d_\mathrm{raw} \gets U \times 3$; \quad $e_\mathrm{raw} \gets T \times 2$
+\State $\mathit{total} \gets r_\mathrm{raw} + d_\mathrm{raw} + e_\mathrm{raw}$
+\State $w_\mathrm{risk} \gets r_\mathrm{raw}/\mathit{total}$; \quad $w_\mathrm{dist} \gets d_\mathrm{raw}/\mathit{total}$; \quad $w_\mathrm{energy} \gets e_\mathrm{raw}/\mathit{total}$
+\If{$P_\mathrm{lvl} \geq 4$} \Comment{high-priority amplification}
+    \State $w_\mathrm{max} \gets \max(w_\mathrm{risk}, w_\mathrm{dist}, w_\mathrm{energy})$
+    \State add $0.1 \times w_\mathrm{max}$ to whichever of $w_\mathrm{risk}, w_\mathrm{dist}, w_\mathrm{energy}$ equals $w_\mathrm{max}$
+    \State renormalise $w_\mathrm{risk}, w_\mathrm{dist}, w_\mathrm{energy}$ so they sum to 1
+\EndIf
+\State compute $d_{\min}, d_{\max}, \varepsilon_{\min}, \varepsilon_{\max}, \rho_{\min}, \rho_{\max}$ over $\mathcal{P}$
+\For{each $p_i = (d_i, \varepsilon_i, \rho_i) \in \mathcal{P}$}
+    \State $\tilde{d}_i \gets (d_i - d_{\min})/(d_{\max} - d_{\min})$ \Comment{0 if $d_{\max} = d_{\min}$}
+    \State $\tilde{\varepsilon}_i \gets (\varepsilon_i - \varepsilon_{\min})/(\varepsilon_{\max} - \varepsilon_{\min})$
+    \State $\tilde{\rho}_i \gets (\rho_i - \rho_{\min})/(\rho_{\max} - \rho_{\min})$
+    \State $\mathrm{score}(p_i) \gets w_\mathrm{dist}(1-\tilde{d}_i) + w_\mathrm{energy}(1-\tilde{\varepsilon}_i) + w_\mathrm{risk}(1-\tilde{\rho}_i)$
+\EndFor
+\State $p^* \gets \arg\max_{p_i \in \mathcal{P}} \mathrm{score}(p_i)$
+\State \Return $p^*$
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Module 4: Testing and Evaluation}
 Evaluates all methods on three scenario scales: S1 (${\approx}50$ nodes, low obstacle
