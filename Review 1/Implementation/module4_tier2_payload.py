@@ -68,7 +68,7 @@ PAYLOAD_PRESETS = {
                             "label": "Fragile\nMedical"},
     "emergency_medicine":  {"F": 1, "W": 1, "U": 3, "P": 5,
                             "label": "Emergency\nMedicine"},
-    "disaster_relief":     {"F": 1, "W": 2, "U": 1, "P": 2,
+    "disaster_relief":     {"F": 1, "W": 3, "U": 1, "P": 2,
                             "label": "Disaster\nRelief"},
     "mixed_cargo":         {"F": 3, "W": 2, "U": 2, "P": 3,
                             "label": "Mixed\nCargo"},
