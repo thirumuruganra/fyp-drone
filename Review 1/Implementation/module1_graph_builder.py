@@ -59,7 +59,7 @@ class AirspaceGraphBuilder:
     Parameters
     ----------
     location : str
-        Address string passed to osmnx (e.g. "Kalavakkam, Tamil Nadu, India").
+        Address string passed to osmnx (e.g. "Thiruvanmiyur, Tamil Nadu, India").
     dist : int
         Radius in metres around `location` to fetch from OSM.
     seed : int
@@ -319,7 +319,7 @@ if __name__ == "__main__":
     os.makedirs("pareto_front_storage", exist_ok=True)
 
     builder = AirspaceGraphBuilder(
-        location="Kalavakkam, Tamil Nadu, India",
+        location="Thiruvanmiyur, Tamil Nadu, India",
         dist=2000,
         seed=42
     )
