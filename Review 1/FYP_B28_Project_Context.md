@@ -1,4 +1,4 @@
-# FYP B27 — Project Context Document
+# FYP B28 — Project Context Document
 
 **Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery**
 
@@ -17,7 +17,7 @@ Department of Computer Science and Engineering
 
 **Guide:** Sujaudeen N, Assistant Professor, Department of Computer Science and Engineering
 
-**Current Status:** Problem statement approved. Review 0 presentation (FYP_B27.pdf) submitted and evaluated.
+**Current Status:** Review 1 complete. Review 0 presentation (FYP_B27.pdf) submitted and evaluated; Phase 1 Report, Review 1 Report, and Review 1 PPT drafted; Python simulation (Tier 1 + Tier 2, synthetic + OSM demos) implemented and running under `Review 1/Implementation/`.
 
 ---
 
@@ -95,7 +95,7 @@ Implements a multi-objective A*/Dijkstra graph-search that pre-computes and stor
 
 **Algorithm:** Multi-objective A*/Dijkstra graph-search over an airspace graph
 
-**Graph Source:** OpenStreetMap (OSM) via `osmnx` Python library
+**Graph Source:** OpenStreetMap (OSM) via `osmnx` Python library. The OSM demo (`run_demo_osm.py`) uses Thiruvanmiyur, Chennai as the reference delivery region — the real deployment target, yielding a ~79-route Pareto front.
 
 **Output:** A stored set of Pareto-optimal routes where no single route dominates another on all three objectives simultaneously.
 
@@ -133,7 +133,7 @@ The solution introduces a **formula-driven mapping from payload metadata to rout
 | Fragility class (F, 1–5) | `w_risk` | Fragile items need low-vibration, low-turbulence corridors → minimize flight risk |
 | Payload weight class (W, 1–3) | `w_energy` | Heavier payload directly increases hover/lift power draw → minimize energy consumption |
 | Delivery urgency (U, 1–3) | `w_distance` | Time-critical deliveries need the shortest path → minimize route distance |
-| Priority level (P, 1–5) | Tie-breaker amplifier | Scales the dominant weight when scores are close |
+| Priority level (P, 1–5) | Dominant-weight amplifier | If `P ≥ 4`, the largest of the three weights is amplified by `0.1 × w_max`, then all three weights are renormalised to sum to 1.0 — biasing high-priority missions further toward their dominant objective |
 
 #### Step 2 — Weight Derivation Formula (No Expert Tuning)
 
@@ -148,6 +148,8 @@ w_energy   = e_raw / (r_raw + d_raw + e_raw)
 ```
 
 Weights are derived **algorithmically from metadata** — no human expert tunes them.
+
+**High-priority amplification (`P ≥ 4`):** after the three weights are derived, the dominant weight `w_max = max(w_risk, w_distance, w_energy)` is increased by `0.1 × w_max` and all three weights are renormalised to sum to 1.0 before scoring. A flat additive bonus to every point's score was tried first and rejected — it shifts all scores equally and never moves the argmax. `P < 4` leaves the weights untouched.
 
 #### Step 3 — Utility Scoring Every Pareto Point
 
@@ -373,4 +375,6 @@ The principal contribution is a formula-driven mapping from payload metadata to 
 
 ---
 
-*Document compiled from Review 0 presentation (FYP_B27.pdf), submitted abstract (BID_28.docx), and panel review session. Last updated: August 2026.*
+*Document compiled from Review 0 presentation (FYP_B27.pdf), submitted abstract (BID_28.docx), panel review session, and Review 1 deliverables (Phase 1 Report, Review 1 Report/PPT, Python simulation). Last updated: 2026-08-28.*
+
+*Note: "temperature sensitivity" in the frozen abstract above was renamed to "payload weight class" after submission — temperature sensitivity had no provable causal link to energy consumption, whereas heavier payload directly raises hover/lift power draw. All current text uses payload weight class (tag `W`, 1–3).*
