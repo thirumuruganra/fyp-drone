@@ -34,7 +34,7 @@ UAV systems for medical and emergency last-mile delivery must balance objectives
 conflict: shorter routes carry higher flight risk, low-risk corridors drain more
 battery, and energy-efficient paths are rarely the fastest. No single fixed trade-off
 serves all payload types, yet existing planners apply the same objective weights to
-every mission regardless of what is being carried.
+every mission regardless of the payload.
 
 Existing multi-objective planners, including entropy-based, diversity-driven, and
 crowding-distance Pareto selection methods, encode objective weights as a fixed scalar
@@ -133,24 +133,22 @@ from metadata, rather than adapting the model to continuous mass.
 
 \section{Motivation}
 
-The motivation for this work arises from three real operational scenarios that impose
-fundamentally incompatible routing requirements:
+Three real operational scenarios motivate this work, and their routing requirements do
+not agree.
 
-\textbf{Fragile medical samples} (tissue biopsies, blood samples, pathology specimens)
-are highly sensitive to vibration, g-forces, and thermal exposure. The dominant routing
-priority is minimising flight risk, defined here as exposure to turbulent corridors,
-sudden altitude changes, and wind-exposed segments. A route that adds 40\% extra
-distance but halves the risk of vibration damage is operationally preferable.
+Fragile medical samples such as tissue biopsies and blood specimens are sensitive to
+vibration and to temperature. The routing priority is to minimise flight risk, taken
+here as time spent in turbulent corridors, sudden altitude changes, and wind-exposed
+segments. A route that adds 40\% distance but halves the chance of vibration damage is
+the better one.
 
-\textbf{Emergency medicine} (insulin, epinephrine, antivenom) has a strict time window.
-The dominant routing priority is minimising route distance to minimise transit time.
-Flight risk and energy are secondary. For a payload with a 15-minute delivery window,
-the shortest path wins unconditionally.
+Emergency medicine such as insulin or antivenom has a strict time window. The priority
+is the shortest route, so transit time is lowest; flight risk and energy come second.
+For a 15-minute delivery window, the shortest path wins outright.
 
-\textbf{Disaster-relief bulk supplies} (water purification tablets, bandages, ration
-packs) weigh significantly more than medical payloads and are not time-critical or
-fragile. The dominant routing priority is energy efficiency: minimising battery drain to
-maximise the number of deliveries possible on a single charge cycle.
+Disaster-relief bulk supplies such as water purification tablets and ration packs are
+heavier than medical payloads and are neither urgent nor fragile. The priority is the
+lowest battery drain, so a single charge covers as many deliveries as possible.
 
 No existing UAV planner switches between these three routing strategies from a payload
 tag. The proposed two-tier system does this with no expert intervention and no
@@ -160,25 +158,23 @@ selection. That is the gap this project targets.
 
 \section{Objectives}
 \begin{enumerate}[label=\arabic*.]
-  \item To formulate multi-objective UAV route planning as a structured \textbf{Pareto
-  front pre-computation} problem over a delivery airspace graph, and to separate the
+  \item To formulate multi-objective UAV route planning as a Pareto front
+  pre-computation problem over a delivery airspace graph, and to separate the
   deterministic graph-search approach from stochastic population-based alternatives on
   theoretical grounds.
-  \item To design a \textbf{payload metadata schema} and a principled rule-based mapping
-  that translates mission context (fragility class, delivery urgency, payload weight
-  class) into Pareto point selection objective weights without any expert weight
-  tuning.
+  \item To design a payload metadata schema and a rule-based mapping that turns mission
+  context (fragility class, delivery urgency, payload weight class) into Pareto point
+  selection weights with no expert weight tuning.
   \item To benchmark Tier~1 route quality and Pareto front coverage against
-  single-objective A* and MOPSO baselines on identical delivery scenarios, measuring
-  hypervolume, Pareto spread, and Inverted Generational Distance (IGD) as three
-  distinct standard multi-objective quality indicators.
-  \item To quantify \textbf{Tier~2 selection accuracy} by measuring alignment between
-  selected route characteristics and payload tag requirements across diverse mission
-  types (fragile medical sample, emergency medicine, disaster-relief supplies).
-  \item To establish the system's \textbf{novelty}: payload metadata serves as the sole
-  input to Pareto point selection, in place of context-blind entropy and diversity-based
-  criteria, through a deterministic algebraic mapping from payload description to route
-  choice.
+  single-objective A* and MOPSO baselines on identical delivery scenarios, using
+  hypervolume, Pareto spread, and Inverted Generational Distance (IGD) as quality
+  indicators.
+  \item To quantify Tier~2 selection accuracy by measuring how closely the selected
+  route's characteristics match the payload tag requirements across mission types
+  (fragile medical sample, emergency medicine, disaster-relief supplies).
+  \item To establish the system's novelty: payload metadata is the sole input to Pareto
+  point selection, in place of context-blind entropy and diversity criteria, through a
+  deterministic algebraic mapping from payload description to route choice.
 \end{enumerate}
 
 \section{Scope}
@@ -286,22 +282,23 @@ discrete payload metadata, as opposed to continuous mass or point geometry, can 
 \emph{selection} step. Adding payload information to them would mean replacing the
 selection criterion outright, which is what the proposed Tier~2 utility scoring does.
 
-This work addresses three specific gaps. \textbf{Gap~1 (No
-payload-aware Pareto selection):} Existing UAV multi-objective planners either apply a
-fixed geometric selection criterion independent of payload type, or offer no selection
-mechanism at all. The proposed Tier~2 introduces a
-formula-driven mapping from four payload tags directly to Pareto point selection.
-\textbf{Gap~2 (No re-use across mission types):} Existing planners re-run the full
-multi-objective search when the mission context changes. The proposed two-tier separation
-decouples Pareto front construction from mission arrivals: Tier~1 refreshes the front on
-a periodic cadence, independent of payload, and Tier~2 performs instantaneous route
-selection for any new payload tag against the current front, without re-running the
-search for each new mission. \textbf{Gap~3 (No
-algebraic bridge between delivery context and routing objectives):} The mapping between
-a payload description and the routing trade-off it implies (e.g., fragility
-$\rightarrow$ minimise risk, urgency $\rightarrow$ minimise distance) has never been
-formalised algebraically. The proposed weight-derivation formula supplies this bridge;
-the mapping it defines is deterministic and reproducible.
+This work addresses three specific gaps.
+
+\begin{enumerate}[label=\textbf{Gap~\arabic*.}]
+  \item Existing UAV multi-objective planners offer no payload-aware route selection:
+  they apply a fixed geometric criterion independent of payload type, or no selection
+  mechanism at all. Tier~2 maps four payload tags directly to Pareto point selection
+  through a formula.
+  \item Existing planners do not re-use one front across mission types; they re-run the
+  full multi-objective search whenever the mission context changes. The two-tier
+  separation decouples front construction from mission arrivals: Tier~1 refreshes the
+  front on a periodic cadence, independent of payload, and Tier~2 selects a route for
+  any new payload tag against the current front with no re-run.
+  \item No algebraic bridge links a payload description to the routing trade-off it
+  implies (e.g. fragility $\rightarrow$ minimise risk, urgency $\rightarrow$ minimise
+  distance); the mapping has never been formalised. The weight-derivation formula
+  supplies that bridge, and the mapping it defines is deterministic and reproducible.
+\end{enumerate}
 
 % ============================================================
 \flowchapter{Problem Statement}
@@ -330,16 +327,15 @@ re-running the multi-objective search.
 
 The inputs are measurable quantities the operator can assign from domain knowledge (e.g.,
 ``this vial is fragile: $F = 5$; delivery is non-urgent: $U = 1$''). The constraints are
-that selection must be deterministic, reproducible, and complete within one second of
-payload tag entry. The success criterion is that the selected route characteristics
-(distance, energy, risk) align with the payload's stated requirements as verified by a
-Tier~2 selection accuracy metric evaluated across multiple payload presets. Closing
-Gap~1 requires $p^*$ to depend on $(F, W, U, P_\mathrm{lvl})$ rather than on front
-geometry alone; closing Gap~2 requires $\mathcal{P}$ to be reused across missions
-between scheduled refreshes rather than rebuilt for every mission; closing Gap~3
-requires the map from
-$(F, W, U, P_\mathrm{lvl})$ to $p^*$ to be an explicit algebraic formula rather than an
-expert-set rule or lookup table.
+that selection must be deterministic, reproducible, and finish within one second of
+payload tag entry. The success criterion is that the selected route's characteristics
+(distance, energy, risk) match the payload's stated requirements, checked by a Tier~2
+selection accuracy metric evaluated across multiple payload presets. Three conditions
+follow from the gaps. The selected route $p^*$ must depend on $(F, W, U, P_\mathrm{lvl})$,
+not on front geometry alone (Gap~1). The front $\mathcal{P}$ must be reused across
+missions between scheduled refreshes instead of rebuilt each time (Gap~2). The map from
+$(F, W, U, P_\mathrm{lvl})$ to $p^*$ must be an explicit algebraic formula, not an
+expert-set rule or a lookup table (Gap~3).
 
 % ============================================================
 \flowchapter{Justification for the Problem Formulation}\label{cha:justification}
@@ -362,28 +358,26 @@ between tagging the payload and generating the mission file.
 
 \section{Feasibility}
 
-\textbf{Technical feasibility:} The Tier~1 multi-objective A*/Dijkstra algorithm is a
-well-studied graph-search extension. The Tier~2 utility scoring is a closed-form
-algebraic formula executable in microseconds on any hardware. Both components are
-implementable in Python with standard open-source libraries (NetworkX \cite{r5}, NumPy). Hardware
-deployment on a Raspberry Pi~5 companion computer is feasible given the computational
-simplicity of Tier~2 route selection ($< 1\,\mathrm{s}$ end-to-end from payload tag
-input to mission file output).
+The work is feasible on technical grounds. The Tier~1 multi-objective A*/Dijkstra
+algorithm is a well-studied graph-search extension, and the Tier~2 utility scoring is a
+closed-form formula that runs in microseconds on any hardware. Both are implementable in
+Python with standard open-source libraries (NetworkX \cite{r5}, NumPy). A Raspberry Pi~5
+companion computer can host Tier~2 route selection, which runs end-to-end in under a
+second from payload tag input to mission file output.
 
-\textbf{Operational feasibility:} The system requires only four integer tag inputs from
-the operator, eliminating the need for weight-tuning expertise. The ArduPilot
-SITL simulation environment allows full end-to-end validation before outdoor flights,
-which keeps hardware risk low.
+Operationally, the system asks the operator for only four integer tags and needs no
+weight-tuning expertise. The ArduPilot SITL environment allows full end-to-end
+validation before any outdoor flight, so hardware risk stays low.
 
-\textbf{Economic feasibility:} All software components use open-source libraries and
-protocols (osmnx \cite{r4}, NetworkX \cite{r5}, NumPy, matplotlib, MAVLink \cite{r7}). The hardware platform (F450 quadcopter frame,
-Pixhawk flight controller, Raspberry Pi~5) uses standard, commercially available
-components at modest cost. No specialised or proprietary software licences are required.
+The cost is modest. All software uses open-source libraries and protocols (osmnx
+\cite{r4}, NetworkX \cite{r5}, NumPy, matplotlib, MAVLink \cite{r7}), and the hardware
+(F450 frame, Pixhawk flight controller, Raspberry Pi~5) is standard and commercially
+available. No proprietary licences are required.
 
-\textbf{Schedule feasibility:} Phase~I (software simulation and benchmarking) is
-achievable within the first semester aligned to Review~I. Phase~II (hardware integration
-and outdoor testing) is planned for the second semester, with milestones aligned to the
-Review~II and Final Review schedule as shown in Chapter~\ref{cha:timeline}.
+The schedule fits the two semesters. Phase~I (software simulation and benchmarking) fits
+the first semester up to Review~I; Phase~II (hardware integration and outdoor testing)
+runs through the second semester, with milestones set against the Review~II and Final
+Review dates in Chapter~\ref{cha:timeline}.
 
 \section{Expected Contribution}
 
@@ -406,7 +400,7 @@ front is built once per delivery region and refreshed periodically, not per miss
 mission that arrives between refreshes runs only Tier~2, which reads the payload tag and
 returns a route from the current front in a fraction of a second.
 
-\section{Architectural Design for Proposed System}
+\section{System Architecture}
 
 Figure~\ref{fig:architecture} shows the complete two-tier system architecture. Airspace
 graph data from OpenStreetMap enters Tier~1, which performs a multi-objective
@@ -442,8 +436,8 @@ dominates route $q$ if $p$ is at least as good as $q$ on all three objectives an
 strictly better on at least one. The Pareto front $\mathcal{P}$ is the set of all
 non-dominated routes.
 
-\textbf{Tier~2 Algebraic Bridge.} Each of the four payload metadata tags maps to exactly
-one Tier~1 routing objective as shown in Table~\ref{tab:semantic-mapping}.
+The Tier~2 algebraic bridge maps each of the four payload metadata tags to exactly one
+Tier~1 routing objective, as shown in Table~\ref{tab:semantic-mapping}.
 
 \begin{table}[H]
 \centering\caption{Semantic mapping: payload metadata tags to Tier~1 routing objectives}\label{tab:semantic-mapping}\small
