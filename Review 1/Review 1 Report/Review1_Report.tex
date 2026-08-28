@@ -10,13 +10,14 @@
 \bibliographystyle{unsrtnat}
 \graphicspath{{../Phase 1 Report/diagrams/}}
 \newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{#1}}
+\newcommand{\flowchapter}[1]{\par\addvspace{30pt}{\let\clearpage\relax\chapter{#1}}}
 
 \projecttitle{PAYLOAD-AWARE TWO-TIER UAV ROUTE PLANNING FOR LAST-MILE DELIVERY}
 \reviewnumber{REVIEW REPORT -- I}
 \students{%
   Thirumurugan RA \hfill (3122235001149)\\
-  Shrika SP Thota \hfill (3122235001125)\\
-  Meghna Manimaran \hfill (3122235001079)}
+  Meghna Manimaran \hfill (3122235001079)\\
+  Shrika SP Thota \hfill (3122235001125)}
 \supervisor{Sujaudeen N, Assistant Professor}
 \department{Department of Computer Science and Engineering}
 \institution{Sri Sivasubramaniya Nadar College of Engineering}
@@ -43,8 +44,8 @@ chosen. When the payload changes, operators must re-tune weights manually and re
 planner, which is not workable under field conditions.
 
 This work proposes a Payload-Aware Two-Tier UAV Route Planning system that separates
-Pareto front construction from route selection, introducing an explicit algebraic
-bridge between Tier 1 routing objectives and Tier 2 payload metadata.
+Pareto front construction from route selection and adds an explicit algebraic bridge
+between Tier 1 routing objectives and Tier 2 payload metadata.
 
 Tier 1 runs a multi-objective A*/Dijkstra graph-search over a delivery airspace graph
 sourced from OpenStreetMap, producing a Pareto-optimal route set across distance, energy
@@ -64,11 +65,11 @@ non-extreme Pareto points for mixed-priority payloads that neither A* nor MOPSO 
 produce.
 
 The principal contribution is a formula-driven mapping from payload metadata to routing
-objective weights, connecting mission context directly to Pareto point selection without
-expert intervention. This replaces context-blind diversity criteria with a direct
-algebraic link from payload description to route choice, and the Pareto front is
-refreshed on a periodic cadence rather than rebuilt for every mission, and is reused
-across all mission types without re-running the planner between deliveries.
+objective weights that links mission context directly to Pareto point selection without
+expert intervention. The payload description sets the route choice through an explicit
+algebraic step, in place of context-blind diversity criteria. The Pareto front is
+rebuilt on a fixed schedule, not once per mission, and one front serves every mission
+type that arrives before the next rebuild.
 \end{reviewabstract}
 
 % ============================================================
@@ -80,8 +81,8 @@ clinics, emergency drug drops during disaster response, and fragile diagnostic s
 transport where road vibration risks contamination. In each scenario the UAV must
 fly a route from a dispatch hub to a delivery point across an airspace that contains
 obstacles, regulated no-fly zones, and variable wind corridors. A good route balances
-three conflicting physical objectives simultaneously: minimising total flight distance,
-minimising battery energy expenditure, and avoiding high-risk segments.
+three conflicting objectives: total flight distance, battery energy use, and exposure to
+high-risk segments.
 
 This three-way conflict is exactly what multi-objective UAV path planning is built to
 handle. Rather than collapsing distance, energy, and risk into one score before the
@@ -112,13 +113,12 @@ role. None of them let what the UAV is carrying influence route choice, or even 
 which route should be chosen for a given payload. That is the gap this project
 addresses.
 
-Autonomous UAV systems for medical and emergency last-mile delivery operate under a
-structural constraint that distinguishes them from general routing problems: the optimal
-route trade-off changes with what is being carried. A fragile
-diagnostic sample demands a low-vibration, low-turbulence corridor even at the cost of a
-much longer flight time. Emergency insulin requires the shortest path regardless of risk.
-Bulk disaster-relief supplies demand the most energy-efficient route to maximise delivery
-range.
+Autonomous UAV systems for medical and emergency last-mile delivery work under a
+constraint that separates them from general routing problems: the best route trade-off
+changes with the payload. A fragile diagnostic sample needs a low-vibration,
+low-turbulence corridor even at the cost of a much longer flight time. Emergency insulin
+needs the shortest path regardless of risk. Bulk disaster-relief supplies need the most
+energy-efficient route to maximise delivery range.
 
 Payload-awareness itself is not absent from the UAV literature: variable payload mass has
 been used to adapt the flight-speed and energy-consumption \emph{model itself} during
@@ -128,8 +128,8 @@ a multi-drop mission \cite{r10}. What is absent is any use of payload metadata t
 weight tag is a discrete, ordinal class (light/medium/heavy) that is one of four metadata
 tags algebraically blended into a static selection weight once per mission; it never
 alters the per-edge energy model or triggers re-planning, unlike \cite{r10}'s continuous
-mass-driven physics adaptation. Closing that gap---metadata-driven \emph{selection} among
-a fixed front, not continuous model adaptation---is precisely the aim of Tier~2.
+mass-driven physics adaptation. Tier~2 closes that gap by selecting among a fixed front
+from metadata, rather than adapting the model to continuous mass.
 
 \section{Motivation}
 
@@ -152,19 +152,18 @@ packs) weigh significantly more than medical payloads and are not time-critical 
 fragile. The dominant routing priority is energy efficiency: minimising battery drain to
 maximise the number of deliveries possible on a single charge cycle.
 
-No existing UAV planner can switch between these three routing strategies based on a
-payload tag. The proposed two-tier system accomplishes this without any expert
-intervention or replanning. Payload metadata (fragility class, payload weight class,
-delivery urgency) has never been used as the sole input to autonomous Pareto point
-selection in the UAV delivery literature, leaving a structural gap this project directly
-addresses.
+No existing UAV planner switches between these three routing strategies from a payload
+tag. The proposed two-tier system does this with no expert intervention and no
+replanning. In the UAV delivery literature, payload metadata (fragility class, payload
+weight class, delivery urgency) has never been the sole input to automatic Pareto point
+selection. That is the gap this project targets.
 
 \section{Objectives}
 \begin{enumerate}[label=\arabic*.]
   \item To formulate multi-objective UAV route planning as a structured \textbf{Pareto
-  front pre-computation} problem over a delivery airspace graph, theoretically
-  distinguishing the deterministic graph-search approach from stochastic
-  population-based alternatives.
+  front pre-computation} problem over a delivery airspace graph, and to separate the
+  deterministic graph-search approach from stochastic population-based alternatives on
+  theoretical grounds.
   \item To design a \textbf{payload metadata schema} and a principled rule-based mapping
   that translates mission context (fragility class, delivery urgency, payload weight
   class) into Pareto point selection objective weights without any expert weight
@@ -176,9 +175,9 @@ addresses.
   \item To quantify \textbf{Tier~2 selection accuracy} by measuring alignment between
   selected route characteristics and payload tag requirements across diverse mission
   types (fragile medical sample, emergency medicine, disaster-relief supplies).
-  \item To establish the system's \textbf{novelty}: payload metadata is used as the sole
-  input to Pareto point selection, replacing context-blind entropy and diversity-based
-  criteria with a deterministic algebraic mapping from payload description to route
+  \item To establish the system's \textbf{novelty}: payload metadata serves as the sole
+  input to Pareto point selection, in place of context-blind entropy and diversity-based
+  criteria, through a deterministic algebraic mapping from payload description to route
   choice.
 \end{enumerate}
 
@@ -191,18 +190,18 @@ evaluated on programmatically generated airspace graphs at three scales (50, 200
 500 nodes). Phase~II extends the validated software to physical hardware: a
 Pixhawk-equipped F450 quadcopter with a Raspberry Pi~5 companion computer, validated
 through ArduPilot SITL simulation and outdoor flight tests. The Tier~1 Pareto front is
-treated as valid for a bounded refresh window rather than permanently static: it is
-rebuilt on a periodic cadence, or when environmental drift (e.g. a substantial
-wind-condition shift) exceeds a defined threshold, and missions arriving within that
-window are served by Tier~2 against the current front without a per-mission recompute.
+treated as valid for a bounded refresh window: it is rebuilt on a periodic cadence, or
+when environmental drift (e.g. a substantial wind-condition shift) exceeds a defined
+threshold. Missions that fall inside that window are served by Tier~2 against the current
+front, with no per-mission recompute.
 The project does not address multi-UAV coordination, dynamic obstacle avoidance during
 flight, or real-time path replanning.
 
 % ============================================================
-\chapter{Related Work}\label{cha:relatedwork}
+\flowchapter{Related Work}\label{cha:relatedwork}
 
-Multi-objective UAV path planning sits at the intersection of graph-search and
-evolutionary optimisation \cite{r11}. Within it, route selection from a computed Pareto
+Multi-objective UAV path planning draws on both graph-search and evolutionary
+optimisation \cite{r11}. Within it, route selection from a computed Pareto
 front is usually guided by the crowding-distance rule introduced by NSGA-II \cite{r8},
 or by an entropy criterion that keeps the archive diverse while a manually weighted
 scalar sum makes the final pick; neither considers delivery context. Payload
@@ -270,26 +269,24 @@ manually weighted scalar sum, re-tuned per mission by a human operator, to make 
 actual final pick. \cite{r10} does not build a Pareto front at all: it folds continuous
 payload mass into the energy model's equations of motion and adapts flight speed as mass
 changes across a multi-drop mission, but never selects among competing routing
-trade-offs based on what is being carried. Whichever direction is taken, geometric
-diversity or continuous mass-driven physics adaptation, none of the three use payload
-weight, or any other payload property, as a discrete input to a Pareto-point
-\emph{selection} mechanism; in \cite{r10}, mass reshapes the cost model itself and never
-enters a selection formula. This is the structural gap the proposed system directly
-addresses: Tier~2 treats payload weight as one of four ordinal metadata tags
-algebraically blended into a selection weight, not a continuous physical parameter that
-reshapes the underlying cost model.
+trade-offs by payload. Whether the mechanism is geometric diversity or continuous
+mass-driven physics adaptation, none of the three use payload weight, or any other
+payload property, as a discrete input to a Pareto-point \emph{selection} mechanism; in
+\cite{r10}, mass reshapes the cost model itself and never enters a selection formula.
+This is the gap the proposed system closes: Tier~2 treats payload weight as one of four
+ordinal metadata tags algebraically blended into a selection weight, and does not use it
+as a continuous physical parameter inside the cost model.
 
-The gap runs deeper than an implementation detail: it is a design assumption baked into
-all three approaches. Entropy and crowding distance are both defined purely over the
+The gap is not an implementation detail; it is a design assumption shared by all three
+approaches. Entropy and crowding distance are both defined purely over the
 geometry of the Pareto front; mass-aware trajectory adaptation is defined purely over the
 physical energy model, with mass entering as a continuous parameter to that model, never
 as a selection criterion. None of these mechanisms has an interface through which
 discrete payload metadata, as opposed to continuous mass or point geometry, can enter a
-\emph{selection} step. Extending them to incorporate payload information would require
-replacing the selection criterion entirely, which is precisely what the proposed Tier~2
-utility scoring mechanism does.
+\emph{selection} step. Adding payload information to them would mean replacing the
+selection criterion outright, which is what the proposed Tier~2 utility scoring does.
 
-Three specific gaps addressed by this work are as follows. \textbf{Gap~1 (No
+This work addresses three specific gaps. \textbf{Gap~1 (No
 payload-aware Pareto selection):} Existing UAV multi-objective planners either apply a
 fixed geometric selection criterion independent of payload type, or offer no selection
 mechanism at all. The proposed Tier~2 introduces a
@@ -303,22 +300,21 @@ search for each new mission. \textbf{Gap~3 (No
 algebraic bridge between delivery context and routing objectives):} The mapping between
 a payload description and the routing trade-off it implies (e.g., fragility
 $\rightarrow$ minimise risk, urgency $\rightarrow$ minimise distance) has never been
-formalised algebraically. The proposed weight-derivation formula provides this bridge,
-making the mapping deterministic, transparent, and reproducible.
+formalised algebraically. The proposed weight-derivation formula supplies this bridge;
+the mapping it defines is deterministic and reproducible.
 
 % ============================================================
-\chapter{Problem Statement}
+\flowchapter{Problem Statement}
 
 Existing UAV route planners either apply a fixed geometric selection criterion over the
-Pareto front, independent of payload type (Gap~1), or fold objectives into a
-\textbf{single hand-tuned weighted-sum scalar} before path search begins, permanently
-fixing the objective trade-off regardless of what is being carried. When the payload
-context changes, from fragile diagnostic samples requiring vibration-minimal routing to
-time-critical emergency medicine requiring shortest-path routing, an expert must
-manually re-tune the planner weights and re-run the search from scratch (Gap~2), because
-no algebraic mapping from payload description to routing trade-off exists to make that
-re-tuning unnecessary (Gap~3). This intervention is \textbf{infeasible in field
-conditions}.
+Pareto front, independent of payload type (Gap~1), or fold objectives into a single
+hand-tuned weighted-sum scalar before path search begins, which fixes the objective
+trade-off regardless of the payload. When the payload context changes, from fragile
+diagnostic samples that need vibration-minimal routing to time-critical emergency
+medicine that needs shortest-path routing, an expert must re-tune the planner weights by
+hand and re-run the search from scratch (Gap~2), because no algebraic mapping from
+payload description to routing trade-off exists to make that re-tuning unnecessary
+(Gap~3). In field conditions, that intervention is not feasible.
 
 Formally, given:
 (i)~an airspace graph $G = (V, E)$ with three-objective edge cost vectors
@@ -346,7 +342,7 @@ $(F, W, U, P_\mathrm{lvl})$ to $p^*$ to be an explicit algebraic formula rather 
 expert-set rule or lookup table.
 
 % ============================================================
-\chapter{Justification for the Problem Formulation}\label{cha:justification}
+\flowchapter{Justification for the Problem Formulation}\label{cha:justification}
 
 \section{Need for the Proposed Work}
 
@@ -356,13 +352,13 @@ search between every dispatch requires an expert on hand at the point of launch,
 unavailable in a time-critical emergency deployment. A system that requires this
 intervention is unusable in the field regardless of its routing quality on paper.
 
-This is what motivates separating Pareto front construction from payload-driven
+This is what motivates the split between Pareto front construction and payload-driven
 selection. The front is built offline for a delivery region and refreshed on a periodic
 cadence, or when environmental drift (e.g. a substantial wind-condition shift) exceeds a
-defined threshold, rather than rebuilt for every mission; each mission arriving within
-that refresh window runs only Tier~2, reading the payload tag and selecting a route from
-the current front in near-instantaneous time. No expert, no per-mission re-planning, no
-delay between payload tagging and mission file generation.
+defined threshold, instead of once per mission. A mission that arrives inside that
+refresh window runs only Tier~2: it reads the payload tag and picks a route from the
+current front in well under a second. No expert, no per-mission replanning, no delay
+between tagging the payload and generating the mission file.
 
 \section{Feasibility}
 
@@ -376,8 +372,8 @@ input to mission file output).
 
 \textbf{Operational feasibility:} The system requires only four integer tag inputs from
 the operator, eliminating the need for weight-tuning expertise. The ArduPilot
-SITL simulation environment allows complete end-to-end validation before outdoor
-flights, reducing hardware risk to an acceptable level.
+SITL simulation environment allows full end-to-end validation before outdoor flights,
+which keeps hardware risk low.
 
 \textbf{Economic feasibility:} All software components use open-source libraries and
 protocols (osmnx \cite{r4}, NetworkX \cite{r5}, NumPy, matplotlib, MAVLink \cite{r7}). The hardware platform (F450 quadcopter frame,
@@ -391,27 +387,24 @@ Review~II and Final Review schedule as shown in Chapter~\ref{cha:timeline}.
 
 \section{Expected Contribution}
 
-Pareto-optimal graph-search is an established technique; the contribution here is not
-the search itself, but the fact that the bridge connecting Tier~1's routing objectives to
-Tier~2's payload metadata is algebraic rather than a lookup table or an expert-set rule.
-Because every weight is a function of all three raw scores simultaneously
-(Chapter~\ref{cha:methodology}), the resulting utility function can select any point on
-the front, not only its extremes, and does so without a human deciding which extreme
-applies to which payload. No prior UAV delivery system grants payload metadata this role:
-existing planners treat route selection as a front-diversity problem, blind to what is
-being carried. In practice, a periodically refreshed front serves every mission profile a
-delivery region sees between refreshes, and route choice becomes a sub-second metadata
-lookup.
+Pareto-optimal graph-search is an established technique; the contribution is the bridge
+between Tier~1's routing objectives and Tier~2's payload metadata. That bridge is
+algebraic, not a lookup table or an expert-set rule. Because every weight depends on all
+three raw scores (Chapter~\ref{cha:methodology}), the utility function can select any
+point on the front, not only its extremes, with no human deciding which extreme fits
+which payload. No prior UAV delivery system gives payload metadata this role; existing
+planners treat route selection as a front-diversity problem that ignores the payload.
+Once built, one front covers every mission profile in a delivery region until the next
+refresh, and route choice becomes a sub-second lookup from metadata.
 
 % ============================================================
-\chapter{Methodology}\label{cha:methodology}
+\flowchapter{Methodology}\label{cha:methodology}
 
-The system rests on one architectural decision: separate Pareto front construction
-(Tier~1) from route selection (Tier~2), for the reasons given in
-Chapter~\ref{cha:justification}. The front is built per delivery region and refreshed on
-a periodic cadence rather than per mission; each mission arriving within a refresh window
-runs only Tier~2, reading the payload tag and selecting a route from the current front in
-near-instantaneous time.
+The system rests on one design decision: separate Pareto front construction (Tier~1)
+from route selection (Tier~2), for the reasons in Chapter~\ref{cha:justification}. The
+front is built once per delivery region and refreshed periodically, not per mission. A
+mission that arrives between refreshes runs only Tier~2, which reads the payload tag and
+returns a route from the current front in a fraction of a second.
 
 \section{Architectural Design for Proposed System}
 
@@ -474,11 +467,11 @@ no expert input:
   w_\mathrm{dist} = \frac{d_\mathrm{raw}}{r_\mathrm{raw} + d_\mathrm{raw} + e_\mathrm{raw}}, \quad
   w_\mathrm{energy} = \frac{e_\mathrm{raw}}{r_\mathrm{raw} + d_\mathrm{raw} + e_\mathrm{raw}} \label{eq:weights}
 \end{align}
-The multipliers (2 for fragility and payload weight, 3 for urgency) reflect the domain
-insight that urgency has a higher penalty sensitivity than fragility or payload weight
-in the UAV medical delivery context. Payload weight is bound to the energy objective
-because heavier payload directly increases hover/lift power draw, a physically grounded
-relationship absent for risk or distance.
+The multipliers (2 for fragility and payload weight, 3 for urgency) encode the
+assumption that urgency is more penalty-sensitive than fragility or payload weight in the
+UAV medical delivery context. Payload weight is tied to the energy objective because a
+heavier payload directly increases hover and lift power draw; no such direct physical
+link holds for risk or distance.
 
 For each Pareto point $p_i$ with objective values $(d_i, \varepsilon_i, \rho_i)$,
 min-max normalised values $\tilde{d}_i$, $\tilde{\varepsilon}_i$, $\tilde{\rho}_i$ are
@@ -620,10 +613,7 @@ flight controller, measuring route adherence (GPS position error vs.\ planned ro
 end-to-end latency.
 
 % ============================================================
-{\let\clearpage\relax
-\vspace{48pt}
-\chapter{Project Timeline Chart}\label{cha:timeline}
-}
+\flowchapter{Project Timeline Chart}\label{cha:timeline}
 
 \begin{figure}[H]
 \centering
