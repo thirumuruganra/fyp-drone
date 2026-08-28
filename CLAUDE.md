@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code in this repo.
+Claude Code guidance, this repo.
 
 ## Communication Style — Caveman Mode
 
@@ -13,13 +13,13 @@ Code/commits/PRs: normal. Off: "stop caveman" / "normal mode".
 
 ## Git Workflow
 
-Semantic commits for all git commits.
+Semantic commits, all commits.
 
 ## Project Overview
 
 FYP (B28) repo. **"Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery"** — Thirumurugan RA, Shrika SP Thota, Meghna Manimaran (Guide: Sujaudeen N), SSN College of Engineering, Dept. of CSE.
 
-Mostly academic deliverables (LaTeX reports, presentations) + small Python sim under `Review 1/Implementation/`. No build system beyond LaTeX compile. No test suite for Python.
+Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Review 1/Implementation/`. No build system beyond LaTeX compile. No Python test suite.
 
 **Core idea:** split Pareto-front build (Tier 1) from mission route pick (Tier 2). Planner run once per delivery region, reused. Payload metadata picks point on front per mission — no manual weight re-tune between deliveries. Read `Review 1/FYP_B28_Project_Context.md` first — problem statement, lit gap, panel feedback history, tech decisions log. Canonical source for *why*, not just what. Read before touching algorithm concepts.
 
@@ -28,7 +28,7 @@ Mostly academic deliverables (LaTeX reports, presentations) + small Python sim u
 - `Abstract/`, `Initial Screening PPT/`, `Review 0/` — early submission artifacts. Frozen/historical.
 - `Review 1/` — current phase deliverables:
   - `FYP_B28_Project_Context.md` — canonical context (problem, arch, math, panel Q&A, timeline). Read first.
-  - `Implementation/` — actual Python sim (below).
+  - `Implementation/` — Python sim (below).
   - `Phase 1 Report/` — LaTeX thesis chapters (`ch1_intro.tex` … `ch5_timeline.tex`), compiled via `main.tex` (uses `Thesis.cls`, `bmacros.tex`).
   - `Review 1 PPT/`, `Review 1 Report/` — LaTeX presentation/report, `ssnreview.cls`.
 - `Reference Material (From Seniors - just for format)/` — prior year thesis, format reference only. Not project content.
@@ -58,9 +58,9 @@ python run_demo_osm.py            # OpenStreetMap-backed demo (requires network 
 
 No automated tests. Correctness check: run demo scripts, inspect printed Pareto front + generated summary figures under `outputs/`.
 
-### The Tier 1 → Tier 2 connection (important when editing Tier 2 logic)
+### Tier 1 → Tier 2 connection (matters when editing Tier 2 logic)
 
-Payload-tag-to-weight mapping: not lookup table, continuous formula. Deliberate — answers review-panel critique documented in `FYP_B28_Project_Context.md`:
+Payload-tag-to-weight mapping: not lookup table, continuous formula. Deliberate — answers review-panel critique, documented `FYP_B28_Project_Context.md`:
 
 ```
 r_raw = F × 2        d_raw = U × 3        e_raw = T × 2
@@ -71,19 +71,13 @@ w_energy = e_raw / (r_raw + d_raw + e_raw)
 score(p_i) = w_distance × (1 − d̃ᵢ) + w_energy × (1 − ẽᵢ) + w_risk × (1 − r̃ᵢ)   # normalized objectives
 ```
 
-Selected route = `argmax(score)` over full Pareto front, not just extreme points. Keep this — reverting to min-distance/min-risk extreme picks kills project's novelty claim.
+Selected route = `argmax(score)` over full Pareto front, not just extreme points. Keep this — revert to min-distance/min-risk extreme picks kills novelty claim.
 
 ## LaTeX Reports
 
-- `Phase 1 Report/main.tex` and `Review 1 Report/Review1_Report.tex` — main compile targets, own dirs. Both need local `.cls`/`.sty` files (`Thesis.cls` or `ssnreview.cls`, `bmacros.tex`, `setspace.sty`, `ssn.jpeg`, etc., sourced from `Reference Material (From Seniors - just for format)/FYP_Phase1_Report/`). Compile from same dir — relative includes need it.
-- BibTeX between first two passes (per `Review 1/Phase 1 Report/README_COMPILE.txt`):
-  ```bash
-  pdflatex main.tex
-  bibtex main
-  pdflatex main.tex
-  pdflatex main.tex
-  ```
-  Refs in `references.bib`, style `unsrtnat` (natbib). Build artifacts (`.aux`, `.bbl`, `.fls`, `.fdb_latexmk`, `.log`, `.out`, `.toc`) already present from prior builds — regenerate, don't hand-edit.
-- `Phase 1 Report/diagrams/*.puml` — PlantUML sources for `arch`, `tier1`, `tier2`, `gantt` diagrams. Render: `java -jar plantuml.jar diagrams\<name>.puml` (or plantuml.com) → `.png` files LaTeX includes. Missing PNG → placeholder, not fail.
-- Non-default LaTeX packages needed: `algpseudocode`/`algorithm` (algorithmicx), `booktabs`, `multirow`, `xcolor`, `url`. `glossaries` errors → comment out `\makeglossaries` in `Thesis.cls`.
-- **After compile, delete all generated build artifacts** — keep only `.tex` source(s), final `.pdf`, style/class files `.tex` links (`.cls`, `.sty`, `bmacros.tex`, `references.bib`, image/diagram assets doc `\include`s). Remove rest: `.aux`, `.bbl`, `.blg`, `.fls`, `.fdb_latexmk`, `.log`, `.out`, `.toc`, `.lof`, `.lot`, `.synctex.gz`, similar. Cleanup pass after successful compile, not before — intermediates needed during multi-pass `pdflatex`/`bibtex` sequence itself.
+- Compile targets: `Phase 1 Report/main.tex`, `Review 1 Report/Review1_Report.tex`. Own dirs. Need local `.cls`/`.sty` (`Thesis.cls` or `ssnreview.cls`, `bmacros.tex`, `setspace.sty`, `ssn.jpeg`, etc., sourced from `Reference Material (From Seniors - just for format)/FYP_Phase1_Report/`). Compile from same dir — relative includes need it.
+- Editor latexmk integration builds PDF on save. In-place, from target dir — never `-outdir=build` (MiKTeX bibtex can't read `references.bib` from parent dir). `Review 1 Report/.latexmkrc` sets `$pdf_mode = 1`, `$clean_ext = "synctex.gz nav snm thm"`, `$bibtex_use = 2`. Refs in `references.bib`, style `unsrtnat` (natbib). Regenerate build files, don't hand-edit.
+- **`Review1_Report.tex` chapter flow:** chapters run continuous — no chapter starts fresh page. Use `\flowchapter{Title}` (preamble: `\par\addvspace{30pt}{\let\clearpage\relax\chapter{#1}}`) for every chapter except first (`Introduction` keeps plain `\chapter`, opens body). Never revert `\flowchapter` to bare `\chapter` — brings back page break + big end-of-page gaps. `\label` goes right after `\flowchapter{...}` call.
+- `Phase 1 Report/diagrams/*.puml` — PlantUML sources for `arch`, `tier1`, `tier2`, `gantt`. Render: `java -jar plantuml.jar diagrams\<name>.puml` (or plantuml.com) → `.png` LaTeX includes. Missing PNG → placeholder, not fail.
+- Non-default LaTeX packages: `algpseudocode`/`algorithm` (algorithmicx), `booktabs`, `multirow`, `xcolor`, `url`. `glossaries` errors → comment out `\makeglossaries` in `Thesis.cls`.
+- **After compile, clean with `latexmk -c Review1_Report.tex`** (`latexmk -c main.tex` for Phase 1 Report). Only command to run for report — with repo `.latexmkrc` (`$bibtex_use = 2`) removes every generated file (`.aux`, `.bbl`, `.blg`, `.fls`, `.fdb_latexmk`, `.log`, `.out`, `.toc`, `.lof`, `.lot`, `.synctex.gz`), leaves only `.tex` source(s), final `.pdf`, and style/class/asset files the `.tex` links (`.cls`, `.sty`, `bmacros.tex`, `references.bib`, images/diagrams).
