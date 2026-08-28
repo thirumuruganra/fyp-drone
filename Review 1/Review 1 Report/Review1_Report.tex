@@ -30,46 +30,33 @@
 
 % ============================================================
 \begin{reviewabstract}
-UAV systems for medical and emergency last-mile delivery must balance objectives that
-conflict: shorter routes carry higher flight risk, low-risk corridors drain more
-battery, and energy-efficient paths are rarely the fastest. No single fixed trade-off
-serves all payload types, yet existing planners apply the same objective weights to
-every mission regardless of the payload.
-
-Existing multi-objective planners, including entropy-based, diversity-driven, and
-crowding-distance Pareto selection methods, encode objective weights as a fixed scalar
-before path search begins. Payload properties such as fragility class, payload weight
-class, and delivery urgency have no influence over which Pareto-optimal route is
-chosen. When the payload changes, operators must re-tune weights manually and re-run the
-planner, which is not workable under field conditions.
-
-This work proposes a Payload-Aware Two-Tier UAV Route Planning system that separates
-Pareto front construction from route selection and adds an explicit algebraic bridge
-between Tier 1 routing objectives and Tier 2 payload metadata.
-
-Tier 1 runs a multi-objective A*/Dijkstra graph-search over a delivery airspace graph
-sourced from OpenStreetMap, producing a Pareto-optimal route set across distance, energy
-consumption, and flight risk. Tier 2 reads four operator-assigned payload tags and
-derives objective weights through a fixed formula: fragility class scales $w_\mathrm{risk}$,
-delivery urgency scales $w_\mathrm{distance}$, and payload weight class scales
-$w_\mathrm{energy}$. These weights score every Pareto point through a utility function;
-the argmax is selected as the mission route. The system will be evaluated on
-programmatically generated airspace graphs at three scales (50, 200, and 500 nodes)
-against single-objective A* and MOPSO baselines, using hypervolume, Pareto spread, and
-Tier 2 selection accuracy as metrics. Hardware validation will use a Pixhawk-equipped
-quadcopter through ArduPilot SITL simulation and outdoor flight tests.
-
-Planned experiments will quantify Tier 1 improvements in hypervolume and Pareto spread
-over both baselines and will determine whether metadata-derived utility scoring selects
-non-extreme Pareto points for mixed-priority payloads that neither A* nor MOPSO can
-produce.
-
-The principal contribution is a formula-driven mapping from payload metadata to routing
-objective weights that links mission context directly to Pareto point selection without
-expert intervention. The payload description sets the route choice through an explicit
-algebraic step, in place of context-blind diversity criteria. The Pareto front is
-rebuilt on a fixed schedule, not once per mission, and one front serves every mission
-type that arrives before the next rebuild.
+In UAV systems for medical and emergency last-mile delivery, conflicting objectives
+must be balanced: higher flight risk is carried by shorter routes, more battery is
+drained by low-risk corridors, and the fastest paths are rarely achieved by
+energy-efficient routing. No single fixed trade-off serves all payload types, yet the
+same objective weights are applied by existing planners to every mission regardless of
+the payload. In existing multi-objective planners, including entropy-based, diversity-driven, and
+crowding-distance Pareto selection methods, objective weights are encoded as a fixed
+scalar before path search begins. No influence is exerted by payload properties such as
+fragility class, payload weight class, and delivery urgency over which Pareto-optimal
+route is chosen. When payloads change, weights must be manually re-tuned and planners
+re-run by operators, which is unworkable under field conditions. The proposed work is a Payload-Aware Two-Tier UAV Route Planning system, wherein
+Pareto front construction is separated from route selection and an explicit algebraic
+bridge is added between Tier 1 routing objectives and Tier 2 payload metadata.
+In Tier 1, a multi-objective A*/Dijkstra graph-search is executed over an OpenStreetMap
+airspace graph, producing a Pareto-optimal route set across distance, energy
+consumption, and flight risk. In Tier 2, four operator-assigned payload tags are read
+and objective weights derived: $w_\mathrm{risk}$ is scaled by fragility class,
+$w_\mathrm{distance}$ by delivery urgency, and $w_\mathrm{energy}$ by payload weight
+class. Every Pareto point is scored by these weights via a utility function, and the
+argmax is selected as the mission route. Evaluation will be conducted on synthetic
+graphs (50, 200, 500 nodes) against single-objective A* and MOPSO baselines using
+hypervolume, spread, and Tier 2 accuracy. Hardware validation will use a Pixhawk
+quadcopter via ArduPilot SITL simulation and outdoor flights. Planned experiments will quantify Tier 1 gains over both baselines, evaluating whether
+non-extreme Pareto points are selected for mixed-priority payloads. The principal contribution is a formula-driven mapping from metadata to routing weights,
+linking mission context directly to Pareto selection without expert intervention. Route
+choice is set by payload properties rather than context-blind diversity criteria. The
+Pareto front is rebuilt periodically, serving all missions between updates.
 \end{reviewabstract}
 
 % ============================================================
@@ -130,6 +117,30 @@ tags algebraically blended into a static selection weight once per mission; it n
 alters the per-edge energy model or triggers re-planning, unlike \cite{r10}'s continuous
 mass-driven physics adaptation. Tier~2 closes that gap by selecting among a fixed front
 from metadata, rather than adapting the model to continuous mass.
+
+Real-world deployments make the operational cost of payload-blind routing concrete.
+In January and May~2019, Swiss Post--Matternet M2 drones carrying clinical laboratory
+specimens on fixed, payload-invariant routes crashed in Z\"{u}rich; post-incident
+analysis confirmed that the aircraft flew identical corridors regardless of whether the
+cargo was a routine parcel or an irreplaceable blood specimen, with no routing
+adjustment for payload fragility~\cite{r12}. Independent laboratory work explains why
+this matters: controlled studies on drone-transported medicines have shown that the
+vibration and turbulence encountered along UAV flight paths cause measurable payload
+degradation---insulin exhibits fibrillation risk, biologics undergo protein denaturation,
+and blood samples show elevated haemolysis indices when the route includes high-vibration
+segments~\cite{r13,r14}. A comparative UAV blood-transport study confirmed that
+pre-analytic integrity varies significantly with flight-path characteristics, with routes
+of greater altitude variation and turbulence producing higher rates of sample rejection at
+the receiving laboratory~\cite{r15}. In every case the root cause is the same: the route
+planner had no knowledge of what was being carried, so it could not prefer smoother,
+lower-risk corridors for fragile payloads or shortest paths for time-critical medicine.
+Operational deployments such as Zipline's blood-delivery network in Rwanda---which serves
+remote clinics up to 80\,km away on a single battery charge---further illustrate the
+energy dimension of the gap: heavier blood-product payloads draw more hover and lift
+power and shorten effective range, yet the system plans the same fixed route regardless
+of payload weight, with no mechanism to select an energy-efficient detour for heavy cargo
+or a direct short route when an urgent, lighter payload makes that trade-off
+optimal~\cite{r16}.
 
 \section{Motivation}
 
