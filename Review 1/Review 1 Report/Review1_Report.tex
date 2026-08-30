@@ -411,6 +411,14 @@ front is built once per delivery region and refreshed periodically, not per miss
 mission that arrives between refreshes runs only Tier~2, which reads the payload tag and
 returns a route from the current front in a fraction of a second.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Methodology Diagram.jpg}
+\caption[Methodology overview: Two-Tier Payload-Aware UAV Route Planning]{Methodology
+overview: Tier~1 Pareto front construction feeding Tier~2 payload-aware route
+selection.}\label{fig:methodology}
+\end{figure}
+
 \section{System Architecture}
 
 Figure~\ref{fig:architecture} shows the complete two-tier system architecture. Airspace
