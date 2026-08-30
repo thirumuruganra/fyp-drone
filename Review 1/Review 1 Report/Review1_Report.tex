@@ -7,6 +7,8 @@
 \usepackage{xltabular}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{xurl}                     % break long URLs anywhere (bib underfull/overfull)
+\setlength{\emergencystretch}{2em}    % last-resort stretch, kills stray over/underfull hboxes
 \bibliographystyle{unsrtnat}
 \graphicspath{{../Phase 1 Report/diagrams/}}
 \newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{#1}}
@@ -170,9 +172,9 @@ selection. That is the gap this project targets.
 \section{Objectives}
 \begin{enumerate}[label=\arabic*.]
   \item To formulate multi-objective UAV route planning as a Pareto front
-  pre-computation problem over a delivery airspace graph, and to separate the
-  deterministic graph-search approach from stochastic population-based alternatives on
-  theoretical grounds.
+  precomputation task over a delivery airspace graph, and to distinguish the
+  deterministic graph-search approach from stochastic population-based alternatives
+  on theoretical grounds.
   \item To design a payload metadata schema and a rule-based mapping that turns mission
   context (fragility class, delivery urgency, payload weight class) into Pareto point
   selection weights with no expert weight tuning.
@@ -262,7 +264,7 @@ CDNSGA-II finds well-spread, collision-free Pareto-optimal paths efficiently in
 octree-modelled urban airspace. &
 Crowding distance encodes only the geometric spread of the front; it cannot represent
 urgency, fragility, or payload weight, and mission context plays no role in
-selection.\\
+selection.
 \end{xltabular}
 \normalsize
 
