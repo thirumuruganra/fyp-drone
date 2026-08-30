@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "ai-writing-detection",
+  "owner": "mike-coulbourn",
+  "repo": "claude-vibes",
+  "path": "plugins/vibes/skills/ai-writing-detection",
+  "branch": "main",
+  "sha": "d0701bc330e1e2499dcb1017873b6b5450d630cd",
+  "source": "manual"
+}
