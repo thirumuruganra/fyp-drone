@@ -40,34 +40,66 @@ When payload context changes from fragile diagnostic samples requiring vibration
 
 The proposed system resolves this by separating Pareto front generation from mission-context-driven route selection. Payload metadata (fragility class, payload weight class, delivery urgency) has never been used as the sole input to autonomous Pareto point selection in the UAV delivery literature, leaving a structural gap this project directly addresses.
 
+### Formal Problem Statement (report Chapter "Problem Statement")
+
+Given:
+(i) airspace graph `G = (V, E)`, edge cost vector `c(e) = [d(e), ε(e), ρ(e)]` — geodesic distance, energy, flight risk;
+(ii) Pareto-optimal front `P` of non-dominated routes pre-computed over `G`;
+(iii) payload metadata tuple `(F, W, U, P_lvl)` — fragility `F∈{1..5}`, payload weight `W∈{1..3}`, urgency `U∈{1..3}`, priority `P_lvl∈{1..5}`.
+
+Problem: select route `p* ∈ P` best satisfying routing requirements implied by payload metadata, no expert re-tuning, no re-running the search.
+
+Constraints: selection deterministic, reproducible, finishes within 1s of tag entry. Success criterion: selected route's characteristics (distance, energy, risk) match payload's stated requirements, checked via Tier 2 selection accuracy metric across payload presets.
+
+Three conditions (from Gaps below): `p*` must depend on `(F,W,U,P_lvl)`, not front geometry alone (Gap 1). Front `P` reused across missions between refreshes, not rebuilt each time (Gap 2). Map from `(F,W,U,P_lvl)` to `p*` explicit algebraic formula, not expert rule or lookup table (Gap 3).
+
+### Three Gaps (report Chapter "Related Work" → Research Gap)
+
+1. **Gap 1 — no payload-aware selection.** Existing planners apply fixed geometric criterion (entropy/crowding) independent of payload, or no selection mechanism at all (Tsoutsouras folds mass into cost model, never selects). Tier 2 maps four payload tags directly to Pareto point selection through formula.
+2. **Gap 2 — no front reuse across missions.** Existing planners re-run full multi-objective search whenever mission context changes. Two-tier split decouples front construction from mission arrivals — Tier 1 refreshes periodically, independent of payload; Tier 2 selects per new tag against current front, no re-run.
+3. **Gap 3 — no algebraic bridge.** No formalised mapping links payload description to routing trade-off it implies (fragility → minimise risk, urgency → minimise distance). Weight-derivation formula supplies that bridge, deterministic and reproducible.
+
+### Real-World Evidence (report Background, added post-Review-0)
+
+Payload-blind routing has documented real-world cost, cited to ground novelty claim:
+- **Swiss Post–Matternet M2 crashes (Zürich, Jan + May 2019)** — drones carrying clinical lab specimens on fixed, payload-invariant routes crashed; post-incident analysis confirmed identical corridors flown regardless of cargo type, no routing adjustment for fragility (`r12`).
+- **Vibration/turbulence degradation studies** — controlled lab work shows drone-transported medicines suffer measurable degradation from flight-path vibration: insulin fibrillation risk, biologic protein denaturation, elevated haemolysis in blood samples on high-vibration segments (`r13`, `r14`). Comparative UAV blood-transport study confirms pre-analytic integrity varies with flight-path characteristics — greater altitude variation/turbulence → higher lab rejection rates (`r15`).
+- **Zipline Rwanda blood-delivery network** (up to 80 km/single charge) — illustrates energy dimension: heavier blood-product payloads draw more hover/lift power, shorten range, yet system plans same fixed route regardless of weight, no energy-efficient detour for heavy cargo or direct short route for urgent light payload (`r16`).
+
+Root cause common to all: planner has no knowledge of what's carried, can't prefer smoother/lower-risk corridors for fragile payloads or shortest paths for time-critical medicine.
+
 ---
 
 ## Literature Review — Existing Work
 
-### Chokkalingam & Ganesan (2026)
-**Journal:** RAIRO-Oper. Res.
-**DOI:** https://doi.org/10.1051/ro/2025159
+Table in report [r1, r3, r10]. Three papers reviewed — post-Review-0 set, replaces older Datsko/Ntakolia draft:
 
-- **Technique:** Multi-objective UAV path planning using adaptive constraint handling with entropy-based criteria to select solutions from the Pareto front.
-- **Limitation:** Entropy criterion selects solutions based on front diversity alone. Payload metadata (fragility, urgency, payload weight) is never incorporated into the selection process.
+### Chokkalingam & Ganesan (2026) — `r1`
+**Journal:** RAIRO — Operations Research
+**DOI:** 10.1051/ro/2025159
 
-### Datsko et al. (2024)
-**Journal:** IEEE RA-L
-**DOI:** https://ieeexplore.ieee.org/document/10414185
+- **Technique:** Pareto-optimal particle swarm optimisation (POPSO) w/ dynamic parameter adaptation + Pareto-entropy archive selection (keeps front diverse during optimisation). Final single route read off via weighted-sum scalarisation, weights set empirically per mission.
+- **Finding:** Entropy-guided archiving improves front diversity + adaptability to real-time environmental change over static-weight baselines.
+- **Limitation:** Final route choice still manually re-tuned weighted sum per mission. Payload metadata never incorporated — fragile samples and emergency medicine get same hand-tuned selection from same front.
 
-- **Technique:** Diversity-driven Pareto selection for UAV routing, optimising geometric spread of candidate solutions across the multi-objective space.
-- **Limitation:** Selection is guided entirely by solution diversity. Delivery context such as payload type, time-window, or priority class has no influence on which route is chosen.
+### Tsoutsouras et al. (2020) — `r10`
+**Source:** arXiv:2001.02531 (eess.SY)
 
-### Ntakolia et al. (2023)
-**Journal:** J. Intell. Robot. Syst.
-**DOI:** https://doi.org/10.1007/s10846-023-01945-9
+- **Technique:** Adapts flight speed + energy-consumption model to UAV's instantaneous payload mass during trajectory planning, multi-user delivery missions. Trajectory updates as mass changes between drop-offs.
+- **Finding:** Mass-aware trajectory adaptation cuts energy consumption vs mass-agnostic planning across multi-stop routes.
+- **Limitation:** Continuous payload mass used only as physical parameter inside energy/speed model itself. Builds no multi-objective Pareto front. No discrete payload metadata (fragility, weight class, urgency) selecting among pre-computed routing trade-offs — mass reshapes cost model, never enters a selection formula.
 
-- **Technique:** Crowding-distance-based Pareto point selection within a multi-objective UAV path planner to maximise solution spread across objective space.
-- **Limitation:** Crowding distance cannot encode mission-specific requirements. Payload fragility, payload weight, or urgency class cannot influence route selection at any stage.
+### Ren et al. (2019) — `r3`
+**Venue:** IEEE SOSE
+**DOI:** 10.1109/SOSE.2019.00059
+
+- **Technique:** Crowding-distance-based NSGA-II (CDNSGA-II) for multi-objective UAV path planning, balances distance + safety over octree-represented urban environment.
+- **Finding:** CDNSGA-II finds well-spread, collision-free Pareto-optimal paths efficiently in octree-modelled urban airspace.
+- **Limitation:** Crowding distance encodes only geometric spread of front. Cannot represent urgency, fragility, payload weight. Mission context plays no role in selection.
 
 ### Common Gap Across All Three Papers
 
-All three papers select Pareto-optimal routes based on **front diversity metrics** (entropy, geometric spread, crowding distance). None of them allow delivery context — what payload is being carried — to influence which route is selected. This is the structural gap the proposed system addresses.
+Two of three (Chokkalingam & Ganesan, Ren) treat front diversity (entropy / crowding distance) as central design concern; only Ren's crowding distance actually *selects* a route from it — Chokkalingam & Ganesan falls back to manual weighted-sum re-tuning for final pick. Tsoutsouras builds no Pareto front at all — folds continuous payload mass into energy model equations of motion, never selects among competing routing trade-offs by payload. None of three use payload weight or any payload property as discrete input to a Pareto-point *selection* mechanism. This is structural gap proposed system closes.
 
 ---
 
@@ -93,7 +125,7 @@ Implements a multi-objective A*/Dijkstra graph-search that pre-computes and stor
 - Energy consumption (battery %)
 - Flight risk (% — derived from obstacle density, no-fly zones, wind exposure)
 
-**Algorithm:** Multi-objective A*/Dijkstra graph-search over an airspace graph
+**Algorithm:** Multi-objective A*/Dijkstra graph-search (NAMOA*) over airspace graph. Maintains cost vector `g` (not scalar) per partial path; dominated paths pruned early via `UpdateParetoFront`. Node-level label-dominance check additionally discards any partial path whose cost vector already dominated by previously-seen label at same node, before it enters open set — avoids exponential blow-up of naive MO-A* on dense graphs.
 
 **Graph Source:** OpenStreetMap (OSM) via `osmnx` Python library. The OSM demo (`run_demo_osm.py`) uses Thiruvanmiyur, Chennai as the reference delivery region — the real deployment target, yielding a ~79-route Pareto front.
 
@@ -228,7 +260,8 @@ Each stochastic scenario (MOPSO) runs **30 times** for mean ± std dev.
 ### Evaluation Metrics
 
 - **Hypervolume (HV):** Volume of objective space dominated by the Pareto front. Higher = better.
-- **Pareto Spread / IGD:** Inverted Generational Distance — how well the front spans objective space.
+- **Pareto Spread (Δ metric):** standard spread metric, captures extent + uniformity of front.
+- **IGD (Inverted Generational Distance):** computed against reference front formed from union of all non-dominated solutions found across every method + repetition, per scenario.
 - **Tier 2 Selection Accuracy:** Alignment between selected route characteristics and payload tag requirements across mission types (fragile medical, emergency medicine, disaster relief).
 - **Computation Time:** Tier 1 pre-computation time vs MOPSO run time.
 
@@ -375,6 +408,8 @@ The principal contribution is a formula-driven mapping from payload metadata to 
 
 ---
 
-*Document compiled from Review 0 presentation (FYP_B27.pdf), submitted abstract (BID_28.docx), panel review session, and Review 1 deliverables (Phase 1 Report, Review 1 Report/PPT, Python simulation). Last updated: 2026-08-28.*
+*Document compiled from Review 0 presentation (FYP_B27.pdf), submitted abstract (BID_28.docx), panel review session, and Review 1 deliverables (Phase 1 Report, Review 1 Report/PPT, Python simulation). Last updated: 2026-08-30.*
+
+*Note: literature review set changed post-Review-0 — Datsko et al. (2024) and Ntakolia et al. (2023) dropped from Review1_Report.tex; replaced with Tsoutsouras et al. (2020) `r10` and Ren et al. (2019) `r3` alongside retained Chokkalingam & Ganesan (2026) `r1`. Real-world evidence (Swiss Post–Matternet crash, vibration-degradation studies, Zipline Rwanda) and formal Gap 1/2/3 framing added to Background/Related Work — both reflected above.*
 
 *Note: "temperature sensitivity" in the frozen abstract above was renamed to "payload weight class" after submission — temperature sensitivity had no provable causal link to energy consumption, whereas heavier payload directly raises hover/lift power draw. All current text uses payload weight class (tag `W`, 1–3).*
