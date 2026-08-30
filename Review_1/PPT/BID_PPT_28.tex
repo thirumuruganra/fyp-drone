@@ -365,20 +365,16 @@
 % ── 10a. Methodology ─────────────────────────────────────────
 \begin{frame}{Proposed Methodology}
   \centering
-  \includegraphics[width=0.85\textwidth,height=0.70\textheight,
+  \includegraphics[width=1\textwidth,height=0.95\textheight,
                    keepaspectratio]{Methodology Diagram.jpg}
 
   \vspace{0.15cm}
-  \small Tier~1 Pareto front construction feeding Tier~2 payload-aware
-  route selection.  The front is built once per delivery region and reused
-  across all missions within the refresh window.
 \end{frame}
 
 % ── 10b. Architecture ────────────────────────────────────────────────────────
 \begin{frame}{Proposed System Architecture}
   \centering
-  \includegraphics[width=0.88\textwidth,height=0.78\textheight,
-                   keepaspectratio]{arch.png}
+  \includegraphics[width=1\textwidth,height=0.85\textheight,keepaspectratio]{arch.png}
 \end{frame}
 
 % ── 11. Modules ─────────────────────────────────────────────────────────────
@@ -436,7 +432,7 @@
   \end{columns}
 \end{frame}
 
-% ── 13. Algorithm (UPDATED: T→W, added P_lvl amplification) ─────────────────
+% ── 13. Algorithm ─────────────────
 \begin{frame}{Core Algorithm: Payload-Aware Two-Tier Route Planning}
   \begin{block}{Algorithm Summary}
     \begin{enumerate}
@@ -466,7 +462,23 @@
   \end{block}
 \end{frame}
 
-% ── 14. Technology stack ────────────────────────────────────────────────────
+% ── 14. Activity Flow Diagrams ──────────────────────────────────────────────────
+\begin{frame}{Activity Flow Diagrams for Two-Tier Architecture}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=6.35cm,keepaspectratio]{tier1.png}
+
+      \small Tier~1: Multi-Objective A* (NAMOA*) Pareto Front Construction
+    \column{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=6.35cm,keepaspectratio]{tier2.png}
+
+      \small Tier~2: Payload-Driven Pareto Route Selection
+  \end{columns}
+\end{frame}
+
+% ── 15. Technology stack ────────────────────────────────────────────────────
 \begin{frame}{Technology Stack and Resources}
   \small
   \begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash}p{3.2cm}Y}
@@ -494,7 +506,7 @@
 \section{Implementation and Results}
 % ════════════════════════════════════════════════════════════════
 
-% ── 15. Implementation status (Phase I — software scope) ───
+% ── 16. Implementation status (Phase I — software scope) ───
 \begin{frame}{Implementation Status}
   \scriptsize
   \renewcommand{\arraystretch}{1.0}
@@ -527,22 +539,6 @@
       benchmark harness vs.\ single-obj.\ A* and MOPSO planned for Phase~II\\
     \bottomrule
   \end{tabularx}
-\end{frame}
-
-% ── 16. Prototype diagrams ──────────────────────────────────────────────────
-\begin{frame}{Prototype / Implementation Diagrams}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-      \centering
-      \includegraphics[width=\linewidth,height=6.1cm,keepaspectratio]{tier1.png}
-
-      \small Tier~1: Multi-Objective A* (NAMOA*) Pareto Front Construction
-    \column{0.48\textwidth}
-      \centering
-      \includegraphics[width=\linewidth,height=6.1cm,keepaspectratio]{tier2.png}
-
-      \small Tier~2: Payload-Driven Pareto Route Selection
-  \end{columns}
 \end{frame}
 
 % ── 17. Results ─────────────────────────────────────────────────────────────
