@@ -415,7 +415,7 @@ returns a route from the current front in a fraction of a second.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{Methodology Diagram.jpg}
+\includegraphics[width=1\textwidth]{Methodology Diagram.jpg}
 \caption[Methodology overview: Two-Tier Payload-Aware UAV Route Planning]{Methodology
 overview: Tier~1 Pareto front construction feeding Tier~2 payload-aware route
 selection.}\label{fig:methodology}
@@ -662,33 +662,6 @@ end-to-end latency.
 \caption{Project timeline (July 2026 -- March 2027). Red diamonds mark review and
 submission milestones.}\label{fig:timeline}
 \end{figure}
-
-\section{Team Responsibilities (Phase~I)}
-
-Phase~I covers the software simulation and benchmarking work up to Review~I; hardware
-integration and outdoor flight testing fall in Phase~II. The Phase~I division of work
-across the three members is given in Table~\ref{tab:responsibilities}.
-
-\begin{table}[H]
-\centering\caption{Phase~I team responsibilities}\label{tab:responsibilities}\small
-\begin{tabularx}{\textwidth}{L{3.0cm} Y}
-\toprule
-\textbf{Member} & \textbf{Phase~I Responsibilities}\\
-\midrule
-Thirumurugan RA &
-System architecture design; Tier~1 multi-objective A*/NAMOA* engine implementation
-(\texttt{pareto\_dominates}, Pareto-front update); airspace graph construction with OSMnx
-and the synthetic generator; per-edge cost vectorization (distance, energy, risk).\\[3pt]
-Meghna Manimaran &
-Tier~2 algebraic bridge design; payload-metadata-to-weight formula and semantic mapping;
-Tier~2 selector implementation and utility scoring; end-to-end demo wiring
-(Tier~1 $\rightarrow$ Tier~2); report writing.\\[3pt]
-Shrika SP Thota &
-Literature survey and problem formulation; risk-cost model design; benchmarking
-methodology and evaluation metrics; Pareto-front visualization and result analysis.\\
-\bottomrule
-\end{tabularx}
-\end{table}
 
 % ============================================================
 \bibliography{references}
