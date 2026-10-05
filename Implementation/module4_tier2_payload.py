@@ -48,15 +48,21 @@ OUTPUT:
     Console table showing all four payload preset results.
 """
 
+import csv
+import json
 import os
 import pickle
-from typing import cast
+import time
+from dataclasses import asdict, dataclass
+from typing import Any, cast
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D   # needed for 3D projection
+
+import config
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,9 +89,50 @@ PRESET_COLOURS = {
 }
 
 
+@dataclass
+class SelectionResult:
+    """Detailed Tier 2 decision record for audit/export."""
+
+    tags: dict
+    weights: dict
+    selected_index: int | None
+    cost_vector: list | None
+    path: list
+    normalised_scores: list
+    objective_ranks: dict | None
+    point_type: str | None
+    latency_s: float
+    feasible_count: int
+    hold_advisory: str | None
+
+
+class WeatherNoGo(Exception):
+    """Raised by callers when weather gate says HOLD."""
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Weight derivation  (Algebraic Bridge — Section 3.3.2)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _validate_integer_tag(name: str, value: Any, lo: int, hi: int) -> int:
+    """Validate one payload tag. Accept numpy integers; reject bool/floats."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+        raise ValueError(f"{name} must be an integer in {lo}..{hi}")
+    value = int(value)
+    if value < lo or value > hi:
+        raise ValueError(f"{name} must be an integer in {lo}..{hi}")
+    return value
+
+
+def validate_payload_tags(F: int, W: int, U: int, P: int) -> tuple[int, int, int, int]:
+    """Validate Tier 2 payload tags and return plain Python ints."""
+    return (
+        _validate_integer_tag("F", F, 1, 5),
+        _validate_integer_tag("W", W, 1, 3),
+        _validate_integer_tag("U", U, 1, 3),
+        _validate_integer_tag("P", P, 1, 5),
+    )
+
 
 def derive_weights(F: int, W: int, U: int) -> tuple:
     """
@@ -110,11 +157,29 @@ def derive_weights(F: int, W: int, U: int) -> tuple:
     -------
     (w_risk, w_dist, w_energy) : floats that sum to 1.0
     """
+    F = _validate_integer_tag("F", F, 1, 5)
+    W = _validate_integer_tag("W", W, 1, 3)
+    U = _validate_integer_tag("U", U, 1, 3)
     r_raw = F * 2
     d_raw = U * 3
     e_raw = W * 2
     total = r_raw + d_raw + e_raw
     return r_raw / total, d_raw / total, e_raw / total
+
+
+def route_energy_wh(
+    energy_objective: float,
+    payload_weight_class: int,
+    *,
+    m_uav_kg: float = config.M_UAV_KG,
+    k_cal_wh_per_km: float = config.K_CAL_WH_PER_KM,
+    payload_mass_kg: dict[int, float] | None = None,
+) -> float:
+    """Convert route energy objective into battery Wh for one payload class."""
+    W = _validate_integer_tag("W", payload_weight_class, 1, 3)
+    masses = payload_mass_kg if payload_mass_kg is not None else config.PAYLOAD_MASS_KG
+    m_payload = masses[W]
+    return float(k_cal_wh_per_km * energy_objective * ((m_uav_kg + m_payload) / m_uav_kg) ** 1.5)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +230,66 @@ class TierTwoSelector:
                 safe_norm(g[1], self.e_min, self.e_max),
                 safe_norm(g[2], self.r_min, self.r_max))
 
+    def _score_all(self, w_risk: float, w_dist: float, w_energy: float) -> np.ndarray:
+        scores = np.empty(len(self.pareto_front))
+        for i, (g, _) in enumerate(self.pareto_front):
+            d_t, e_t, r_t = self._normalise(g)
+            scores[i] = (w_dist   * (1.0 - d_t) +
+                         w_energy * (1.0 - e_t) +
+                         w_risk   * (1.0 - r_t))
+        return scores
+
+    def _derive_amplified_weights(self, F: int, W: int, U: int, P: int) -> tuple[float, float, float]:
+        w_risk, w_dist, w_energy = derive_weights(F, W, U)
+        if P >= 4:
+            w_max = max(w_risk, w_dist, w_energy)
+            bonus = 0.1 * w_max
+            if w_risk == w_max:
+                w_risk += bonus
+            elif w_dist == w_max:
+                w_dist += bonus
+            else:
+                w_energy += bonus
+            total = w_risk + w_dist + w_energy
+            w_risk, w_dist, w_energy = w_risk / total, w_dist / total, w_energy / total
+        return w_risk, w_dist, w_energy
+
+    def _objective_ranks(self, route_index: int) -> dict:
+        ranks = {}
+        for obj_idx, name in enumerate(("distance", "energy", "risk")):
+            order = sorted(range(len(self.pareto_front)), key=lambda idx: (self.costs[idx, obj_idx], idx))
+            ranks[name] = order.index(route_index) + 1
+        return ranks
+
+    def _waypoints_for_path(self, path: list, graph=None) -> list:
+        waypoints = []
+        for node in path:
+            data = graph.nodes[node] if graph is not None and node in graph else {}
+            waypoints.append({
+                "node": node,
+                "lat": data.get("lat"),
+                "lon": data.get("lon"),
+                "alt_amsl_m": data.get("alt_amsl_m"),
+                "agl_m": data.get("agl_m"),
+            })
+        return waypoints
+
+    def _write_selection_outputs(self, result: SelectionResult, output_dir: str, name: str) -> None:
+        os.makedirs(output_dir, exist_ok=True)
+        json_path = os.path.join(output_dir, f"selection_{name}.json")
+        csv_path = os.path.join(output_dir, f"selection_{name}.csv")
+
+        with open(json_path, "w", encoding="utf-8") as fh:
+            json.dump(asdict(result), fh, indent=2)
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=["seq", "node", "lat", "lon", "alt_amsl_m", "agl_m"])
+            writer.writeheader()
+            for seq, waypoint in enumerate(result.path):
+                row = {"seq": seq}
+                row.update(waypoint)
+                writer.writerow(row)
+
     # ------------------------------------------------------------------
     #  Algorithm 2 — single selection
     # ------------------------------------------------------------------
@@ -186,40 +311,94 @@ class TierTwoSelector:
         w_risk, w_dist, w_energy : derived weights
         scores : np.ndarray of all utility scores
         """
-        # Step 1–2: derive weights via algebraic bridge (Eqs. 3.2–3.7)
-        w_risk, w_dist, w_energy = derive_weights(F, W, U)
-
-        # High-priority amplification (P ≥ 4, Algorithm 2 lines 17–19):
-        # the dominant weight is amplified by 0.1 × w_max, then all three
-        # weights are renormalised so they still sum to 1.0.
-        if P >= 4:
-            w_max = max(w_risk, w_dist, w_energy)
-            bonus = 0.1 * w_max
-            if w_risk == w_max:
-                w_risk += bonus
-            elif w_dist == w_max:
-                w_dist += bonus
-            else:
-                w_energy += bonus
-            total = w_risk + w_dist + w_energy
-            w_risk, w_dist, w_energy = w_risk / total, w_dist / total, w_energy / total
-
-        # Step 3: min-max normalise all Pareto objectives
-        # (precomputed from __init__)
-
-        # Step 4: compute utility score for every Pareto point (Eq. 3.9)
-        scores = np.empty(len(self.pareto_front))
-        for i, (g, _) in enumerate(self.pareto_front):
-            d_t, e_t, r_t = self._normalise(g)
-            scores[i] = (w_dist   * (1.0 - d_t) +
-                         w_energy * (1.0 - e_t) +
-                         w_risk   * (1.0 - r_t))
+        F, W, U, P = validate_payload_tags(F, W, U, P)
+        w_risk, w_dist, w_energy = self._derive_amplified_weights(F, W, U, P)
+        scores = self._score_all(w_risk, w_dist, w_energy)
 
         # argmax → selected mission route (Algorithm 2, lines 21–22)
         best_idx       = int(np.argmax(scores))
         selected_route = self.pareto_front[best_idx]
 
         return selected_route, w_risk, w_dist, w_energy, scores
+
+    def select_detailed(
+        self,
+        F: int,
+        W: int,
+        U: int,
+        P: int,
+        *,
+        graph=None,
+        output_name: str = "custom",
+        output_dir: str = "outputs/tier2",
+        write_outputs: bool = True,
+        weather_no_go: bool = False,
+        weather_advisory: str | None = None,
+        battery_wh: float = config.BATTERY_WH,
+        battery_reserve: float = config.BATTERY_RESERVE,
+        m_uav_kg: float = config.M_UAV_KG,
+        k_cal_wh_per_km: float = config.K_CAL_WH_PER_KM,
+        payload_mass_kg: dict[int, float] | None = None,
+    ) -> SelectionResult:
+        """Detailed Tier 2 selection with validation, feasibility, and export."""
+        t0 = time.perf_counter()
+        F, W, U, P = validate_payload_tags(F, W, U, P)
+        w_risk, w_dist, w_energy = self._derive_amplified_weights(F, W, U, P)
+        scores = self._score_all(w_risk, w_dist, w_energy)
+        usable_wh = float(battery_wh * (1.0 - battery_reserve))
+        feasible_indices = [
+            idx for idx, (g, _) in enumerate(self.pareto_front)
+            if route_energy_wh(
+                float(g[1]), W,
+                m_uav_kg=m_uav_kg,
+                k_cal_wh_per_km=k_cal_wh_per_km,
+                payload_mass_kg=payload_mass_kg,
+            ) <= usable_wh
+        ]
+
+        hold_advisory = None
+        if weather_no_go:
+            hold_advisory = weather_advisory or "HOLD: weather gate is NO-GO."
+        elif not feasible_indices:
+            hold_advisory = (
+                f"HOLD: no feasible route for payload W={W}; "
+                f"usable battery {usable_wh:.2f} Wh."
+            )
+
+        if hold_advisory:
+            result = SelectionResult(
+                tags={"F": F, "W": W, "U": U, "P": P},
+                weights={"risk": w_risk, "distance": w_dist, "energy": w_energy},
+                selected_index=None,
+                cost_vector=None,
+                path=[],
+                normalised_scores=[float(x) for x in scores],
+                objective_ranks=None,
+                point_type=None,
+                latency_s=time.perf_counter() - t0,
+                feasible_count=len(feasible_indices),
+                hold_advisory=hold_advisory,
+            )
+        else:
+            best_idx = max(feasible_indices, key=lambda idx: (scores[idx], -idx))
+            g, path = self.pareto_front[best_idx]
+            result = SelectionResult(
+                tags={"F": F, "W": W, "U": U, "P": P},
+                weights={"risk": w_risk, "distance": w_dist, "energy": w_energy},
+                selected_index=int(best_idx),
+                cost_vector=[float(x) for x in g],
+                path=self._waypoints_for_path(path, graph=graph),
+                normalised_scores=[float(x) for x in scores],
+                objective_ranks=self._objective_ranks(best_idx),
+                point_type=self.classify_point(best_idx),
+                latency_s=time.perf_counter() - t0,
+                feasible_count=len(feasible_indices),
+                hold_advisory=None,
+            )
+
+        if write_outputs:
+            self._write_selection_outputs(result, output_dir, output_name)
+        return result
 
     # ------------------------------------------------------------------
     #  Run all four reference presets

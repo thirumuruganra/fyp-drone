@@ -37,6 +37,7 @@ OUTPUT FILES (all in  outputs/ folder):
   osm_module4_routes_on_graph.png     — flight paths drawn on OSM map
 """
 
+import argparse
 import os
 import sys
 import time
@@ -57,7 +58,12 @@ except ImportError:
 
 from module1_graph_builder import AirspaceGraphBuilder
 from module2_tier1_moastar  import TierOneEngine
-from module4_tier2_payload   import TierTwoSelector, PAYLOAD_PRESETS, PRESET_COLOURS
+from module4_tier2_payload   import (
+    TierTwoSelector,
+    PAYLOAD_PRESETS,
+    PRESET_COLOURS,
+    validate_payload_tags,
+)
 
 os.makedirs("outputs",              exist_ok=True)
 os.makedirs("pareto_front_storage", exist_ok=True)
@@ -293,11 +299,28 @@ def run_module2_osm(G, source, target):
     return pareto_front, engine
 
 
-def run_module4_osm(pareto_front, G, source, target):
+def run_module4_osm(pareto_front, G, source, target, selection_request=None):
     print_banner(4, "Payload-Aware Route Selection — Tier 2  [Module 4]")
     t0 = time.time()
 
     selector = TierTwoSelector(pareto_front)
+    if selection_request is not None:
+        name, tags = selection_request
+        result = selector.select_detailed(
+            tags["F"], tags["W"], tags["U"], tags["P"],
+            graph=G,
+            output_name=name,
+        )
+        if result.hold_advisory:
+            print(f"[Demo] {result.hold_advisory}")
+        else:
+            print(f"[Demo] Selected route index: {result.selected_index}")
+            print(f"[Demo] Cost vector: {result.cost_vector}")
+            print("[Demo] Detailed selection saved → "
+                  f"outputs/tier2/selection_{name}.json/.csv")
+        print(f"[Demo] Module 4 done in {time.time()-t0:.1f}s ✓")
+        return selector, {name: result}
+
     results  = selector.run_all_presets()
 
     fig1 = selector.visualise_route_comparison(results)
@@ -331,7 +354,47 @@ def run_module4_osm(pareto_front, G, source, target):
 #  Main
 # ─────────────────────────────────────────────────────────────────────────────
 
-def main():
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Run OSM Tier 1 + Tier 2 demo.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--payload",
+        nargs=4,
+        metavar=("F", "W", "U", "P"),
+        help="select one custom payload tag set",
+    )
+    group.add_argument(
+        "--preset",
+        choices=sorted(PAYLOAD_PRESETS.keys()),
+        help="select one named payload preset",
+    )
+    return parser.parse_args(argv)
+
+
+def _selection_request_from_args(args):
+    if args.payload:
+        try:
+            parsed = []
+            for field, raw in zip(("F", "W", "U", "P"), args.payload):
+                try:
+                    parsed.append(int(raw))
+                except ValueError as exc:
+                    raise ValueError(f"{field} must be an integer") from exc
+            F, W, U, P = validate_payload_tags(*parsed)
+        except ValueError as exc:
+            print(f"[ERROR] {exc}")
+            sys.exit(2)
+        return "custom", {"F": F, "W": W, "U": U, "P": P}
+    if args.preset:
+        tags = PAYLOAD_PRESETS[args.preset]
+        return args.preset, {"F": tags["F"], "W": tags["W"], "U": tags["U"], "P": tags["P"]}
+    return None
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    selection_request = _selection_request_from_args(args)
+
     if not OSMNX_AVAILABLE:
         print("\n[ERROR] osmnx is not installed.")
         print("  Install it with:  pip install osmnx")
@@ -363,7 +426,10 @@ def main():
         sys.exit(1)
 
     # Step 3 — Tier 2: Payload-aware selection
-    selector, results = run_module4_osm(pareto_front, G, source, target)
+    selector, results = run_module4_osm(
+        pareto_front, G, source, target,
+        selection_request=selection_request,
+    )
 
     # Final summary
     elapsed = time.time() - t_start
@@ -374,10 +440,15 @@ def main():
     print("    • osm_module1_airspace_graph.png")
     print("    • osm_module2_pareto_front_3d.png")
     print("    • osm_module2_pareto_front_2d.png")
-    print("    • osm_module4_route_comparison.png")
-    print("    • osm_module4_pareto_selections.png")
-    print("    • osm_module4_weight_derivation.png")
-    print("    • osm_module4_routes_on_graph.png")
+    if selection_request is None:
+        print("    • osm_module4_route_comparison.png")
+        print("    • osm_module4_pareto_selections.png")
+        print("    • osm_module4_weight_derivation.png")
+        print("    • osm_module4_routes_on_graph.png")
+    else:
+        name, _ = selection_request
+        print(f"    • tier2/selection_{name}.json")
+        print(f"    • tier2/selection_{name}.csv")
     print("═" * 62)
 
 
