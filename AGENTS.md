@@ -39,12 +39,14 @@ Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Rev
 
 Python sim, four modules, no package structure — flat scripts, imported direct by two demo entry points.
 
-- `module1_graph_builder.py` — `AirspaceGraphBuilder`: builds airspace graph (synthetic, or subclass for OSM), assigns each edge 3-vector cost `[distance, energy, risk]`.
-- `run_demo_osm.py` — `OSMAirspaceGraphBuilder(AirspaceGraphBuilder)`: OSM-backed variant, `osmnx`, real-world edge costs (grade-based energy proxy, obstacle-proximity risk).
+- `config.py` — every tunable (region, heights, wind consts, risk weights, battery/mass). Edit here, not inline.
+- `env_data.py` — `fetch_weather()` → `WeatherSnapshot` (Open-Meteo, no key; live → cache → calm). Disk cache in `cache/`.
+- `module1_graph_builder.py` — shared cost pipeline: static edge attrs (`d_h`, `bearing`, `grade`, `obstacle`) → `apply_weather(G, snapshot)` → `energy`, `risk`, `risk_components`, `cost=[d, ε, ρ]`. Builders: `AirspaceGraphBuilder` (seeded synthetic grid, seeded wind/terrain/obstacles), `LatticeAirspaceBuilder` (200 m lattice, 6 km box, Thiruvanmiyur). Airspace = grid lattice, not road network.
+- `run_demo_osm.py` — lattice demo (name historic). Flags `--offline`, `--wind-override SPEED DIR_FROM`, `--box-km`, `--spacing-m`. Outputs `outputs/osm_*`.
 - `module2_tier1_moastar.py` — `TierOneEngine`: multi-objective A*/Dijkstra search (`pareto_dominates`, `update_pareto_front`), produces non-dominated route set for source/target pair. Tier 1.
 - `module4_tier2_payload.py` — `TierTwoSelector` + `derive_weights(F, T, U)`: converts four payload tags (fragility, temp sensitivity, urgency, priority) into objective weights via fixed formula (project context doc), scores every Pareto point, picks `argmax(score)`. Tier 2.
 - `run_demo_syn.py` / `run_demo_osm.py` — end-to-end demo scripts (`main()`), wire modules 1 → 2 → 4 on synthetic and OSM graphs, print step banners, render summary figures via Matplotlib.
-- `wind_integration_plan.md` — design doc, not-yet-built wind-aware extension (headwind/crosswind energy penalty, wind-speed risk term via Open-Meteo API). Read before touching wind-related edge costs — exact formulas, constants, which functions change.
+- `wind_integration_plan.md` — v1.1, implemented. Wind formulas, constants, six v1.0 bugs fixed. Read before touching wind-related edge costs.
 - `cache/`, `outputs/`, `pareto_front_storage/`, `__pycache__/` — generated artifacts, not source.
 
 Module numbering skips 3 (1, 2, 4 — no `module3`) — matches tier terms in report. Don't "fix" by renumbering.
@@ -58,7 +60,7 @@ python run_demo_syn.py            # synthetic airspace graph demo
 python run_demo_osm.py            # OpenStreetMap-backed demo (requires network access for OSM + optionally osmnx)
 ```
 
-No automated tests. Correctness check: run demo scripts, inspect printed Pareto front + generated summary figures under `outputs/`.
+Tests (unittest, offline): `python -m unittest discover -s Implementation/tests`. Also run demo scripts, inspect printed Pareto front + figures under `outputs/`. Sandbox blocks Open-Meteo: use `--offline` or `--wind-override`.
 
 ### Tier 1 → Tier 2 connection (matters when editing Tier 2 logic)
 

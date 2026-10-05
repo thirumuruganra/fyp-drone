@@ -22,6 +22,7 @@ from typing import Iterable
 import networkx as nx
 import numpy as np
 
+from module1_graph_builder import haversine_km
 from module2_tier1_moastar import pareto_dominates, update_pareto_front
 
 
@@ -81,9 +82,8 @@ def single_objective_astar(
         if objective != "distance":
             return 0.0
         try:
-            dx = (G.nodes[u]["x"] - G.nodes[v]["x"]) * 111.0
-            dy = (G.nodes[u]["y"] - G.nodes[v]["y"]) * 111.0
-            return float(np.hypot(dx, dy))
+            return haversine_km(G.nodes[u]["y"], G.nodes[u]["x"],
+                                G.nodes[v]["y"], G.nodes[v]["x"])
         except (KeyError, TypeError):
             return 0.0
 
@@ -155,9 +155,8 @@ def _random_walk_path(
             ], dtype=float)
             scalar = float(edge_cost @ bias) if bias is not None else float(edge_cost.sum())
             try:
-                dx = (G.nodes[v]["x"] - G.nodes[target]["x"]) * 111.0
-                dy = (G.nodes[v]["y"] - G.nodes[target]["y"]) * 111.0
-                scalar += 0.25 * float(np.hypot(dx, dy))
+                scalar += 0.25 * haversine_km(G.nodes[v]["y"], G.nodes[v]["x"],
+                                              G.nodes[target]["y"], G.nodes[target]["x"])
             except (KeyError, TypeError):
                 pass
             scored.append((v, scalar))

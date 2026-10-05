@@ -6,7 +6,7 @@ FYP: Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery
 This script runs the FULL end-to-end pipeline for the 30% Review 1
 implementation demo:
 
-  Step 1 → Module 1: Build airspace graph from OpenStreetMap (or synthetic)
+  Step 1 → Module 1: Build the seeded synthetic airspace graph (wind + terrain + obstacles)
   Step 2 → Module 2: Run Multi-Objective A* to compute Pareto front (Tier 1)
   Step 3 → Module 4: Run Payload-Aware selection for 4 payload presets (Tier 2)
   Step 4 → Save all output plots to outputs/
@@ -57,7 +57,7 @@ def print_banner(step: int, title: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-def run_module1(location="Kalavakkam, Tamil Nadu, India",
+def run_module1(location="Thiruvanmiyur, Chennai, Tamil Nadu, India",
                 dist=2000, seed=42):
     """Build and save the airspace graph, return G + (source, target)."""
     print_banner(1, "Airspace Graph Builder  [Module 1]")
