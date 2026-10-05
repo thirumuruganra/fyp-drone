@@ -52,7 +52,7 @@ def run_namoa(G, source, target, max_explored: int):
     t0 = time.perf_counter()
     engine = TierOneEngine(G, source, target, max_explored=max_explored)
     routes = engine.run()
-    return routes, time.perf_counter() - t0
+    return routes, time.perf_counter() - t0, engine.diagnostics()
 
 
 def plot_metric_bars(rows: list[dict], out_dir: Path) -> None:
@@ -110,7 +110,7 @@ def run_benchmarks(args):
         method_routes = {}
         runtimes = {}
 
-        namoa_routes, namoa_runtime = run_namoa(
+        namoa_routes, namoa_runtime, namoa_diag = run_namoa(
             G, source, target, max_explored=scenario["max_explored"]
         )
         method_routes["namoa"] = namoa_routes
@@ -154,6 +154,7 @@ def run_benchmarks(args):
             **scenario,
             "source": source,
             "target": target,
+            "namoa": namoa_diag,
             "reference": ref_meta,
             "method_route_counts_raw": {k: len(v) for k, v in method_routes.items()},
         })
