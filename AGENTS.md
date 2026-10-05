@@ -46,6 +46,9 @@ Python sim, five modules, no package structure — flat scripts, imported direct
 - `module5_evaluation.py` — hypervolume, IGD, spread, reference front, Tier 2 evidence helpers.
 - `run_demo_syn.py` / `run_demo_osm.py` — end-to-end demo scripts (`main()`), wire modules 1 → 2 → 4 on synthetic and OSM graphs, print step banners, render summary figures via Matplotlib.
 - `run_benchmarks.py` — benchmark entry point for synthetic scenarios and baselines.
+- `mission_export.py` — QGroundControl / Mission Planner `QGC WPL 110` export from `SelectionResult`; relative AGL altitude frame, RTL ending.
+- `dashboard.py` — minimal Tkinter operator dashboard: load stored graph/front, enter tags, show route, export mission.
+- `SITL_NOTES.md` — SITL validation checklist; hardware/SITL not run yet.
 - `wind_integration_plan.md` — design doc, not-yet-built wind-aware extension (headwind/crosswind energy penalty, wind-speed risk term via Open-Meteo API). Read before touching wind-related edge costs — exact formulas, constants, which functions change.
 - `cache/`, `outputs/`, `pareto_front_storage/`, `__pycache__/` — generated artifacts, not source.
 
@@ -56,6 +59,7 @@ cd Implementation
 pip install -r requirements.txt   # networkx, numpy, matplotlib, osmnx (osmnx optional — synthetic path falls back without it)
 python run_demo_syn.py            # synthetic airspace graph demo
 python run_demo_osm.py            # OpenStreetMap-backed demo (requires network access for OSM + optionally osmnx)
+python dashboard.py               # local operator dashboard, exports .waypoints
 python -m unittest discover -s tests
 ```
 
