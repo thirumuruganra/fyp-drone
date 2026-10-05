@@ -116,8 +116,11 @@ def run_module4(pareto_front, G=None, source=None, target=None):
     print_banner(4, "Payload-Aware Route Selection — Tier 2  [Module 4]")
     t0 = time.time()
 
-    selector = TierTwoSelector(pareto_front)
+    selector = TierTwoSelector(pareto_front, no_go_reasons=(G.graph.get("no_go_reasons") if G is not None else None))
     results  = selector.run_all_presets()
+    if selector.no_go:
+        print(f"[Demo] {selector.hold_advisory()} — Tier 2 plots skipped")
+        return selector, results
 
     fig1 = selector.visualise_route_comparison(results)
     fig1.savefig("outputs/module4_route_comparison.png",
@@ -297,7 +300,8 @@ def main():
             self.costs = costs
     eng = _FakeEngine(np.array([g for (g, _) in pareto_front]))
 
-    build_summary_figure(G, source, target, eng, selector, results)
+    if results:                                   # empty after a weather NO-GO hold
+        build_summary_figure(G, source, target, eng, selector, results)
 
     # ── Final summary ────────────────────────────────────────────────────
     elapsed = time.time() - t_start

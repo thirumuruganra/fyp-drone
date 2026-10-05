@@ -87,6 +87,20 @@ class WeatherSnapshot:
         known = {f for f in cls.__dataclass_fields__}
         return cls(**{k: v for k, v in data.items() if k in known})
 
+    def no_go_reasons(self) -> list:
+        """Reasons the weather forbids flight (empty list = GO): thunderstorm, heavy rain,
+        low visibility or gusts above the limit.  Thresholds live in config.py."""
+        reasons = []
+        if self.weather_code in cfg.NO_GO_WEATHER_CODES:
+            reasons.append(f"thunderstorm (WMO code {self.weather_code})")
+        if self.precipitation_mm >= cfg.NO_GO_PRECIP_MM_H:
+            reasons.append(f"heavy rain ({self.precipitation_mm:.1f} mm/h ≥ {cfg.NO_GO_PRECIP_MM_H:g})")
+        if self.visibility_m < cfg.NO_GO_VISIBILITY_M:
+            reasons.append(f"low visibility ({self.visibility_m:.0f} m < {cfg.NO_GO_VISIBILITY_M:g})")
+        if self.gust_kmh > cfg.NO_GO_GUST_KMH:
+            reasons.append(f"gusts {self.gust_kmh:.0f} km/h > {cfg.NO_GO_GUST_KMH:g}")
+        return reasons
+
     def describe(self) -> str:
         return (f"{self.wind_speed_kmh:.1f} km/h from {self.wind_dir_from_deg:.0f}° "
                 f"(gust {self.gust_kmh:.1f}) @ {self.wind_height_m:.0f} m  "
@@ -502,7 +516,13 @@ OSM_LAYER_TAGS = {
 _OSM_KEEP = ["building", "building:levels", "height", "name", "aeroway", "military",
              "landuse", "amenity", "boundary", "leisure", "office", "natural",
              "waterway", "highway"]
-FIXTURE_BUILDINGS = "osm_buildings_thiruvanmiyur.geojson"
+FIXTURE_LAYER_FILES = {
+    "buildings": "osm_buildings_thiruvanmiyur.geojson",
+    "restricted": "osm_restricted_thiruvanmiyur.geojson",
+    "water": "osm_water_thiruvanmiyur.geojson",
+    "landuse": "osm_landuse_thiruvanmiyur.geojson",
+}
+FIXTURE_BUILDINGS = FIXTURE_LAYER_FILES["buildings"]
 FIXTURE_DEM = "dem_thiruvanmiyur.json"
 
 _NUM = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
@@ -557,15 +577,9 @@ class BuildingIndex:
     @classmethod
     def from_gdf(cls, gdf, frame: LocalFrame) -> "BuildingIndex":
         """Polygon buildings of an EPSG:4326 GeoDataFrame, projected into `frame`."""
-        import shapely
         geoms, heights = [], []
-        if gdf is None or len(gdf) == 0:
-            return cls.empty()
-        for geom, (_, row) in zip(gdf.geometry, gdf.iterrows()):
-            if geom is None or geom.is_empty or geom.geom_type not in ("Polygon", "MultiPolygon"):
-                continue
-            local = shapely.transform(geom, lambda xy: np.column_stack(frame.to_local(xy[:, 1], xy[:, 0])))
-            geoms.append(local)
+        for geom, row in _local_rows(gdf, frame, ("Polygon", "MultiPolygon")):
+            geoms.append(geom)
             heights.append(building_height_m(row))
         return cls(geoms, heights)
 
@@ -584,6 +598,27 @@ class BuildingIndex:
         xs, ys = np.asarray(xs, float), np.asarray(ys, float)
         return self._reduce(shapely.box(xs - half_m, ys - half_m, xs + half_m, ys + half_m), "intersects")
 
+    def cell_density_height(self, xs, ys, half_m: float):
+        """
+        Per square cell: building plan-area ratio (footprint area inside the cell / cell
+        area, ≤ 1) and the footprint-area-weighted mean building height (0 if empty).
+        """
+        import shapely
+        xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+        density, mean_h = np.zeros(len(xs)), np.zeros(len(xs))
+        if self.tree is None or len(xs) == 0:
+            return density, mean_h
+        boxes = shapely.box(xs - half_m, ys - half_m, xs + half_m, ys + half_m)
+        q_idx, t_idx = self.tree.query(boxes, predicate="intersects")
+        geoms = np.asarray(self.geoms, dtype=object)
+        area = shapely.area(shapely.intersection(boxes[q_idx], geoms[t_idx]))
+        a_sum, ah_sum = np.zeros(len(xs)), np.zeros(len(xs))
+        np.add.at(a_sum, q_idx, area)
+        np.add.at(ah_sum, q_idx, area * self.heights[t_idx])
+        density = np.clip(a_sum / (2.0 * half_m) ** 2, 0.0, 1.0)
+        np.divide(ah_sum, a_sum, out=mean_h, where=a_sum > 0)
+        return density, mean_h
+
     def tallest_under(self, xs, ys) -> np.ndarray:
         """Height of the tallest footprint containing each point (0 if none)."""
         import shapely
@@ -594,6 +629,209 @@ class BuildingIndex:
         import shapely
         return self._reduce(shapely.points(np.asarray(xs, float), np.asarray(ys, float)),
                             "dwithin", distance=radius_m)
+
+
+def _tag(row, key: str) -> str:
+    """OSM tag value as a lower-case string ('' when absent or NaN)."""
+    v = row.get(key) if hasattr(row, "get") else None
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return ""
+    return str(v).strip().lower()
+
+
+def _local_rows(gdf, frame: LocalFrame, geom_types=None):
+    """(geometry in local metres, row) for each usable feature of an EPSG:4326 GeoDataFrame."""
+    import shapely
+    if gdf is None or len(gdf) == 0:
+        return
+    for geom, (_, row) in zip(gdf.geometry, gdf.iterrows()):
+        if geom is None or geom.is_empty:
+            continue
+        if geom_types is not None and geom.geom_type not in geom_types:
+            continue
+        yield shapely.transform(
+            geom, lambda xy: np.column_stack(frame.to_local(xy[:, 1], xy[:, 0]))), row
+
+
+def _widen(geom, line_m: float, point_m: float):
+    """Polygons stay as they are; lines and points get a buffer."""
+    if geom.geom_type in ("Polygon", "MultiPolygon"):
+        return geom
+    if geom.geom_type in ("LineString", "MultiLineString"):
+        return geom.buffer(line_m)
+    if geom.geom_type in ("Point", "MultiPoint"):
+        return geom.buffer(point_m)
+    return None
+
+
+def population_class(row) -> float:
+    """
+    SORA-style ground-risk class ∈ [0, 1] of a land-use / POI / road feature:
+    assembly of people (school, hospital, university, marketplace) 1.0 > commercial
+    0.7 > major road 0.6 > residential 0.5 > industrial 0.3 > anything else 0.
+    """
+    if _tag(row, "amenity") in cfg.POPULATION_ASSEMBLY_AMENITIES:
+        return cfg.POPULATION_CLASS_ASSEMBLY
+    landuse = _tag(row, "landuse")
+    if landuse in ("commercial", "retail"):
+        return cfg.POPULATION_CLASS_COMMERCIAL
+    if _tag(row, "highway") in cfg.POPULATION_MAJOR_ROADS:
+        return cfg.POPULATION_CLASS_ROAD
+    if landuse == "residential":
+        return cfg.POPULATION_CLASS_RESIDENTIAL
+    if landuse == "industrial":
+        return cfg.POPULATION_CLASS_INDUSTRIAL
+    return 0.0
+
+
+class ZoneIndex:
+    """Polygons in local metres (restricted zones, water): containment, distance, segment tests."""
+
+    def __init__(self, geoms: Sequence):
+        from shapely import STRtree
+        self.geoms = [g for g in geoms if g is not None and not g.is_empty]
+        self.tree = STRtree(self.geoms) if self.geoms else None
+
+    def __len__(self) -> int:
+        return len(self.geoms)
+
+    @classmethod
+    def empty(cls) -> "ZoneIndex":
+        return cls([])
+
+    @classmethod
+    def from_restricted(cls, gdf, frame: LocalFrame, manual=None) -> "ZoneIndex":
+        """
+        OSM restricted features (lines/points widened) plus a manual no-fly list of
+        (name, lat, lon, radius_m): `manual` itself, or config.MANUAL_NO_FLY_ZONES when
+        None and config.USE_MANUAL_NO_FLY_ZONES is on.
+        """
+        from shapely.geometry import Point
+        if manual is None:
+            manual = cfg.MANUAL_NO_FLY_ZONES if cfg.USE_MANUAL_NO_FLY_ZONES else ()
+        geoms = [_widen(g, cfg.RESTRICTED_LINE_POINT_BUFFER_M, cfg.RESTRICTED_LINE_POINT_BUFFER_M)
+                 for g, _ in _local_rows(gdf, frame)]
+        for _name, lat, lon, radius in manual:
+            x, y = frame.to_local(lat, lon)
+            geoms.append(Point(float(x), float(y)).buffer(radius))
+        return cls(geoms)
+
+    @classmethod
+    def from_water(cls, gdf, frame: LocalFrame) -> "ZoneIndex":
+        """Water polygons, buffered waterway lines and sea polygons built from the coastline."""
+        geoms = []
+        for g, row in _local_rows(gdf, frame):
+            if _tag(row, "natural") == "coastline" and g.geom_type in ("LineString", "MultiLineString"):
+                geoms.extend(sea_polygons(g))
+            else:
+                geoms.append(_widen(g, cfg.WATERWAY_BUFFER_M, cfg.WATERWAY_BUFFER_M))
+        return cls(geoms)
+
+    def contains(self, xs, ys) -> np.ndarray:
+        """True where a point lies in (or on the edge of) any zone."""
+        import shapely
+        xs = np.asarray(xs, float)
+        out = np.zeros(len(xs), dtype=bool)
+        if self.tree is None or len(xs) == 0:
+            return out
+        q_idx, _ = self.tree.query(shapely.points(xs, np.asarray(ys, float)), predicate="intersects")
+        out[q_idx] = True
+        return out
+
+    def distance(self, xs, ys, max_m: float) -> np.ndarray:
+        """Distance in metres to the nearest zone (0 inside); inf beyond max_m."""
+        import shapely
+        xs = np.asarray(xs, float)
+        out = np.full(len(xs), np.inf)
+        if self.tree is None or len(xs) == 0:
+            return out
+        idx, dist = self.tree.query_nearest(shapely.points(xs, np.asarray(ys, float)),
+                                            max_distance=max_m, return_distance=True,
+                                            all_matches=False)
+        out[idx[0]] = dist
+        return out
+
+    def intersects_segments(self, p0, p1) -> np.ndarray:
+        """True for each segment p0[k] → p1[k] (arrays of shape (n, 2)) touching any zone."""
+        import shapely
+        p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
+        out = np.zeros(len(p0), dtype=bool)
+        if self.tree is None or len(p0) == 0:
+            return out
+        lines = shapely.linestrings(np.stack([p0, p1], axis=1))
+        q_idx, _ = self.tree.query(lines, predicate="intersects")
+        out[q_idx] = True
+        return out
+
+    def outlines(self, frame: LocalFrame) -> list:
+        """Exterior rings as (n, 2) lon/lat arrays, for plotting."""
+        rings = []
+        for g in self.geoms:
+            for poly in getattr(g, "geoms", [g]):
+                if poly.geom_type == "Polygon":
+                    x, y = np.asarray(poly.exterior.coords).T
+                    lat, lon = frame.to_latlon(x, y)
+                    rings.append(np.column_stack([lon, lat]))
+        return rings
+
+
+def sea_polygons(coastline, offset_m: float = cfg.SEA_OFFSET_M) -> list:
+    """
+    Sea polygons from OSM coastline lines (local metres).  OSM keeps land on the left of
+    a coastline way, so the sea lies on its right: each line is offset to the right by
+    offset_m and closed into a polygon.  (The ocean itself is not a polygon in OSM.)
+    """
+    from shapely.geometry import Polygon
+    out = []
+    for line in getattr(coastline, "geoms", [coastline]):
+        if line.length <= 0:
+            continue
+        right = line.offset_curve(-offset_m)
+        if right.is_empty:
+            continue
+        ring = list(line.coords) + list(reversed(list(right.coords)))
+        poly = Polygon(ring).buffer(0)
+        if not poly.is_empty:
+            out.append(poly)
+    return out
+
+
+class ClassIndex:
+    """Features with a population class ∈ [0, 1]; class at a point = the highest covering class."""
+
+    def __init__(self, geoms: Sequence, classes: Sequence[float]):
+        from shapely import STRtree
+        self.geoms = list(geoms)
+        self.classes = np.asarray(classes, dtype=float)
+        self.tree = STRtree(self.geoms) if self.geoms else None
+
+    def __len__(self) -> int:
+        return len(self.geoms)
+
+    @classmethod
+    def empty(cls) -> "ClassIndex":
+        return cls([], [])
+
+    @classmethod
+    def from_gdf(cls, gdf, frame: LocalFrame) -> "ClassIndex":
+        geoms, classes = [], []
+        for g, row in _local_rows(gdf, frame):
+            c = population_class(row)
+            g = _widen(g, cfg.ROAD_BUFFER_M, cfg.POI_BUFFER_M)
+            if c > 0 and g is not None:
+                geoms.append(g)
+                classes.append(c)
+        return cls(geoms, classes)
+
+    def class_at(self, xs, ys) -> np.ndarray:
+        import shapely
+        xs = np.asarray(xs, float)
+        out = np.zeros(len(xs))
+        if self.tree is None or len(xs) == 0:
+            return out
+        q_idx, t_idx = self.tree.query(shapely.points(xs, np.asarray(ys, float)), predicate="intersects")
+        np.maximum.at(out, q_idx, self.classes[t_idx])
+        return out
 
 
 def _empty_layer():
@@ -621,7 +859,7 @@ def fetch_osm_layers(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
     as EPSG:4326 GeoDataFrames, cached as one GeoPackage in cache_dir.
 
     Order: cached GeoPackage → live osmnx.features_from_point (skipped when
-    offline) → hand-made fixture buildings from fixture_dir (only if given;
+    offline) → hand-made fixture layers from fixture_dir (only if given;
     announced loudly) → empty layers.
 
     fetcher(lat, lon, dist_m, tags) → GeoDataFrame replaces osmnx (tests).
@@ -663,11 +901,35 @@ def fetch_osm_layers(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
             print(f"[OSM] Live fetch failed ({type(exc).__name__}: {exc})")
 
     layers = {name: _empty_layer() for name in OSM_LAYER_TAGS}
-    fixture = os.path.join(fixture_dir, FIXTURE_BUILDINGS) if fixture_dir else None
-    if fixture and os.path.exists(fixture):
-        layers["buildings"] = gpd.read_file(fixture)
-        print(f"[OSM] USING HAND-MADE FIXTURE buildings ({len(layers['buildings'])}) from {fixture} "
+    loaded = []
+    for name, fname in FIXTURE_LAYER_FILES.items():
+        fixture = os.path.join(fixture_dir, fname) if fixture_dir else None
+        if fixture and os.path.exists(fixture):
+            layers[name] = gpd.read_file(fixture)
+            loaded.append(f"{name}={len(layers[name])}")
+    if loaded:
+        print(f"[OSM] USING HAND-MADE FIXTURE layers ({', '.join(loaded)}) from {fixture_dir} "
               f"— not real OSM data")
     else:
         print("[OSM] No cached layers and no network — continuing without OSM layers")
     return layers
+
+
+def build_layer_indexes(layers: dict, frame: LocalFrame, buildings: bool = True,
+                        risk_layers: bool = True, manual_nfz=None) -> dict:
+    """
+    Spatial indexes for LatticeAirspaceBuilder from fetch_osm_layers() output:
+    building_index, restricted_zones (OSM restricted features, plus the manual no-fly
+    list when manual_nfz is True, or None and config.USE_MANUAL_NO_FLY_ZONES),
+    water_zones and population_index.  buildings=False / risk_layers=False leave the
+    corresponding indexes out.
+    """
+    out: dict = {}
+    if buildings:
+        out["building_index"] = BuildingIndex.from_gdf(layers.get("buildings"), frame)
+    if risk_layers:
+        manual = cfg.MANUAL_NO_FLY_ZONES if manual_nfz else (None if manual_nfz is None else ())
+        out["restricted_zones"] = ZoneIndex.from_restricted(layers.get("restricted"), frame, manual)
+        out["water_zones"] = ZoneIndex.from_water(layers.get("water"), frame)
+        out["population_index"] = ClassIndex.from_gdf(layers.get("landuse"), frame)
+    return out

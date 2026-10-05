@@ -1,0 +1,82 @@
+{
+  "weather": {
+    "wind_speed_kmh": 30.0,
+    "wind_dir_from_deg": 225.0,
+    "gust_kmh": 30.0,
+    "precipitation_mm": 0.0,
+    "visibility_m": 10000.0,
+    "weather_code": 0,
+    "time": "",
+    "source": "override",
+    "wind_height_m": 60.0,
+    "latitude": 12.983,
+    "longitude": 80.2594,
+    "fetched_at": ""
+  },
+  "source": 840,
+  "target": 58,
+  "box_km": 6.0,
+  "spacing_m": 200.0,
+  "variants": [
+    {
+      "variant": "all",
+      "nodes": 893,
+      "edges": 6752,
+      "front_size": 196,
+      "runtime_s": 19.28,
+      "distance_min": 7.83673,
+      "distance_max": 10.8227,
+      "energy_min": 8.81607,
+      "energy_max": 12.60363,
+      "risk_min": 8.84941,
+      "risk_max": 13.11618,
+      "mean_rho": 0.19876,
+      "max_rho": 1.0
+    },
+    {
+      "variant": "no_wind",
+      "nodes": 893,
+      "edges": 6752,
+      "front_size": 206,
+      "runtime_s": 33.21,
+      "distance_min": 7.83673,
+      "distance_max": 10.89139,
+      "energy_min": 7.84382,
+      "energy_max": 10.89863,
+      "risk_min": 0.09876,
+      "risk_max": 4.24477,
+      "mean_rho": 0.06139,
+      "max_rho": 0.9275
+    },
+    {
+      "variant": "no_terrain",
+      "nodes": 893,
+      "edges": 6752,
+      "front_size": 56,
+      "runtime_s": 2.05,
+      "distance_min": 7.83672,
+      "distance_max": 11.57397,
+      "energy_min": 8.80911,
+      "energy_max": 13.58344,
+      "risk_min": 8.81313,
+      "risk_max": 13.08084,
+      "mean_rho": 0.19794,
+      "max_rho": 1.0
+    },
+    {
+      "variant": "no_buildings",
+      "nodes": 894,
+      "edges": 6768,
+      "front_size": 190,
+      "runtime_s": 15.39,
+      "distance_min": 7.83673,
+      "distance_max": 10.7941,
+      "energy_min": 8.81607,
+      "energy_max": 12.76361,
+      "risk_min": 8.84934,
+      "risk_max": 12.25599,
+      "mean_rho": 0.19167,
+      "max_rho": 1.0
+    }
+  ]
+}

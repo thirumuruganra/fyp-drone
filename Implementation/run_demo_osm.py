@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(__file__))
 
 import config as cfg
-from env_data import (FIXTURE_DEM, BuildingIndex, LocalFrame, LocalRasterProvider,
+from env_data import (FIXTURE_DEM, LocalFrame, LocalRasterProvider, build_layer_indexes,
                       default_elevation_providers, fetch_osm_layers)
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar  import TierOneEngine
@@ -122,23 +122,25 @@ def print_banner(step: int, title: str) -> None:
 
 
 def load_environment(args):
-    """(elevation providers, BuildingIndex) for the lattice, honouring --offline and --no-*."""
+    """(elevation providers, layer kwargs for the builder), honouring --offline and --no-*."""
     providers = None
     if not args.no_terrain:
         providers = default_elevation_providers()
         if args.offline:      # cached DEM first, hand-made fixture DEM as the last resort
             providers.append(LocalRasterProvider(os.path.join(FIXTURE_DIR, FIXTURE_DEM)))
 
-    index = None
-    if not args.no_buildings:
+    layer_kwargs: dict = {}
+    if not (args.no_buildings and args.no_risk_layers):
         try:
             layers = fetch_osm_layers(cfg.CENTER_LAT, cfg.CENTER_LON, offline=args.offline,
                                       fixture_dir=FIXTURE_DIR if args.offline else None)
-            index = BuildingIndex.from_gdf(layers["buildings"],
-                                           LocalFrame(cfg.CENTER_LAT, cfg.CENTER_LON))
+            layer_kwargs = build_layer_indexes(
+                layers, LocalFrame(cfg.CENTER_LAT, cfg.CENTER_LON),
+                buildings=not args.no_buildings, risk_layers=not args.no_risk_layers,
+                manual_nfz=args.manual_nfz or None)
         except ImportError as exc:
-            print(f"[Demo] Buildings skipped ({exc}); pip install geopandas shapely osmnx")
-    return providers, index
+            print(f"[Demo] OSM layers skipped ({exc}); pip install geopandas shapely osmnx")
+    return providers, layer_kwargs
 
 
 def run_module1_osm(args):
@@ -146,11 +148,11 @@ def run_module1_osm(args):
     t0 = time.time()
 
     override = tuple(args.wind_override) if args.wind_override else None
-    providers, index = load_environment(args)
+    providers, layer_kwargs = load_environment(args)
     builder = LatticeAirspaceBuilder(
         box_m=args.box_km * 1000.0, spacing_m=args.spacing_m, seed=SEED,
         offline=args.offline, wind_override=override,
-        elevation_providers=providers, building_index=index,
+        elevation_providers=providers, **layer_kwargs,
     )
     G = builder.fetch_graph()
     builder.save(path="pareto_front_storage/airspace_graph_osm.pkl")
@@ -160,7 +162,13 @@ def run_module1_osm(args):
     print(f"[Demo]   Elevation   : {G.graph['elevation_provider']}, "
           f"ground {min(grounds):.1f}–{max(grounds):.1f} m")
     print(f"[Demo]   Buildings   : {G.graph['n_buildings']} footprints, "
-          f"{G.graph['blocked_nodes']} node(s) blocked (> {cfg.H_MAX_AGL:.0f} m AGL needed)")
+          f"{G.graph['blocked_nodes']} node(s) blocked "
+          f"({G.graph['nfz_nodes']} in restricted zones, rest > {cfg.H_MAX_AGL:.0f} m AGL needed)")
+    print(f"[Demo]   Risk layers : {G.graph['n_restricted_zones']} restricted zones "
+          f"({G.graph.get('nfz_edges', 0)} edges cut), {G.graph['n_water_zones']} water, "
+          f"{G.graph['n_population_features']} exposure features")
+    print(f"[Demo]   Weather gate: " + ("NO-GO — " + "; ".join(G.graph['no_go_reasons'])
+                                          if G.graph['no_go'] else "GO"))
     print(f"[Demo]   Flight alt. : {min(alts):.1f}–{max(alts):.1f} m AMSL")
 
     source, target = pick_distant_pair(G, seed=SEED)
@@ -207,8 +215,11 @@ def run_module4_osm(pareto_front, G, source, target):
     print_banner(4, "Payload-Aware Route Selection — Tier 2  [Module 4]")
     t0 = time.time()
 
-    selector = TierTwoSelector(pareto_front)
+    selector = TierTwoSelector(pareto_front, no_go_reasons=G.graph.get("no_go_reasons"))
     results  = selector.run_all_presets()
+    if selector.no_go:
+        print(f"[Demo] {selector.hold_advisory()} — Tier 2 plots skipped")
+        return selector, results
 
     fig1 = selector.visualise_route_comparison(results)
     fig1.savefig("outputs/osm_module4_route_comparison.png",
@@ -250,6 +261,10 @@ def parse_args(argv=None):
                    help="replace the wind: SPEED km/h blowing FROM DIR degrees (0 = north)")
     p.add_argument("--no-terrain", action="store_true", help="flat ground (skip the DEM)")
     p.add_argument("--no-buildings", action="store_true", help="skip OSM building footprints")
+    p.add_argument("--manual-nfz", action="store_true",
+                   help="also apply config.MANUAL_NO_FLY_ZONES (approximate, unverified coordinates)")
+    p.add_argument("--no-risk-layers", action="store_true",
+                   help="skip restricted-zone, water and land-use/population layers")
     p.add_argument("--box-km", type=float, default=cfg.BOX_M / 1000.0,
                    help="lattice box side in km (default %(default)s)")
     p.add_argument("--spacing-m", type=float, default=cfg.LATTICE_SPACING_M,

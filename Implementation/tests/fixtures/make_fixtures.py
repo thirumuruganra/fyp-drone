@@ -5,6 +5,10 @@ Regenerate the offline terrain fixtures (deterministic):
 
   dem_thiruvanmiyur.json              hand-made DEM grid (ElevationGrid JSON)
   osm_buildings_thiruvanmiyur.geojson hand-made building footprints in OSM tag style
+  osm_restricted_thiruvanmiyur.geojson hand-made restricted zone (hard no-fly)
+  osm_water_thiruvanmiyur.geojson     hand-made canal (waterway line) and pond (water polygon)
+  osm_landuse_thiruvanmiyur.geojson   hand-made residential/commercial areas, school, hospital,
+                                      market and a primary road
 
 These are SYNTHETIC stand-ins shaped like SRTM/OSM data for offline runs and
 tests.  They are NOT real elevation or OpenStreetMap data.
@@ -80,7 +84,62 @@ def make_buildings():
     (HERE / "osm_buildings_thiruvanmiyur.geojson").write_text(json.dumps(fc), encoding="utf-8")
 
 
+def _ring(frame, pts):
+    out = []
+    for x, y in pts + [pts[0]]:
+        lat, lon = frame.to_latlon(x, y)
+        out.append([round(float(lon), 7), round(float(lat), 7)])
+    return out
+
+
+def _rect(frame, x0, y0, x1, y1):
+    return {"type": "Polygon", "coordinates": [_ring(frame, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)])]}
+
+
+def _line(frame, pts):
+    coords = []
+    for x, y in pts:
+        lat, lon = frame.to_latlon(x, y)
+        coords.append([round(float(lon), 7), round(float(lat), 7)])
+    return {"type": "LineString", "coordinates": coords}
+
+
+def _point(frame, x, y):
+    lat, lon = frame.to_latlon(x, y)
+    return {"type": "Point", "coordinates": [round(float(lon), 7), round(float(lat), 7)]}
+
+
+def _write(name, features):
+    fc = {"type": "FeatureCollection", "_comment": COMMENT, "features": features}
+    (HERE / name).write_text(json.dumps(fc), encoding="utf-8")
+
+
+def make_risk_layers():
+    frame = LocalFrame(cfg.CENTER_LAT, cfg.CENTER_LON)
+    feat = lambda geom, **props: {"type": "Feature", "properties": props, "geometry": geom}
+
+    _write("osm_restricted_thiruvanmiyur.geojson", [
+        feat(_rect(frame, 100, 900, 650, 1350), office="government", name="fixture government compound"),
+    ])
+    _write("osm_water_thiruvanmiyur.geojson", [
+        feat(_line(frame, [(-2900, -250), (-1000, -500), (500, -450), (2900, -900)]),
+             waterway="canal", name="fixture canal"),
+        feat(_rect(frame, -1700, 100, -1350, 330), natural="water", name="fixture pond"),
+    ])
+    _write("osm_landuse_thiruvanmiyur.geojson", [
+        feat(_rect(frame, -2400, 500, -900, 2200), landuse="residential"),
+        feat(_rect(frame, 700, 1300, 2200, 2100), landuse="commercial"),
+        feat(_rect(frame, 1300, -2300, 2500, -1100), landuse="industrial"),
+        feat(_rect(frame, -1000, -1600, -700, -1300), amenity="hospital", name="fixture hospital"),
+        feat(_point(frame, -300, 650), amenity="school", name="fixture school"),
+        feat(_point(frame, 1000, -300), amenity="marketplace", name="fixture market"),
+        feat(_line(frame, [(-200, -2900), (-150, 0), (-250, 2900)]), highway="primary", name="fixture road"),
+        feat(_line(frame, [(-2900, 1500), (0, 1450), (2900, 1500)]), highway="residential"),
+    ])
+
+
 if __name__ == "__main__":
     make_dem()
     make_buildings()
+    make_risk_layers()
     print("fixtures written to", HERE)

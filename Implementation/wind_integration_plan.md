@@ -78,16 +78,21 @@ stays admissible.
 ### 3.3 Risk
 
 ```
-ρ = clip( Σ_k w_k · ρ_k , 0, 1 ),   every ρ_k ∈ [0, 1]
+ρ = clip( Σ_k w_k · ρ_k , 0, 1 ),   every ρ_k ∈ [0, 1]       weights: config.RISK_WEIGHTS
 
-ρ_wind    = clip( (CW + K_GUST·max(0, gust − v)) / V_MAX_SAFE )     w = GAMMA_WIND = 0.30
-ρ_weather = W_PRECIP·clip(precip / 7.5 mm/h) + W_VIS·clip(1 − visibility / 10 km)   w = 0.20
-ρ_obstacle = static, from the builder                                w = 1.0
+ρ_wind       = clip( CW / V_MAX_SAFE )                        w = GAMMA_WIND = 0.30
+ρ_gust       = clip( K_GUST·max(0, gust − v) / V_MAX_SAFE )   w = 0.30
+ρ_turbulence = building density × clip(v / V_MAX_SAFE)        w = 0.20
+ρ_weather    = W_PRECIP·clip(precip / 7.5 mm/h) + W_VIS·clip(1 − visibility / 10 km)   w = 0.20
 ```
 
-Each edge stores the weighted contributions in `risk_components` next to `risk`.
-Components added in later phases (buildings, terrain, population, restricted zones,
-comm/GPS, water, turbulence) extend `config.RISK_WEIGHTS`.
+(v1.0 merged crosswind and gust into one term, `(CW + k_g·(gust − v)) / V_MAX_SAFE`;
+Phase 3 splits them so the breakdown shows each separately.) The static components
+(obstacle, building, terrain, population, nfz, water, comm) come from the builder.
+Each edge stores the weighted contributions in `risk_components`, the clipped score in
+`rho`, and the cumulative exposure `risk = rho · d_h / spacing` used as the third
+objective. A global weather go/no-go gate (thunderstorm codes 95–99, heavy rain, low
+visibility, gusts over the limit) is stored on the graph and respected by Tier 2.
 
 ### 3.4 Pipeline
 
