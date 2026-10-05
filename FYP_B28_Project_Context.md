@@ -18,9 +18,10 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
 - Review 2 in prep. `Review_2/Report/r2_reviewreport.tex` + `Review_2/PPT/R2_UG_Project_Presentation_Template.tex` still blank college templates. Report chapters needed: Introduction/Objectives, First Review Queries and Answers, Problem Statement, Methodology (architecture + modules), Implementation, Results and Discussion.
-- Python sim under `Implementation/`. Built: M1 graph builder, M2 NAMOA* Tier 1, M3 baselines, M4 Tier 2 selector, M5 evaluation metrics, synthetic demo, OSM demo, benchmark smoke path, unit tests.
+- Python sim under `Implementation/`. Built: M1 graph builder, M2 NAMOA* Tier 1, M3 baselines, M4 Tier 2 selector, M5 evaluation metrics, mission export, minimal dashboard, synthetic demo, OSM demo, benchmark smoke path, unit tests.
 - Phase 5 Tier 2 hardening done: input validation, battery feasibility filter, `SelectionResult`, JSON/CSV export, `run_demo_osm.py --payload/--preset`, tests.
-- Not built: calibrated risk weights, real-data live verification, mission export, dashboard, SITL, hardware.
+- Phase 7 integration extras done in code: `mission_export.py`, `dashboard.py`, `SITL_NOTES.md`. SITL/hardware not executed.
+- Not built: calibrated risk weights, real-data live verification, SITL execution, hardware.
 
 **Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (repo root), this file at root.
 
@@ -198,7 +199,7 @@ Stochastic baselines (MOPSO): 30 runs, mean ± std.
 
 1. **Tier 1:** MO A*/Dijkstra, precompute + store well-distributed Pareto set (distance, energy, risk) per region; periodic refresh, reuse across missions.
 2. **Tier 2:** payload metadata interpreter, four tags → one Pareto point, no weight re-tuning.
-3. **Ground-station dashboard:** tag entered once → ready-to-fly ArduPilot Mission Planner file, no further input.
+3. **Ground-station dashboard:** tag entered once → `QGC WPL 110` mission file exported. Minimal Tkinter version built; Mission Planner/QGroundControl import not verified.
 4. **Hardware validation:** quadcopter outdoor flights; measure route adherence + end-to-end latency (tag → mission execution).
 
 ### Research
