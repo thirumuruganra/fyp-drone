@@ -1,12 +1,12 @@
 # Wind Speed Integration Plan
 ## FYP B28 — Payload-Aware Two-Tier UAV Route Planning
-### Phase II Extension: Wind-Aware Airspace Graph (`run_demo_2.py`)
+### Phase II Extension: Wind-Aware Airspace Graph (`run_demo_osm.py`)
 
 ---
 
 ## 1. Motivation
 
-The current `run_demo_2.py` computes edge risk using only obstacle proximity and adds
+The current `run_demo_osm.py` computes edge risk using only obstacle proximity and adds
 a random noise term labelled "environmental variation." Wind is listed as a planned
 risk component in Section 3.2.3 of the report but is not yet implemented.
 
@@ -124,7 +124,7 @@ At 40 km/h (gale) → ρ_wind = 0.30 (approaches the open-sky base risk).
 
 ## 4. Implementation Plan
 
-### Step 1 — Add `fetch_wind()` utility  (new function in `run_demo_2.py`)
+### Step 1 — Add `fetch_wind()` utility  (new function in `run_demo_osm.py`)
 
 ```python
 import requests
@@ -260,8 +260,8 @@ and to the Module 1 graph title so the condition is visible in the saved PNG.
 
 | File | Change |
 |---|---|
-| `run_demo_2.py` | Add `fetch_wind()`, `_edge_bearing()`, `_energy_cost_wind()`, update `_risk_score_scaled()` and `fetch_graph()` |
-| `module1_graph_builder.py` | No change (OSM subclass lives in `run_demo_2.py`) |
+| `run_demo_osm.py` | Add `fetch_wind()`, `_edge_bearing()`, `_energy_cost_wind()`, update `_risk_score_scaled()` and `fetch_graph()` |
+| `module1_graph_builder.py` | No change (OSM subclass lives in `run_demo_osm.py`) |
 | `module2_tier1_moastar.py` | No change (consumes edge costs, agnostic to how they're set) |
 | `module4_tier2_payload.py` | No change (consumes Pareto front, agnostic to cost model) |
 

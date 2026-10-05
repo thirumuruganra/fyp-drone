@@ -225,6 +225,25 @@ class TierTwoSelector:
     #  Run all four reference presets
     # ------------------------------------------------------------------
 
+    def selected_index(self, selected_route: tuple) -> int:
+        """Return the index of a selected route in the current Pareto front."""
+        return self.pareto_front.index(selected_route)
+
+    def classify_point(self, route_index: int) -> str:
+        """
+        Classify a Pareto point for demo diagnostics.
+
+        A point is an objective extreme only if it is the best route for at
+        least one individual objective. Otherwise it is non-extreme.
+        """
+        objective_names = ("min-distance", "min-energy", "min-risk")
+        matches = [
+            objective_names[obj_idx]
+            for obj_idx in range(3)
+            if route_index == int(np.argmin(self.costs[:, obj_idx]))
+        ]
+        return "/".join(matches) if matches else "non-extreme"
+
     def run_all_presets(self) -> dict:
         """
         Run Tier 2 for all four payload presets from Table 3.2.
@@ -233,30 +252,35 @@ class TierTwoSelector:
         -------
         results : dict  name → (g_vector, path, w_risk, w_dist, w_energy, scores)
         """
-        print("\n" + "="*88)
+        print("\n" + "="*118)
         print("  MODULE 4 — Tier 2 Payload-Aware Route Selection  (all presets)")
-        print("="*88)
+        print("="*118)
         header = (f"{'Preset':<26} {'F':>2} {'W':>2} {'U':>2} {'P':>2}"
                   f"  {'w_risk':>7} {'w_dist':>7} {'w_enrg':>7}"
-                  f"  {'Dist(km)':>9} {'Energy':>8} {'Risk':>7}")
+                  f"  {'Idx':>4} {'Dist(km)':>9} {'Energy':>8}"
+                  f" {'CumRisk':>8} {'Score':>8} {'Point type':>13}")
         print(header)
-        print("-"*88)
+        print("-"*118)
 
         results = {}
         for name, tags in PAYLOAD_PRESETS.items():
             F, W, U, Plvl = tags["F"], tags["W"], tags["U"], tags["P"]
             selected, wr, wd, we, scores = self.select(F, W, U, Plvl)
             g, path = selected
+            route_idx = self.selected_index(selected)
+            point_type = self.classify_point(route_idx)
             results[name] = (g, path, wr, wd, we, scores)
             print(f"  {name:<24} {F:>2} {W:>2} {U:>2} {Plvl:>2}"
                   f"  {wr:>7.3f} {wd:>7.3f} {we:>7.3f}"
-                  f"  {g[0]:>9.4f} {g[1]:>8.4f} {g[2]:>7.4f}")
+                  f"  {route_idx:>4} {g[0]:>9.4f} {g[1]:>8.4f}"
+                  f" {g[2]:>8.4f} {scores[route_idx]:>8.4f}"
+                  f" {point_type:>13}")
 
-        print("="*88)
-        print("  ↳  Each preset selects a DIFFERENT point on the Pareto front.")
-        print("     Emergency medicine (U=3) picks the shortest-distance extreme;")
-        print("     all others pick NON-EXTREME intermediate points.")
-        print("="*88 + "\n")
+        unique_routes = len({tuple(result[1]) for result in results.values()})
+        print("="*118)
+        print(f"  ↳  Unique selected routes: {unique_routes}/{len(results)}")
+        print("     Route reuse is valid when one Pareto point maximises utility for multiple payloads.")
+        print("="*118 + "\n")
         return results
 
     # ------------------------------------------------------------------
@@ -271,7 +295,7 @@ class TierTwoSelector:
         labels = [PAYLOAD_PRESETS[n]["label"] for n in names]
         colors = [PRESET_COLOURS[n] for n in names]
 
-        metrics     = ["Distance (km)", "Energy (proxy)", "Flight Risk [0–1]"]
+        metrics     = ["Distance (km)", "Energy (proxy)", "Cumulative Risk"]
         metric_idx  = [0, 1, 2]
 
         fig, axes = plt.subplots(1, 3, figsize=(14, 6))
@@ -289,7 +313,7 @@ class TierTwoSelector:
 
         fig.suptitle(
             "Module 4 — Tier 2 Payload-Aware Route Selection\n"
-            "Each payload preset selects a DIFFERENT, non-extreme Pareto point",
+            "Payload tags score the Pareto front; routes may be reused when utility agrees",
             fontweight="bold", fontsize=13
         )
         plt.tight_layout()
@@ -319,7 +343,7 @@ class TierTwoSelector:
 
         ax.set_xlabel("Distance (km)", labelpad=10)
         ax.set_ylabel("Energy (proxy)", labelpad=10)
-        ax.set_zlabel("Flight Risk [0–1]", labelpad=10)
+        ax.set_zlabel("Cumulative Risk", labelpad=10)
         ax.set_title("Module 4 — Pareto Front with Tier 2 Payload-Aware Selections",
                      fontsize=11, fontweight="bold")
         ax.legend(loc="upper left", fontsize=8, framealpha=0.85)
@@ -395,7 +419,7 @@ class TierTwoSelector:
             ax.set_title(
                 f"{label}\n"
                 f"Dist = {g_vec[0]:.1f} km  |  Energy = {g_vec[1]:.1f}"
-                f"  |  Risk = {g_vec[2]:.2f}  |  Hops = {hop_count}\n"
+                f"  |  CumRisk = {g_vec[2]:.2f}  |  Hops = {hop_count}\n"
                 f"w_risk={wr:.2f}  w_dist={wd:.2f}  w_energy={we:.2f}",
                 fontsize=10, fontweight="bold", color=color, pad=6
             )

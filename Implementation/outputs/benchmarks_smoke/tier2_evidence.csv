@@ -1,0 +1,5 @@
+preset,F,W,U,P,w_risk,w_distance,w_energy,dominant_weight,selected_index,distance,energy,risk,rank_distance,rank_energy,rank_risk,dominant_objective_rank,point_type,selection_latency_ms,score,unique_routes_across_presets,scenario,nodes
+fragile_medical,5,1,1,3,0.6666666666666666,0.2,0.13333333333333333,risk,1,8.77168,9.54892,0.396,2,2,1,1,min-risk,0.017249999473278876,0.6666666666666666,2,S1_50_sparse,50
+emergency_medicine,1,1,3,5,0.14388489208633096,0.7122302158273381,0.14388489208633096,distance,0,8.58325,9.456019999999999,0.7561,1,1,2,1,min-distance/min-energy,0.009082999895326793,0.8561151079136691,2,S1_50_sparse,50
+disaster_relief,1,3,1,2,0.18181818181818182,0.2727272727272727,0.5454545454545454,energy,0,8.58325,9.456019999999999,0.7561,1,1,2,1,min-distance/min-energy,0.008832999810692854,0.8181818181818181,2,S1_50_sparse,50
+mixed_cargo,3,2,2,3,0.375,0.375,0.25,risk,0,8.58325,9.456019999999999,0.7561,1,1,2,2,min-distance/min-energy,0.007708999874012079,0.625,2,S1_50_sparse,50

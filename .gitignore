@@ -5,7 +5,13 @@ ProjectWork-2627.docx
 Review_1/FYP_B28_Review1_Report.zip
 Review_1/FirstReviewLaTeX.zip
 
+# OS junk
+.DS_Store
+
 # Implementation Stuff
+__pycache__/
+*.py[cod]
+tmp/
 Implementation/__pycache__/
 Implementation/cache/
 
