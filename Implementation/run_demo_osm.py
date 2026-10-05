@@ -5,29 +5,35 @@ FYP: Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery
 
 Same pipeline as run_demo_syn.py, but Module 1 builds a regular airspace
 lattice (200 m spacing, 6 km box) centred on Thiruvanmiyur, Chennai, with
-LIVE wind from Open-Meteo applied to every edge (headwind/crosswind energy
-penalty, crosswind + gust risk term).  The UAV flies the lattice, not the roads.
-
-(The file keeps its historical name; osmnx is not used until the OSM layers
-of the next phase land.)
+  • LIVE wind from Open-Meteo on every edge (headwind/crosswind energy penalty,
+    crosswind + gust risk term),
+  • terrain: ground elevation from a DEM (local raster → OpenTopography →
+    Open-Meteo → flat),
+  • OSM buildings (osmnx, cached as GeoPackage): node altitude clears the
+    tallest building in its cell by 15 m, never above 120 m AGL.
+The UAV flies the lattice, not the roads.  (The file keeps its historical name.)
 
 Key points
 ──────────
   • Wind: live Open-Meteo → last cached snapshot → calm.  No API key needed.
-  • --offline          skip the network (cached snapshot, else calm)
+  • DEM: free OpenTopography key (env OPENTOPO_API_KEY) is optional; without it
+    the keyless Open-Meteo elevation API is used.  $DEM_RASTER_PATH = local GeoTIFF.
+  • --offline          no network: cached weather/DEM/OSM, else hand-made
+                       FIXTURES in tests/fixtures (NOT real data) / calm wind
+  • --no-terrain / --no-buildings   Phase-1 behaviour (flat / no footprints)
   • --wind-override S D  force wind of S km/h blowing FROM D degrees
   • Source and target: the most distant pair in the largest strongly
     connected component of the lattice
   • Outputs go to outputs/ with an "osm_" prefix, next to the synthetic ones
 
 HOW TO RUN:
-    pip install networkx numpy matplotlib requests
+    pip install -r requirements.txt
     python run_demo_osm.py                        # live wind
     python run_demo_osm.py --offline              # deterministic, no network
     python run_demo_osm.py --wind-override 30 90  # 30 km/h easterly
 
 OUTPUT FILES (all in  outputs/ folder):
-  osm_module1_airspace_graph.png      — lattice, wind in the title
+  osm_module1_airspace_graph.png      — lattice shaded by altitude, wind in the title
   osm_module2_pareto_front_3d.png     — Pareto front in 3D
   osm_module2_pareto_front_2d.png     — 2D projections
   osm_module4_route_comparison.png    — bar chart per payload
@@ -49,6 +55,8 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(__file__))
 
 import config as cfg
+from env_data import (FIXTURE_DEM, BuildingIndex, LocalFrame, LocalRasterProvider,
+                      default_elevation_providers, fetch_osm_layers)
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar  import TierOneEngine
 from module4_tier2_payload   import TierTwoSelector, PAYLOAD_PRESETS, PRESET_COLOURS
@@ -57,6 +65,7 @@ os.makedirs("outputs",              exist_ok=True)
 os.makedirs("pareto_front_storage", exist_ok=True)
 
 SEED = 42
+FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,17 +121,47 @@ def print_banner(step: int, title: str) -> None:
     print(f"╚{bar}╝")
 
 
+def load_environment(args):
+    """(elevation providers, BuildingIndex) for the lattice, honouring --offline and --no-*."""
+    providers = None
+    if not args.no_terrain:
+        providers = default_elevation_providers()
+        if args.offline:      # cached DEM first, hand-made fixture DEM as the last resort
+            providers.append(LocalRasterProvider(os.path.join(FIXTURE_DIR, FIXTURE_DEM)))
+
+    index = None
+    if not args.no_buildings:
+        try:
+            layers = fetch_osm_layers(cfg.CENTER_LAT, cfg.CENTER_LON, offline=args.offline,
+                                      fixture_dir=FIXTURE_DIR if args.offline else None)
+            index = BuildingIndex.from_gdf(layers["buildings"],
+                                           LocalFrame(cfg.CENTER_LAT, cfg.CENTER_LON))
+        except ImportError as exc:
+            print(f"[Demo] Buildings skipped ({exc}); pip install geopandas shapely osmnx")
+    return providers, index
+
+
 def run_module1_osm(args):
     print_banner(1, "Airspace Graph Builder — Thiruvanmiyur lattice  [Module 1]")
     t0 = time.time()
 
     override = tuple(args.wind_override) if args.wind_override else None
+    providers, index = load_environment(args)
     builder = LatticeAirspaceBuilder(
         box_m=args.box_km * 1000.0, spacing_m=args.spacing_m, seed=SEED,
         offline=args.offline, wind_override=override,
+        elevation_providers=providers, building_index=index,
     )
     G = builder.fetch_graph()
     builder.save(path="pareto_front_storage/airspace_graph_osm.pkl")
+
+    alts = [d["alt_amsl_m"] for _, d in G.nodes(data=True)]
+    grounds = [d["ground_elev_m"] for _, d in G.nodes(data=True)]
+    print(f"[Demo]   Elevation   : {G.graph['elevation_provider']}, "
+          f"ground {min(grounds):.1f}–{max(grounds):.1f} m")
+    print(f"[Demo]   Buildings   : {G.graph['n_buildings']} footprints, "
+          f"{G.graph['blocked_nodes']} node(s) blocked (> {cfg.H_MAX_AGL:.0f} m AGL needed)")
+    print(f"[Demo]   Flight alt. : {min(alts):.1f}–{max(alts):.1f} m AMSL")
 
     source, target = pick_distant_pair(G, seed=SEED)
     print(f"[Demo]   Source node : {source}")
@@ -209,6 +248,8 @@ def parse_args(argv=None):
                    help="no network: use the cached weather snapshot, else calm")
     p.add_argument("--wind-override", nargs=2, type=float, metavar=("SPEED_KMH", "DIR_FROM_DEG"),
                    help="replace the wind: SPEED km/h blowing FROM DIR degrees (0 = north)")
+    p.add_argument("--no-terrain", action="store_true", help="flat ground (skip the DEM)")
+    p.add_argument("--no-buildings", action="store_true", help="skip OSM building footprints")
     p.add_argument("--box-km", type=float, default=cfg.BOX_M / 1000.0,
                    help="lattice box side in km (default %(default)s)")
     p.add_argument("--spacing-m", type=float, default=cfg.LATTICE_SPACING_M,
@@ -221,11 +262,12 @@ def main(argv=None):
     t_start = time.time()
     print("╔══════════════════════════════════════════════════════════════╗")
     print("║   FYP B28 — Payload-Aware Two-Tier UAV Route Planning       ║")
-    print("║   Phase I Simulation  |  Thiruvanmiyur lattice + wind       ║")
+    print("║   Phase I Simulation  |  Thiruvanmiyur lattice + wind + terrain║")
     print("╚══════════════════════════════════════════════════════════════╝")
     print(f"\n  Location : {cfg.LOCATION_NAME}")
     print(f"  Lattice  : {args.box_km:g} km box, {args.spacing_m:g} m spacing")
-    mode = "offline" if args.offline else "live wind (Open-Meteo), cached/calm fallback"
+    mode = ("offline (cache, else hand-made fixtures / calm)" if args.offline
+            else "live wind (Open-Meteo), cached/calm fallback")
     print(f"  Weather  : {mode}"
           + (f", override {args.wind_override[0]:g} km/h from {args.wind_override[1]:g}°"
              if args.wind_override else "") + "\n")

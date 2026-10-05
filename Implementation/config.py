@@ -36,13 +36,36 @@ VIS_CLEAR_M = 10_000.0    # visibility at/above which the visibility term is 0
 W_PRECIP = 0.5            # share of the weather term from rain
 W_VIS = 0.5               # share of the weather term from poor visibility
 
+# ── Terrain / buildings (Phase 2) ──────────────────────────────────────────
+GRADE_MAX = 0.30                 # |grade| at which the sudden-altitude-change term saturates
+EDGE_SAMPLE_STEP_M = 25.0        # along-edge sampling step for clearance / footprint terms
+BUILDING_NEAR_M = 30.0           # "near a footprint" distance
+BUILDING_MARGIN_REF_M = 60.0     # vertical margin above a nearby roof at which risk is 0
+OSM_FETCH_RADIUS_M = 4500.0      # features_from_point radius (covers the 6 km box corners)
+DEM_PROVIDER_TYPE = "COP30"      # OpenTopography global DEM (COP30 | COP90 | SRTMGL1 | ...)
+OPENTOPO_ENV_KEY = "OPENTOPO_API_KEY"
+DEM_RASTER_ENV = "DEM_RASTER_PATH"   # optional local GeoTIFF (SRTM / Copernicus)
+ELEVATION_BATCH = 100            # Open-Meteo elevation API: coordinates per request
+ELEVATION_ROUND_DEG = 5          # cache key precision (≈ 1 m)
+# Building height assumption (Chennai OSM height coverage is sparse):
+#   height=*  →  building:levels × LEVEL_HEIGHT_M  →  per-type default
+LEVEL_HEIGHT_M = 3.0
+BUILDING_DEFAULT_HEIGHT_M = {"residential": 9.0, "commercial": 15.0, "other": 10.0}
+BUILDING_RESIDENTIAL_TYPES = {"residential", "house", "apartments", "detached",
+                              "semidetached_house", "terrace", "dormitory",
+                              "bungalow", "hut", "cabin"}
+BUILDING_COMMERCIAL_TYPES = {"commercial", "retail", "office", "hotel", "supermarket",
+                             "kiosk", "mall", "warehouse", "industrial"}
+
 # ── Risk weights: ρ = clip(Σ w_k · ρ_k, 0, 1), every ρ_k ∈ [0, 1] ───────────
-# Phase 1 components: obstacle, wind, weather.  Phase 2/3 add building,
-# terrain, population, NFZ, comm/GPS, water and turbulence.
+# Components so far: obstacle, wind, weather (Phase 1), building, terrain
+# (Phase 2).  Phase 3 adds population, NFZ, comm/GPS, water and turbulence.
 RISK_WEIGHTS = {
     "obstacle": 1.0,
     "wind": GAMMA_WIND,
     "weather": 0.20,
+    "building": 0.60,
+    "terrain": 0.30,
 }
 
 # ── Synthetic scenarios (seeded, deterministic) ────────────────────────────

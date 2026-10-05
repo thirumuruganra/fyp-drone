@@ -12,11 +12,15 @@ Builds the delivery airspace graph G = (V, E).  Every edge carries a
   ε(e) : energy proxy (km-equivalent) = d · (1 + |grade| + headwind + crosswind)
   ρ(e) : flight risk ∈ [0, 1] = clip(Σ w_k · ρ_k)
 
+Node altitude (lattice): alt_amsl = ground + max(H_CRUISE_AGL, tallest building
+in the node's cell + CLEARANCE); nodes needing more than H_MAX_AGL are blocked.
+Edge grade = Δalt / d_h from the endpoint altitudes.
+
 Shared cost pipeline (used by every builder):
 
       static edge attributes  →  apply_weather(G, snapshot)  →  energy / risk
       (d_h, bearing, grade,        energy_cost(), risk_components()
-       obstacle)
+       obstacle, building, terrain)
 
 Static attributes never change after construction; apply_weather() can be
 re-run on the same graph with a new WeatherSnapshot (calm vs windy, refresh).
@@ -37,7 +41,7 @@ import math
 import os
 import pickle
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 import networkx as nx
@@ -47,7 +51,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 import config as cfg
-from env_data import WeatherSnapshot, fetch_weather, seeded_weather
+from env_data import (BuildingIndex, ElevationProvider, LocalFrame, WeatherSnapshot,
+                      fetch_elevations, fetch_weather, seeded_weather)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,21 +88,29 @@ class EdgeFeatures:
     distance_km: float     # 3-D length √(d_h² + Δalt²)
     bearing_deg: float     # heading u → v
     grade: float           # signed Δalt / d_h
-    obstacle: float        # ρ_obstacle ∈ [0, 1]
+    obstacle: float        # ρ_obstacle ∈ [0, 1]   (synthetic obstacle discs)
+    building: float = 0.0  # ρ_building ∈ [0, 1]   (footprint proximity × vertical margin)
+    terrain: float = 0.0   # ρ_terrain ∈ [0, 1]    (clearance margin, sudden altitude change)
 
     @classmethod
     def build(cls, d_h_km: float, bearing_deg: float,
-              dalt_m: float = 0.0, obstacle: float = 0.0) -> "EdgeFeatures":
+              dalt_m: float = 0.0, obstacle: float = 0.0,
+              building: float = 0.0, terrain: Optional[float] = None) -> "EdgeFeatures":
+        """terrain=None → clip(|grade| / GRADE_MAX): the sudden-altitude-change term alone."""
         grade = (dalt_m / 1000.0) / d_h_km if d_h_km > 0 else 0.0
         distance = math.hypot(d_h_km, dalt_m / 1000.0)
+        if terrain is None:
+            terrain = abs(grade) / cfg.GRADE_MAX
+        unit = lambda x: float(np.clip(x, 0.0, 1.0))
         return cls(d_h_km, distance, bearing_deg % 360.0, grade,
-                   float(np.clip(obstacle, 0.0, 1.0)))
+                   unit(obstacle), unit(building), unit(terrain))
 
     @classmethod
     def from_edge(cls, data: dict) -> "EdgeFeatures":
         try:
             return cls(data["d_h"], data["distance"], data["bearing"],
-                       data["grade"], data["obstacle"])
+                       data["grade"], data["obstacle"],
+                       data.get("building", 0.0), data.get("terrain", 0.0))
         except KeyError as exc:
             raise KeyError(f"edge lacks static attribute {exc}; rebuild the graph "
                            f"with a current builder") from None
@@ -105,7 +118,8 @@ class EdgeFeatures:
     def edge_attrs(self) -> dict:
         return {"d_h": round(self.d_h_km, 5), "distance": round(self.distance_km, 5),
                 "bearing": round(self.bearing_deg, 3), "grade": round(self.grade, 5),
-                "obstacle": round(self.obstacle, 5)}
+                "obstacle": round(self.obstacle, 5), "building": round(self.building, 5),
+                "terrain": round(self.terrain, 5)}
 
 
 def wind_components(bearing_deg: float, speed_kmh: float,
@@ -140,7 +154,9 @@ def risk_components(f: EdgeFeatures, w: WeatherSnapshot) -> dict:
     """
     Weighted risk contributions w_k·ρ_k (each ρ_k ∈ [0, 1]); ρ = clip(Σ, 0, 1).
 
-      obstacle : static, from the builder
+      obstacle : static, synthetic obstacle discs
+      building : static, fraction of along-edge samples near a footprint × vertical margin
+      terrain  : static, max(clearance margin, |grade| / GRADE_MAX)
       wind     : (CW + k_g·max(0, gust − v)) / V_MAX_SAFE   — crosswind + gust instability
       weather  : uniform; rain and poor visibility
     """
@@ -150,6 +166,8 @@ def risk_components(f: EdgeFeatures, w: WeatherSnapshot) -> dict:
                     + cfg.W_VIS * min(1.0, max(0.0, 1.0 - w.visibility_m / cfg.VIS_CLEAR_M)))
     terms = {
         "obstacle": f.obstacle,
+        "building": f.building,
+        "terrain": f.terrain,
         "wind": min(1.0, wind_term),
         "weather": min(1.0, weather_term),
     }
@@ -278,9 +296,15 @@ class AirspaceGraphBuilder:
                                edge_color="#C0C0C0", arrows=False,
                                width=0.6, alpha=0.7)
 
-        # All nodes (blue, small)
-        nx.draw_networkx_nodes(self.G, pos, ax=ax,
-                               node_size=25, node_color="#4A90D9", alpha=0.85)
+        # All nodes: shaded by altitude when it varies, else blue
+        alts = [d.get("alt_m", 0.0) for _, d in self.G.nodes(data=True)]
+        if max(alts) - min(alts) > 0.5:
+            sc = nx.draw_networkx_nodes(self.G, pos, ax=ax, node_size=30,
+                                        node_color=alts, cmap=plt.cm.viridis, alpha=0.9)
+            fig.colorbar(sc, ax=ax, shrink=0.6, pad=0.01, label="Node altitude AMSL (m)")
+        else:
+            nx.draw_networkx_nodes(self.G, pos, ax=ax,
+                                   node_size=25, node_color="#4A90D9", alpha=0.85)
 
         # Source / target highlights
         if source is not None:
@@ -433,13 +457,18 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
     (x_m, y_m) from the centre; lat/lon follow from the sphere.  8-neighbour
     edges in both directions; the largest strongly connected component is kept.
 
-    Node attributes : x = lon, y = lat, lat, lon, x_m, y_m, alt_m
-    Edge attributes : d_h, distance, bearing, grade, obstacle, time_s,
-                      energy, risk, risk_components, cost
+    Terrain and height (optional):
+      elevation_providers : list of ElevationProvider → ground_elev_m from the DEM
+                            (None: flat, 0 m, no lookups)
+      building_index      : BuildingIndex → bldg_h_m = tallest footprint touching
+                            the node's cell (None: no buildings)
+      alt_amsl_m = ground + max(H_CRUISE_AGL, bldg_h + CLEARANCE); a node needing
+      more than H_MAX_AGL is blocked (removed).
 
-    Phase 1 has no terrain, building or restricted-zone layers: the lattice is
-    flat (alt_m = 0, grade = 0, obstacle = 0), so energy and risk differences
-    come from the wind alone.
+    Node attributes : x = lon, y = lat, lat, lon, x_m, y_m, ground_elev_m,
+                      bldg_h_m, agl_m, alt_amsl_m, alt_m (= alt_amsl_m)
+    Edge attributes : d_h, distance (3-D), bearing, grade (Δalt/d_h), obstacle,
+                      building, terrain, time_s, energy, risk, risk_components, cost
     """
 
     def __init__(self,
@@ -450,13 +479,19 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
                  weather: Optional[WeatherSnapshot] = None,
                  offline: bool = False,
                  wind_override: Optional[Tuple[float, float]] = None,
-                 location: str = cfg.LOCATION_NAME):
+                 location: str = cfg.LOCATION_NAME,
+                 elevation_providers: Optional[Sequence[ElevationProvider]] = None,
+                 building_index: Optional[BuildingIndex] = None):
         super().__init__(location=location, dist=int(box_m / 2), seed=seed, weather=weather)
         self.center = center
         self.box_m = box_m
         self.spacing_m = spacing_m
         self.offline = offline
         self.wind_override = wind_override
+        self.elevation_providers = elevation_providers
+        self.building_index = building_index
+        self.frame = LocalFrame(*center)
+        self.build_info: dict = {}
 
     def resolve_weather(self) -> WeatherSnapshot:
         """Explicit snapshot, else fetch (live → cache → calm); then apply any wind override."""
@@ -475,42 +510,108 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         apply_weather(G, weather)
         print(f"[Module 1] Wind conditions: {weather.describe()}")
         G.graph.update(source="lattice", location=self.location,
-                       center=self.center, box_m=self.box_m, spacing_m=self.spacing_m)
+                       center=self.center, box_m=self.box_m, spacing_m=self.spacing_m,
+                       **self.build_info)
         self.G = G
         print(f"[Module 1] Lattice ready: {G.number_of_nodes()} nodes, "
               f"{G.number_of_edges()} edges")
         return G
 
+    # ------------------------------------------------------------------
+
+    def _node_environment(self, lats, lons, xs, ys):
+        """Ground elevation, tallest building per cell and the resulting altitudes (arrays)."""
+        if self.elevation_providers is None:
+            ground, provider = np.zeros(len(xs)), "none (flat)"
+        else:
+            ground, provider = fetch_elevations(list(zip(lats, lons)), self.elevation_providers,
+                                                offline=self.offline)
+        if self.building_index is not None and len(self.building_index):
+            bldg = self.building_index.max_height_in_cells(xs, ys, self.spacing_m / 2.0)
+        else:
+            bldg = np.zeros(len(xs))
+        agl = np.maximum(cfg.H_CRUISE_AGL, bldg + cfg.CLEARANCE)
+        self.build_info = {
+            "elevation_provider": provider,
+            "n_buildings": len(self.building_index) if self.building_index is not None else 0,
+        }
+        return ground, bldg, agl
+
+    def _edge_terms(self, a: dict, b: dict, d_h_km: float, grade: float) -> Tuple[float, float]:
+        """
+        (ρ_building, ρ_terrain) from samples every EDGE_SAMPLE_STEP_M along the edge,
+        flying the straight line between the endpoint altitudes.
+
+          margin_k   = flight altitude − ground − tallest footprint under the sample
+          terrain    = max(1 − clip(min margin / CLEARANCE), clip(|grade| / GRADE_MAX))
+          building   = mean_k [ near_k · (1 − clip((flight − ground − roof near) / REF)) ]
+                       where near_k = a footprint lies within BUILDING_NEAR_M of the sample
+        """
+        n = max(2, int(math.ceil(d_h_km * 1000.0 / cfg.EDGE_SAMPLE_STEP_M)) + 1)
+        t = np.linspace(0.0, 1.0, n)
+        flight = a["alt_amsl_m"] + t * (b["alt_amsl_m"] - a["alt_amsl_m"])
+        ground = a["ground_elev_m"] + t * (b["ground_elev_m"] - a["ground_elev_m"])
+        agl = flight - ground
+        idx = self.building_index
+        if idx is not None and len(idx):
+            xs = a["x_m"] + t * (b["x_m"] - a["x_m"])
+            ys = a["y_m"] + t * (b["y_m"] - a["y_m"])
+            under = idx.tallest_under(xs, ys)
+            near = idx.tallest_within(xs, ys, cfg.BUILDING_NEAR_M)
+            margin = agl - under
+            building = float(np.mean((near > 0) * (1.0 - np.clip((agl - near) / cfg.BUILDING_MARGIN_REF_M, 0.0, 1.0))))
+        else:
+            margin, building = agl, 0.0
+        clearance_risk = 1.0 - float(np.clip(margin.min() / cfg.CLEARANCE, 0.0, 1.0))
+        terrain = max(clearance_risk, min(1.0, abs(grade) / cfg.GRADE_MAX))
+        return building, terrain
+
     def _build_lattice(self) -> nx.DiGraph:
-        lat0, lon0 = self.center
         n = max(2, int(round(self.box_m / self.spacing_m)))
-        m_per_deg_lat = math.radians(1.0) * cfg.EARTH_RADIUS_KM * 1000.0
-        m_per_deg_lon = m_per_deg_lat * math.cos(math.radians(lat0))
         half = (n - 1) / 2.0
+        cols, rows = np.meshgrid(np.arange(n), np.arange(n))      # node id = r * n + c
+        xs = ((cols - half) * self.spacing_m).ravel()
+        ys = ((rows - half) * self.spacing_m).ravel()
+        lats, lons = self.frame.to_latlon(xs, ys)
+        ground, bldg, agl = self._node_environment(lats, lons, xs, ys)
+
+        blocked = agl > cfg.H_MAX_AGL
+        if blocked.any():
+            print(f"[Module 1] Blocked {int(blocked.sum())} node(s): required height above "
+                  f"ground exceeds {cfg.H_MAX_AGL:.0f} m")
+        self.build_info["blocked_nodes"] = int(blocked.sum())
 
         G = nx.DiGraph()
-        for r in range(n):
-            for c in range(n):
-                x_m = (c - half) * self.spacing_m
-                y_m = (r - half) * self.spacing_m
-                lat = lat0 + y_m / m_per_deg_lat
-                lon = lon0 + x_m / m_per_deg_lon
-                G.add_node(r * n + c, x=lon, y=lat, lat=lat, lon=lon,
-                           x_m=x_m, y_m=y_m, alt_m=0.0)
+        for k in range(n * n):
+            if blocked[k]:
+                continue
+            alt = float(ground[k] + agl[k])
+            G.add_node(k, x=float(lons[k]), y=float(lats[k]), lat=float(lats[k]), lon=float(lons[k]),
+                       x_m=float(xs[k]), y_m=float(ys[k]),
+                       ground_elev_m=round(float(ground[k]), 3), bldg_h_m=round(float(bldg[k]), 3),
+                       agl_m=round(float(agl[k]), 3), alt_amsl_m=round(alt, 3), alt_m=round(alt, 3))
 
         for r in range(n):
             for c in range(n):
                 u = r * n + c
+                if u not in G:
+                    continue
                 for dr in (-1, 0, 1):
                     for dc in (-1, 0, 1):
                         rr, cc = r + dr, c + dc
                         if (dr == 0 and dc == 0) or not (0 <= rr < n and 0 <= cc < n):
                             continue
                         v = rr * n + cc
+                        if v not in G:
+                            continue
                         a, b = G.nodes[u], G.nodes[v]
                         d_h = haversine_km(a["lat"], a["lon"], b["lat"], b["lon"])
                         brg = initial_bearing_deg(a["lat"], a["lon"], b["lat"], b["lon"])
-                        self._add_edge(G, u, v, EdgeFeatures.build(d_h, brg))
+                        dalt = b["alt_amsl_m"] - a["alt_amsl_m"]
+                        grade = (dalt / 1000.0) / d_h
+                        building, terrain = self._edge_terms(a, b, d_h, grade)
+                        self._add_edge(G, u, v, EdgeFeatures.build(
+                            d_h, brg, dalt, building=building, terrain=terrain))
 
         scc = max(nx.strongly_connected_components(G), key=len)
         if len(scc) < G.number_of_nodes():
