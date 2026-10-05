@@ -93,7 +93,9 @@ class EnergyAndRiskTests(unittest.TestCase):
         steady = WeatherSnapshot(wind_speed_kmh=20, wind_dir_from_deg=90, gust_kmh=20)
         gusty = WeatherSnapshot(wind_speed_kmh=20, wind_dir_from_deg=90, gust_kmh=36)
         f = EdgeFeatures.build(0.2, 90)
-        self.assertGreater(risk_components(f, gusty)["wind"], risk_components(f, steady)["wind"])
+        self.assertGreater(risk_components(f, gusty)["gust"], risk_components(f, steady)["gust"])
+        self.assertEqual(risk_components(f, gusty)["wind"], risk_components(f, steady)["wind"])
+        self.assertEqual(risk_components(f, steady)["gust"], 0.0)
 
     def test_weather_term_is_uniform_and_bounded(self):
         stormy = WeatherSnapshot(precipitation_mm=50, visibility_m=200)
@@ -107,7 +109,7 @@ class EnergyAndRiskTests(unittest.TestCase):
         w = WeatherSnapshot(wind_speed_kmh=80, wind_dir_from_deg=90, gust_kmh=120,
                             precipitation_mm=50, visibility_m=0)
         G = AirspaceGraphBuilder(seed=1, weather=w)._build_synthetic_graph(16)
-        self.assertTrue(all(0.0 <= d["risk"] <= 1.0 for _, _, d in G.edges(data=True)))
+        self.assertTrue(all(0.0 <= d["rho"] <= 1.0 for _, _, d in G.edges(data=True)))
         self.assertGreater(sum(risk_components(f, w).values()), 1.0)
 
 
@@ -129,8 +131,8 @@ class ApplyWeatherTests(unittest.TestCase):
         G = AirspaceGraphBuilder(seed=3)._build_synthetic_graph(25)
         for _, _, d in G.edges(data=True):
             self.assertEqual(d["cost"], [d["distance"], d["energy"], d["risk"]])
-            if d["risk"] < 1.0:      # below the clip, components add up to the risk
-                self.assertAlmostEqual(sum(d["risk_components"].values()), d["risk"], places=4)
+            if d["rho"] < 1.0:       # below the clip, components add up to the edge risk score
+                self.assertAlmostEqual(sum(d["risk_components"].values()), d["rho"], places=4)
 
     def test_synthetic_graph_is_deterministic(self):
         a = AirspaceGraphBuilder(seed=11)._build_synthetic_graph(36)

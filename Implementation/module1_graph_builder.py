@@ -10,7 +10,10 @@ Builds the delivery airspace graph G = (V, E).  Every edge carries a
 
   d(e) : flight distance of the segment (km, 3-D: √(d_h² + Δalt²))
   ε(e) : energy proxy (km-equivalent) = d · (1 + |grade| + headwind + crosswind)
-  ρ(e) : flight risk ∈ [0, 1] = clip(Σ w_k · ρ_k)
+  ρ(e) : cumulative risk exposure = ρ_edge · d_h / spacing, where
+         ρ_edge = clip(Σ w_k · ρ_k) ∈ [0, 1] (weights in config.RISK_WEIGHTS).
+         Length weighting makes a path's risk sum proportional to the distance
+         flown through risk, so a diagonal hop counts √2 axis-aligned hops.
 
 Node altitude (lattice): alt_amsl = ground + max(H_CRUISE_AGL, tallest building
 in the node's cell + CLEARANCE); nodes needing more than H_MAX_AGL are blocked.
@@ -20,8 +23,11 @@ Shared cost pipeline (used by every builder):
 
       static edge attributes  →  apply_weather(G, snapshot)  →  energy / risk
       (d_h, bearing, grade,        energy_cost(), risk_components()
-       obstacle, building, terrain)
+       obstacle, building, terrain,
+       population, nfz, water, comm, density)
 
+The global weather go/no-go gate is stored on the graph (G.graph["no_go"],
+["no_go_reasons"]) and respected by Tier 2.
 Static attributes never change after construction; apply_weather() can be
 re-run on the same graph with a new WeatherSnapshot (calm vs windy, refresh).
 
@@ -51,8 +57,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 import config as cfg
-from env_data import (BuildingIndex, ElevationProvider, LocalFrame, WeatherSnapshot,
-                      fetch_elevations, fetch_weather, seeded_weather)
+from env_data import (BuildingIndex, ClassIndex, ElevationProvider, LocalFrame, WeatherSnapshot,
+                      ZoneIndex, fetch_elevations, fetch_weather, seeded_weather)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -91,11 +97,20 @@ class EdgeFeatures:
     obstacle: float        # ρ_obstacle ∈ [0, 1]   (synthetic obstacle discs)
     building: float = 0.0  # ρ_building ∈ [0, 1]   (footprint proximity × vertical margin)
     terrain: float = 0.0   # ρ_terrain ∈ [0, 1]    (clearance margin, sudden altitude change)
+    population: float = 0.0  # ρ_population ∈ [0, 1] (SORA-style class, mean along the edge)
+    nfz: float = 0.0       # ρ_nfz ∈ [0, 1]        (soft buffer exp(−dist/λ) outside restricted zones)
+    water: float = 0.0     # ρ_water ∈ [0, 1]      (fraction of the edge over water)
+    comm: float = 0.0      # ρ_comm ∈ [0, 1]       (urban canyon: density × mean height)
+    density: float = 0.0   # building density ∈ [0, 1] (normalised); scales turbulence with wind
+
+    _OPTIONAL = ("building", "terrain", "population", "nfz", "water", "comm", "density")
 
     @classmethod
     def build(cls, d_h_km: float, bearing_deg: float,
               dalt_m: float = 0.0, obstacle: float = 0.0,
-              building: float = 0.0, terrain: Optional[float] = None) -> "EdgeFeatures":
+              building: float = 0.0, terrain: Optional[float] = None,
+              population: float = 0.0, nfz: float = 0.0, water: float = 0.0,
+              comm: float = 0.0, density: float = 0.0) -> "EdgeFeatures":
         """terrain=None → clip(|grade| / GRADE_MAX): the sudden-altitude-change term alone."""
         grade = (dalt_m / 1000.0) / d_h_km if d_h_km > 0 else 0.0
         distance = math.hypot(d_h_km, dalt_m / 1000.0)
@@ -103,14 +118,15 @@ class EdgeFeatures:
             terrain = abs(grade) / cfg.GRADE_MAX
         unit = lambda x: float(np.clip(x, 0.0, 1.0))
         return cls(d_h_km, distance, bearing_deg % 360.0, grade,
-                   unit(obstacle), unit(building), unit(terrain))
+                   unit(obstacle), unit(building), unit(terrain), unit(population),
+                   unit(nfz), unit(water), unit(comm), unit(density))
 
     @classmethod
     def from_edge(cls, data: dict) -> "EdgeFeatures":
         try:
             return cls(data["d_h"], data["distance"], data["bearing"],
                        data["grade"], data["obstacle"],
-                       data.get("building", 0.0), data.get("terrain", 0.0))
+                       *(data.get(k, 0.0) for k in cls._OPTIONAL))
         except KeyError as exc:
             raise KeyError(f"edge lacks static attribute {exc}; rebuild the graph "
                            f"with a current builder") from None
@@ -118,8 +134,8 @@ class EdgeFeatures:
     def edge_attrs(self) -> dict:
         return {"d_h": round(self.d_h_km, 5), "distance": round(self.distance_km, 5),
                 "bearing": round(self.bearing_deg, 3), "grade": round(self.grade, 5),
-                "obstacle": round(self.obstacle, 5), "building": round(self.building, 5),
-                "terrain": round(self.terrain, 5)}
+                "obstacle": round(self.obstacle, 5),
+                **{k: round(getattr(self, k), 5) for k in self._OPTIONAL}}
 
 
 def wind_components(bearing_deg: float, speed_kmh: float,
@@ -152,24 +168,32 @@ def energy_cost(f: EdgeFeatures, w: WeatherSnapshot) -> float:
 
 def risk_components(f: EdgeFeatures, w: WeatherSnapshot) -> dict:
     """
-    Weighted risk contributions w_k·ρ_k (each ρ_k ∈ [0, 1]); ρ = clip(Σ, 0, 1).
+    Weighted risk contributions w_k·ρ_k (each ρ_k ∈ [0, 1]); ρ_edge = clip(Σ, 0, 1).
 
-      obstacle : static, synthetic obstacle discs
-      building : static, fraction of along-edge samples near a footprint × vertical margin
-      terrain  : static, max(clearance margin, |grade| / GRADE_MAX)
-      wind     : (CW + k_g·max(0, gust − v)) / V_MAX_SAFE   — crosswind + gust instability
-      weather  : uniform; rain and poor visibility
+    Static (from the builder):
+      obstacle, building, terrain, population, nfz, water, comm
+    Weather-dependent:
+      wind       : CW / V_MAX_SAFE                              crosswind, direction-dependent
+      gust       : k_g·max(0, gust − v) / V_MAX_SAFE            gust excess over the mean wind
+      weather    : uniform; rain and poor visibility
+      turbulence : building density × v / V_MAX_SAFE            urban turbulence
     """
     _, cw = wind_components(f.bearing_deg, w.wind_speed_kmh, w.wind_dir_from_deg)
-    wind_term = (cw + cfg.K_GUST * max(0.0, w.gust_kmh - w.wind_speed_kmh)) / cfg.V_MAX_SAFE_KMH
-    weather_term = (cfg.W_PRECIP * min(1.0, max(0.0, w.precipitation_mm / cfg.PRECIP_HEAVY_MM_H))
-                    + cfg.W_VIS * min(1.0, max(0.0, 1.0 - w.visibility_m / cfg.VIS_CLEAR_M)))
+    unit = lambda x: min(1.0, max(0.0, x))
+    weather_term = (cfg.W_PRECIP * unit(w.precipitation_mm / cfg.PRECIP_HEAVY_MM_H)
+                    + cfg.W_VIS * unit(1.0 - w.visibility_m / cfg.VIS_CLEAR_M))
     terms = {
         "obstacle": f.obstacle,
         "building": f.building,
         "terrain": f.terrain,
-        "wind": min(1.0, wind_term),
-        "weather": min(1.0, weather_term),
+        "wind": unit(cw / cfg.V_MAX_SAFE_KMH),
+        "gust": unit(cfg.K_GUST * max(0.0, w.gust_kmh - w.wind_speed_kmh) / cfg.V_MAX_SAFE_KMH),
+        "weather": unit(weather_term),
+        "population": f.population,
+        "nfz": f.nfz,
+        "water": f.water,
+        "comm": f.comm,
+        "turbulence": f.density * unit(w.wind_speed_kmh / cfg.V_MAX_SAFE_KMH),
     }
     return {k: cfg.RISK_WEIGHTS[k] * v for k, v in terms.items()}
 
@@ -183,22 +207,34 @@ def ground_speed_kmh(f: EdgeFeatures, w: WeatherSnapshot) -> float:
 
 def apply_weather(G: nx.DiGraph, snapshot: Optional[WeatherSnapshot] = None) -> nx.DiGraph:
     """
-    (Re)compute energy, risk, cost, risk_components and time_s on every edge
-    from its static attributes and `snapshot` (calm when None).  Idempotent;
-    safe to call repeatedly with different snapshots.
+    (Re)compute rho, risk, energy, cost, risk_components and time_s on every edge from
+    its static attributes and `snapshot` (calm when None).  Idempotent; safe to call
+    repeatedly with different snapshots.
+
+      rho  = clip(Σ w_k·ρ_k, 0, 1)                 per-edge risk score
+      risk = rho · d_h / spacing_km                cumulative risk exposure (cost[2])
+
+    spacing_km is the nominal node spacing in G.graph (1 when absent).  The weather
+    go/no-go gate is written to G.graph["no_go"] / ["no_go_reasons"].
     """
     w = snapshot if snapshot is not None else WeatherSnapshot.calm()
+    spacing_km = float(G.graph.get("spacing_km") or 1.0)
     for _, _, data in G.edges(data=True):
         f = EdgeFeatures.from_edge(data)
         eps = round(energy_cost(f, w), 5)
         comps = risk_components(f, w)
-        rho = round(float(np.clip(sum(comps.values()), 0.0, 1.0)), 5)
+        rho = float(np.clip(sum(comps.values()), 0.0, 1.0))
+        exposure = round(rho * f.d_h_km / spacing_km, 5)
         data["energy"] = eps
-        data["risk"] = rho
+        data["rho"] = round(rho, 5)
+        data["risk"] = exposure
         data["risk_components"] = {k: round(v, 5) for k, v in comps.items()}
-        data["cost"] = [data["distance"], eps, rho]
+        data["cost"] = [data["distance"], eps, exposure]
         data["time_s"] = round(3600.0 * f.distance_km / ground_speed_kmh(f, w), 2)
+    reasons = w.no_go_reasons()
     G.graph["weather"] = w.to_dict()
+    G.graph["no_go"] = bool(reasons)
+    G.graph["no_go_reasons"] = reasons
     return G
 
 
@@ -306,6 +342,20 @@ class AirspaceGraphBuilder:
             nx.draw_networkx_nodes(self.G, pos, ax=ax,
                                    node_size=25, node_color="#4A90D9", alpha=0.85)
 
+        # Restricted zones (hard no-fly): shaded outlines
+        xs_all = [p[0] for p in pos.values()]
+        ys_all = [p[1] for p in pos.values()]
+        padx = 0.03 * (max(xs_all) - min(xs_all))
+        pady = 0.03 * (max(ys_all) - min(ys_all))
+        x0, x1, y0, y1 = min(xs_all) - padx, max(xs_all) + padx, min(ys_all) - pady, max(ys_all) + pady
+        for ring in self.G.graph.get("nfz_outlines", []):
+            if ring[:, 0].max() < x0 or ring[:, 0].min() > x1 or ring[:, 1].max() < y0 or ring[:, 1].min() > y1:
+                continue                                    # zone lies outside the plotted area
+            ax.fill(ring[:, 0], ring[:, 1], facecolor="#E74C3C", alpha=0.18,
+                    edgecolor="#C0392B", hatch="//", linewidth=1.2, zorder=1)
+        ax.set_xlim(x0, x1)
+        ax.set_ylim(y0, y1)
+
         # Source / target highlights
         if source is not None:
             nx.draw_networkx_nodes(self.G, pos, nodelist=[source], ax=ax,
@@ -396,6 +446,8 @@ class AirspaceGraphBuilder:
                         d_h, brg, nj["alt_m"] - ni["alt_m"], obstacles(xm, ym)))
 
         weather = self.weather if self.weather is not None else seeded_weather(self.seed)
+        G.graph["spacing_km"] = haversine_km(cfg.SYN_ORIGIN_LAT, cfg.SYN_ORIGIN_LON,
+                                             cfg.SYN_ORIGIN_LAT + cfg.SYN_SPACING_DEG, cfg.SYN_ORIGIN_LON)
         apply_weather(G, weather)
         print(f"[Module 1] Synthetic graph: {G.number_of_nodes()} nodes, "
               f"{G.number_of_edges()} edges | wind {weather.describe()}")
@@ -465,10 +517,19 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
       alt_amsl_m = ground + max(H_CRUISE_AGL, bldg_h + CLEARANCE); a node needing
       more than H_MAX_AGL is blocked (removed).
 
+    Risk layers (optional, all in local metres):
+      restricted_zones : ZoneIndex — hard no-fly: a node inside a zone and an edge whose
+                         segment touches one are removed; outside, soft buffer exp(−d/λ)
+      water_zones      : ZoneIndex — fraction of the edge over water
+      population_index : ClassIndex — SORA-style exposure class, mean along the edge
+      (the building index also gives comm/GPS canyon and turbulence density)
+
     Node attributes : x = lon, y = lat, lat, lon, x_m, y_m, ground_elev_m,
-                      bldg_h_m, agl_m, alt_amsl_m, alt_m (= alt_amsl_m)
-    Edge attributes : d_h, distance (3-D), bearing, grade (Δalt/d_h), obstacle,
-                      building, terrain, time_s, energy, risk, risk_components, cost
+                      bldg_h_m, bldg_density, bldg_mean_h_m, agl_m, alt_amsl_m,
+                      alt_m (= alt_amsl_m)
+    Edge attributes : d_h, distance (3-D), bearing, grade (Δalt/d_h), obstacle, building,
+                      terrain, population, nfz, water, comm, density, time_s, energy,
+                      rho, risk (= rho · d_h / spacing), risk_components, cost
     """
 
     def __init__(self,
@@ -481,7 +542,10 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
                  wind_override: Optional[Tuple[float, float]] = None,
                  location: str = cfg.LOCATION_NAME,
                  elevation_providers: Optional[Sequence[ElevationProvider]] = None,
-                 building_index: Optional[BuildingIndex] = None):
+                 building_index: Optional[BuildingIndex] = None,
+                 restricted_zones: Optional[ZoneIndex] = None,
+                 water_zones: Optional[ZoneIndex] = None,
+                 population_index: Optional[ClassIndex] = None):
         super().__init__(location=location, dist=int(box_m / 2), seed=seed, weather=weather)
         self.center = center
         self.box_m = box_m
@@ -490,6 +554,9 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         self.wind_override = wind_override
         self.elevation_providers = elevation_providers
         self.building_index = building_index
+        self.restricted_zones = restricted_zones
+        self.water_zones = water_zones
+        self.population_index = population_index
         self.frame = LocalFrame(*center)
         self.build_info: dict = {}
 
@@ -512,6 +579,8 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         G.graph.update(source="lattice", location=self.location,
                        center=self.center, box_m=self.box_m, spacing_m=self.spacing_m,
                        **self.build_info)
+        if self.restricted_zones is not None:
+            G.graph["nfz_outlines"] = self.restricted_zones.outlines(self.frame)
         self.G = G
         print(f"[Module 1] Lattice ready: {G.number_of_nodes()} nodes, "
               f"{G.number_of_edges()} edges")
@@ -520,42 +589,53 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
     # ------------------------------------------------------------------
 
     def _node_environment(self, lats, lons, xs, ys):
-        """Ground elevation, tallest building per cell and the resulting altitudes (arrays)."""
+        """Ground elevation, building cell statistics and the resulting heights (arrays)."""
         if self.elevation_providers is None:
             ground, provider = np.zeros(len(xs)), "none (flat)"
         else:
             ground, provider = fetch_elevations(list(zip(lats, lons)), self.elevation_providers,
                                                 offline=self.offline)
-        if self.building_index is not None and len(self.building_index):
-            bldg = self.building_index.max_height_in_cells(xs, ys, self.spacing_m / 2.0)
+        idx = self.building_index
+        if idx is not None and len(idx):
+            half = self.spacing_m / 2.0
+            bldg = idx.max_height_in_cells(xs, ys, half)
+            density, mean_h = idx.cell_density_height(xs, ys, half)
         else:
-            bldg = np.zeros(len(xs))
+            bldg, density, mean_h = np.zeros(len(xs)), np.zeros(len(xs)), np.zeros(len(xs))
         agl = np.maximum(cfg.H_CRUISE_AGL, bldg + cfg.CLEARANCE)
         self.build_info = {
             "elevation_provider": provider,
-            "n_buildings": len(self.building_index) if self.building_index is not None else 0,
+            "n_buildings": len(idx) if idx is not None else 0,
+            "n_restricted_zones": len(self.restricted_zones) if self.restricted_zones is not None else 0,
+            "n_water_zones": len(self.water_zones) if self.water_zones is not None else 0,
+            "n_population_features": len(self.population_index) if self.population_index is not None else 0,
         }
-        return ground, bldg, agl
+        return ground, bldg, agl, density, mean_h
 
-    def _edge_terms(self, a: dict, b: dict, d_h_km: float, grade: float) -> Tuple[float, float]:
+    def _edge_terms(self, a: dict, b: dict, d_h_km: float, grade: float) -> dict:
         """
-        (ρ_building, ρ_terrain) from samples every EDGE_SAMPLE_STEP_M along the edge,
+        Static risk terms of one edge from samples every EDGE_SAMPLE_STEP_M along it,
         flying the straight line between the endpoint altitudes.
 
           margin_k   = flight altitude − ground − tallest footprint under the sample
           terrain    = max(1 − clip(min margin / CLEARANCE), clip(|grade| / GRADE_MAX))
           building   = mean_k [ near_k · (1 − clip((flight − ground − roof near) / REF)) ]
                        where near_k = a footprint lies within BUILDING_NEAR_M of the sample
+          population = mean_k class at the sample (SORA-style lookup)
+          nfz        = max_k exp(−dist_k / λ) to the nearest restricted zone (0 beyond 4λ)
+          water      = fraction of samples over water
+          comm       = clip(mean density / DENSITY_REF) · clip(mean height / COMM_HEIGHT_REF)
+          density    = clip(mean density / DENSITY_REF)   (scales turbulence with the wind)
         """
         n = max(2, int(math.ceil(d_h_km * 1000.0 / cfg.EDGE_SAMPLE_STEP_M)) + 1)
         t = np.linspace(0.0, 1.0, n)
+        xs = a["x_m"] + t * (b["x_m"] - a["x_m"])
+        ys = a["y_m"] + t * (b["y_m"] - a["y_m"])
         flight = a["alt_amsl_m"] + t * (b["alt_amsl_m"] - a["alt_amsl_m"])
         ground = a["ground_elev_m"] + t * (b["ground_elev_m"] - a["ground_elev_m"])
         agl = flight - ground
         idx = self.building_index
         if idx is not None and len(idx):
-            xs = a["x_m"] + t * (b["x_m"] - a["x_m"])
-            ys = a["y_m"] + t * (b["y_m"] - a["y_m"])
             under = idx.tallest_under(xs, ys)
             near = idx.tallest_within(xs, ys, cfg.BUILDING_NEAR_M)
             margin = agl - under
@@ -564,7 +644,20 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
             margin, building = agl, 0.0
         clearance_risk = 1.0 - float(np.clip(margin.min() / cfg.CLEARANCE, 0.0, 1.0))
         terrain = max(clearance_risk, min(1.0, abs(grade) / cfg.GRADE_MAX))
-        return building, terrain
+
+        population = float(self.population_index.class_at(xs, ys).mean()) if self.population_index is not None else 0.0
+        nfz = 0.0
+        if self.restricted_zones is not None and len(self.restricted_zones):
+            d = self.restricted_zones.distance(xs, ys, cfg.NFZ_SOFT_CUTOFF * cfg.NFZ_SOFT_LAMBDA_M)
+            nfz = float(np.max(np.exp(-d / cfg.NFZ_SOFT_LAMBDA_M)))       # exp(−inf) = 0 beyond the cutoff
+        water = float(self.water_zones.contains(xs, ys).mean()) if self.water_zones is not None else 0.0
+
+        dens = (a["bldg_density"] + b["bldg_density"]) / 2.0
+        mean_h = (a["bldg_mean_h_m"] + b["bldg_mean_h_m"]) / 2.0
+        density = min(1.0, dens / cfg.DENSITY_REF)
+        comm = density * min(1.0, mean_h / cfg.COMM_HEIGHT_REF_M)
+        return {"building": building, "terrain": terrain, "population": population,
+                "nfz": nfz, "water": water, "comm": comm, "density": density}
 
     def _build_lattice(self) -> nx.DiGraph:
         n = max(2, int(round(self.box_m / self.spacing_m)))
@@ -573,15 +666,21 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         xs = ((cols - half) * self.spacing_m).ravel()
         ys = ((rows - half) * self.spacing_m).ravel()
         lats, lons = self.frame.to_latlon(xs, ys)
-        ground, bldg, agl = self._node_environment(lats, lons, xs, ys)
+        ground, bldg, agl, density, mean_h = self._node_environment(lats, lons, xs, ys)
 
-        blocked = agl > cfg.H_MAX_AGL
-        if blocked.any():
-            print(f"[Module 1] Blocked {int(blocked.sum())} node(s): required height above "
+        too_tall = agl > cfg.H_MAX_AGL
+        in_nfz = (self.restricted_zones.contains(xs, ys) if self.restricted_zones is not None
+                  else np.zeros(len(xs), dtype=bool))
+        blocked = too_tall | in_nfz
+        if too_tall.any():
+            print(f"[Module 1] Blocked {int(too_tall.sum())} node(s): required height above "
                   f"ground exceeds {cfg.H_MAX_AGL:.0f} m")
+        if in_nfz.any():
+            print(f"[Module 1] Removed {int(in_nfz.sum())} node(s) inside restricted zones")
         self.build_info["blocked_nodes"] = int(blocked.sum())
+        self.build_info["nfz_nodes"] = int(in_nfz.sum())
 
-        G = nx.DiGraph()
+        G = nx.DiGraph(spacing_km=self.spacing_m / 1000.0)
         for k in range(n * n):
             if blocked[k]:
                 continue
@@ -589,8 +688,10 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
             G.add_node(k, x=float(lons[k]), y=float(lats[k]), lat=float(lats[k]), lon=float(lons[k]),
                        x_m=float(xs[k]), y_m=float(ys[k]),
                        ground_elev_m=round(float(ground[k]), 3), bldg_h_m=round(float(bldg[k]), 3),
+                       bldg_density=round(float(density[k]), 5), bldg_mean_h_m=round(float(mean_h[k]), 3),
                        agl_m=round(float(agl[k]), 3), alt_amsl_m=round(alt, 3), alt_m=round(alt, 3))
 
+        candidates = []                                            # directed (u, v) among kept nodes
         for r in range(n):
             for c in range(n):
                 u = r * n + c
@@ -601,17 +702,26 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
                         rr, cc = r + dr, c + dc
                         if (dr == 0 and dc == 0) or not (0 <= rr < n and 0 <= cc < n):
                             continue
-                        v = rr * n + cc
-                        if v not in G:
-                            continue
-                        a, b = G.nodes[u], G.nodes[v]
-                        d_h = haversine_km(a["lat"], a["lon"], b["lat"], b["lon"])
-                        brg = initial_bearing_deg(a["lat"], a["lon"], b["lat"], b["lon"])
-                        dalt = b["alt_amsl_m"] - a["alt_amsl_m"]
-                        grade = (dalt / 1000.0) / d_h
-                        building, terrain = self._edge_terms(a, b, d_h, grade)
-                        self._add_edge(G, u, v, EdgeFeatures.build(
-                            d_h, brg, dalt, building=building, terrain=terrain))
+                        if rr * n + cc in G:
+                            candidates.append((u, rr * n + cc))
+
+        if self.restricted_zones is not None and candidates:     # hard NFZ: drop crossing edges
+            p0 = np.array([[G.nodes[u]["x_m"], G.nodes[u]["y_m"]] for u, _ in candidates])
+            p1 = np.array([[G.nodes[v]["x_m"], G.nodes[v]["y_m"]] for _, v in candidates])
+            crossing = self.restricted_zones.intersects_segments(p0, p1)
+            if crossing.any():
+                print(f"[Module 1] Removed {int(crossing.sum())} edge(s) crossing restricted zones")
+            self.build_info["nfz_edges"] = int(crossing.sum())
+            candidates = [e for e, hit in zip(candidates, crossing) if not hit]
+
+        for u, v in candidates:
+            a, b = G.nodes[u], G.nodes[v]
+            d_h = haversine_km(a["lat"], a["lon"], b["lat"], b["lon"])
+            brg = initial_bearing_deg(a["lat"], a["lon"], b["lat"], b["lon"])
+            dalt = b["alt_amsl_m"] - a["alt_amsl_m"]
+            grade = (dalt / 1000.0) / d_h
+            self._add_edge(G, u, v, EdgeFeatures.build(
+                d_h, brg, dalt, **self._edge_terms(a, b, d_h, grade)))
 
         scc = max(nx.strongly_connected_components(G), key=len)
         if len(scc) < G.number_of_nodes():

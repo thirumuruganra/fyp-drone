@@ -57,15 +57,63 @@ BUILDING_RESIDENTIAL_TYPES = {"residential", "house", "apartments", "detached",
 BUILDING_COMMERCIAL_TYPES = {"commercial", "retail", "office", "hotel", "supermarket",
                              "kiosk", "mall", "warehouse", "industrial"}
 
+# ── Population / road exposure (SORA-style ground-risk class lookup) ───────
+# Class ∈ [0, 1] per OSM feature; the edge term is the mean over along-edge samples.
+POPULATION_CLASS_ASSEMBLY = 1.0       # schools, hospitals, universities, marketplaces
+POPULATION_CLASS_COMMERCIAL = 0.7     # commercial / retail land use
+POPULATION_CLASS_ROAD = 0.6           # motorway / trunk / primary roads (people and vehicles)
+POPULATION_CLASS_RESIDENTIAL = 0.5
+POPULATION_CLASS_INDUSTRIAL = 0.3
+POPULATION_ASSEMBLY_AMENITIES = {"school", "hospital", "college", "university", "marketplace"}
+POPULATION_MAJOR_ROADS = {"motorway", "trunk", "primary"}
+ROAD_BUFFER_M = 15.0                  # half-width given to road centre-lines
+POI_BUFFER_M = 60.0                   # radius given to point amenities
+
+# ── Restricted / no-fly zones ──────────────────────────────────────────────
+# Hard: a node inside a zone, or an edge whose segment intersects one, is removed.
+# Soft: outside a zone, ρ_nfz = exp(−distance / NFZ_SOFT_LAMBDA_M), taken at the
+# closest approach along the edge and dropped beyond NFZ_SOFT_CUTOFF · λ.
+NFZ_SOFT_LAMBDA_M = 150.0
+NFZ_SOFT_CUTOFF = 4.0
+RESTRICTED_LINE_POINT_BUFFER_M = 100.0   # lines/points tagged restricted (runways, helipads)
+# Manual list: (name, lat, lon, radius_m).  The centres and radii are APPROXIMATE, typed
+# from memory and NOT verified — check them against the Digital Sky map / DGCA before
+# enabling.  Off by default: an unverified zone must not silently remove real airspace
+# (the Raj Bhavan buffer clips the NW corner of the default box).
+USE_MANUAL_NO_FLY_ZONES = False
+MANUAL_NO_FLY_ZONES = [
+    ("Chennai airport (MAA) red-zone buffer", 12.9941, 80.1709, 5000.0),
+    ("Raj Bhavan, Guindy", 13.0090, 80.2290, 600.0),
+    ("Guindy National Park", 13.0067, 80.2206, 1200.0),
+]
+
+# ── Water (payload loss), comm/GPS and turbulence ──────────────────────────
+WATERWAY_BUFFER_M = 15.0              # half-width given to waterway centre-lines
+SEA_OFFSET_M = 10_000.0               # coastline → sea polygon (sea is on the way's right)
+DENSITY_REF = 0.30                    # building plan-area ratio at which density saturates
+COMM_HEIGHT_REF_M = 30.0              # mean building height at which the canyon term saturates
+
+# ── Weather go/no-go gate (stored on the graph, respected by Tier 2) ───────
+NO_GO_WEATHER_CODES = (95, 96, 97, 98, 99)   # WMO thunderstorm
+NO_GO_PRECIP_MM_H = PRECIP_HEAVY_MM_H
+NO_GO_VISIBILITY_M = 1000.0
+NO_GO_GUST_KMH = 45.0                        # PLACEHOLDER limit for an F450-class UAV
+
 # ── Risk weights: ρ = clip(Σ w_k · ρ_k, 0, 1), every ρ_k ∈ [0, 1] ───────────
-# Components so far: obstacle, wind, weather (Phase 1), building, terrain
-# (Phase 2).  Phase 3 adds population, NFZ, comm/GPS, water and turbulence.
+# ρ is the per-edge probability-like score; the objective sums the length-weighted
+# exposure ρ · d_h / spacing (see module1.apply_weather).
 RISK_WEIGHTS = {
-    "obstacle": 1.0,
-    "wind": GAMMA_WIND,
-    "weather": 0.20,
-    "building": 0.60,
-    "terrain": 0.30,
+    "obstacle": 1.0,        # synthetic obstacle discs
+    "building": 0.60,       # footprint proximity × vertical margin
+    "terrain": 0.30,        # clearance margin, sudden altitude change
+    "wind": GAMMA_WIND,     # crosswind
+    "gust": GAMMA_WIND,     # gust excess over the mean wind
+    "weather": 0.20,        # rain, visibility
+    "population": 0.50,     # people / road exposure
+    "nfz": 0.80,            # soft buffer around restricted zones
+    "water": 0.30,          # fraction of the edge over water
+    "comm": 0.20,           # urban-canyon comm / GPS loss
+    "turbulence": 0.20,     # building density × wind
 }
 
 # ── Synthetic scenarios (seeded, deterministic) ────────────────────────────

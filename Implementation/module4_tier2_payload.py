@@ -121,6 +121,10 @@ def derive_weights(F: int, W: int, U: int) -> tuple:
 #  Tier 2 selector
 # ─────────────────────────────────────────────────────────────────────────────
 
+class WeatherNoGo(RuntimeError):
+    """The weather gate forbids flight: no route may be selected (hold the mission)."""
+
+
 class TierTwoSelector:
     """
     Payload Metadata Interpreter — Tier 2 Pareto Selection.
@@ -129,11 +133,16 @@ class TierTwoSelector:
     ----------
     pareto_front : list of ([d, ε, ρ], path)
         Pre-computed Pareto front from Module 2 (Tier 1).
+    no_go_reasons : list of str, optional
+        Reasons from the weather go/no-go gate (G.graph["no_go_reasons"]).  When
+        non-empty, select() raises WeatherNoGo and run_all_presets() prints a HOLD
+        advisory and returns no routes.
     """
 
-    def __init__(self, pareto_front: list):
+    def __init__(self, pareto_front: list, no_go_reasons=None):
         if not pareto_front:
             raise ValueError("Pareto front is empty — run Module 2 first.")
+        self.no_go_reasons = list(no_go_reasons or [])
         self.pareto_front = pareto_front
         self.costs = np.array([g for (g, _) in pareto_front])   # shape (K, 3)
         self._compute_minmax()
@@ -169,6 +178,13 @@ class TierTwoSelector:
     #  Algorithm 2 — single selection
     # ------------------------------------------------------------------
 
+    @property
+    def no_go(self) -> bool:
+        return bool(self.no_go_reasons)
+
+    def hold_advisory(self) -> str:
+        return "HOLD — weather NO-GO: " + "; ".join(self.no_go_reasons)
+
     def select(self, F: int, W: int, U: int, P: int) -> tuple:
         """
         Algorithm 2 — Payload-Driven Pareto Route Selection.
@@ -186,6 +202,9 @@ class TierTwoSelector:
         w_risk, w_dist, w_energy : derived weights
         scores : np.ndarray of all utility scores
         """
+        if self.no_go:
+            raise WeatherNoGo(self.hold_advisory())
+
         # Step 1–2: derive weights via algebraic bridge (Eqs. 3.2–3.7)
         w_risk, w_dist, w_energy = derive_weights(F, W, U)
 
@@ -251,7 +270,13 @@ class TierTwoSelector:
         Returns
         -------
         results : dict  name → (g_vector, path, w_risk, w_dist, w_energy, scores)
+                  (empty, after a HOLD advisory, when the weather gate is NO-GO)
         """
+        if self.no_go:
+            print("\n" + "=" * 118)
+            print(f"  MODULE 4 — {self.hold_advisory()}")
+            print("=" * 118)
+            return {}
         print("\n" + "="*118)
         print("  MODULE 4 — Tier 2 Payload-Aware Route Selection  (all presets)")
         print("="*118)
