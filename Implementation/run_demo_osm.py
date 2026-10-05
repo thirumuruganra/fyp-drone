@@ -59,6 +59,7 @@ from env_data import (FIXTURE_DEM, LocalFrame, LocalRasterProvider, build_layer_
                       default_elevation_providers, fetch_osm_layers)
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar  import TierOneEngine
+from pareto_store import ParetoStore, front_from_record
 from module4_tier2_payload   import TierTwoSelector, PAYLOAD_PRESETS, PRESET_COLOURS
 
 os.makedirs("outputs",              exist_ok=True)
@@ -186,14 +187,21 @@ def run_module1_osm(args):
     return G, source, target, builder
 
 
-def run_module2_osm(G, source, target):
+def run_module2_osm(G, source, target, args):
     print_banner(2, "Multi-Objective A* — Tier 1 Pareto Front  [Module 2]")
     t0 = time.time()
 
+    # Reuse the stored front while the weather is representative; rebuild on drift,
+    # expiry, a changed graph or --refresh (pareto_store.py).
+    record, rebuilt, _ = ParetoStore().get_or_build(
+        G, source, target, refresh=args.refresh, front_max=args.front_max)
+    pareto_front = front_from_record(record)
     engine = TierOneEngine(G, source, target)
-    pareto_front = engine.run()
+    engine.pareto_front = pareto_front
+    engine.truncated = record["truncated"]
     engine.print_summary()
-    engine.save()
+    if rebuilt:
+        engine.save()
 
     fig3d = engine.visualise_3d()
     if fig3d:
@@ -261,6 +269,10 @@ def parse_args(argv=None):
                    help="replace the wind: SPEED km/h blowing FROM DIR degrees (0 = north)")
     p.add_argument("--no-terrain", action="store_true", help="flat ground (skip the DEM)")
     p.add_argument("--no-buildings", action="store_true", help="skip OSM building footprints")
+    p.add_argument("--refresh", action="store_true",
+                   help="ignore the stored Tier 1 front and rebuild it")
+    p.add_argument("--front-max", type=int, default=None, metavar="N",
+                   help="thin the Tier 1 front to at most N routes by ε-dominance (default: exact front)")
     p.add_argument("--manual-nfz", action="store_true",
                    help="also apply config.MANUAL_NO_FLY_ZONES (approximate, unverified coordinates)")
     p.add_argument("--no-risk-layers", action="store_true",
@@ -291,7 +303,7 @@ def main(argv=None):
     G, source, target, builder = run_module1_osm(args)
 
     # Step 2 — Tier 1: Multi-Objective A*
-    pareto_front, engine = run_module2_osm(G, source, target)
+    pareto_front, engine = run_module2_osm(G, source, target, args)
 
     if not pareto_front:
         print("\n[ERROR] No Pareto-optimal routes found between the chosen nodes.")

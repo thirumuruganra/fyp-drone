@@ -1,23 +1,23 @@
 """
-Module 2 — Multi-Objective A* / Dijkstra Engine  (Tier 1)  [OPTIMISED]
-========================================================================
+Module 2 — NAMOA* Multi-Objective A*  (Tier 1)
+==============================================
 FYP: Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery
-Phase I — Software Simulation
 
-Implements Algorithm 1 (Section 3.2.5) using the NAMOA* optimisation:
+Implements Algorithm 1 (Section 3.2.5) as NAMOA* with label dominance:
 
-  KEY SPEED FIX — Node-level label dominance pruning:
-  Rather than only pruning at the destination, we track, for every
-  intermediate node v, the set of non-dominated cost vectors that have
-  ever reached v.  Any new partial path arriving at v whose cost is
-  already dominated by a previously-seen label at v is discarded
-  immediately — before it enters the open set.  This eliminates the
-  exponential blowup that occurs with naive MO-A* on dense graphs.
-
-  Additional fixes vs the original:
-    • Cycle detection via O(1) set lookup  (was O(n) list scan)
-    • Path stored as parent-pointer dict   (no list copy per expansion)
-    • Safety cap: stop after max_explored partial paths (configurable)
+  • Label table — every partial path is a label (node, g, parent label id), so a
+    path is rebuilt by following parent ids.  Nothing is copied per push, and no
+    visited set is needed: a path that revisits a node is weakly dominated by
+    its own earlier label (every edge has distance > 0), so cycles die in the
+    node-level dominance check.
+  • Node-level dominance — a new label at v is dropped if any label already at v
+    is ≤ it in every objective (equal vectors count as dominated: no duplicates);
+    labels it dominates are marked dead and skipped when popped.
+  • Heuristic — h(v, t) = [h, h, 0] with h the great-circle distance to the
+    target.  Admissible: distance ≥ d_h and energy ≥ distance ≥ d_h on every edge,
+    and risk ≥ 0.  A label is pruned when the front weakly dominates g + h(v, t).
+  • Diagnostics — `truncated` (the max_explored cap was hit with live labels
+    left, so the front may be incomplete), `expanded`, `generated`, `runtime_s`.
 
 HOW TO RUN:
     python module2_tier1_moastar.py
@@ -31,6 +31,7 @@ OUTPUT:
 import os
 import heapq
 import pickle
+import time
 import numpy as np
 import networkx as nx
 import matplotlib
@@ -70,47 +71,88 @@ def update_pareto_front(pareto_front: list, g_new: list, path_new: list) -> bool
     return True
 
 
-def heuristic(G: nx.DiGraph, u, t) -> float:
-    """Great-circle lower-bound heuristic h(u,t); node x = lon, y = lat."""
+def heuristic_vector(G: nx.DiGraph, u, t) -> tuple:
+    """Admissible lower bound [h, h, 0] on the remaining [distance, energy, risk]; h = great-circle km."""
     try:
         d = haversine_km(G.nodes[u]["y"], G.nodes[u]["x"],
                          G.nodes[t]["y"], G.nodes[t]["x"])
-        return float(np.linalg.norm([d, d, 0.0]))
+        return (d, d, 0.0)
     except (KeyError, TypeError):
-        return 0.0
+        return (0.0, 0.0, 0.0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Reconstruct path from parent-pointer table
+#  Front thinning (optional)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _reconstruct(parents: dict, node) -> list:
-    path = []
-    while node is not None:
-        path.append(node)
-        node = parents[node]
-    path.reverse()
-    return path
+def thin_front(front: list, front_max: int) -> list:
+    """
+    Cap a Pareto front at front_max routes by ε-dominance, keeping it well distributed.
+
+    Objectives are min-max normalised and cut into ε-boxes; one route (the closest to
+    its box's lower corner) survives per box and boxes dominated by another box are
+    dropped.  ε is the smallest value (bisection) leaving ≤ front_max − 3 boxes; the
+    per-objective extremes (cheapest route in distance, energy, risk) are then added
+    back, so the result never exceeds front_max routes and always holds the extremes
+    Tier 2 normalises against.  The result is a mutually non-dominated subset.
+    """
+    if front_max < 3:
+        raise ValueError("front_max must be at least 3 (the three objective extremes)")
+    if len(front) <= front_max:
+        return list(front)
+    pts = np.array([g for g, _ in front], dtype=float)
+    span = np.where(np.ptp(pts, axis=0) > 0, np.ptp(pts, axis=0), 1.0)
+    norm = (pts - pts.min(axis=0)) / span
+    extremes = {int(np.argmin(pts[:, k])) for k in range(3)}
+
+    def select(eps: float) -> list:
+        boxes = np.floor(norm / eps).astype(int)
+        best = {}
+        for i, b in enumerate(map(tuple, boxes)):
+            corner = np.array(b) * eps
+            d = float(np.linalg.norm(norm[i] - corner))
+            if b not in best or d < best[b][0]:
+                best[b] = (d, i)
+        keys = list(best)
+        arr = np.array(keys)
+        keep = [i for k, (_, i) in best.items()
+                if not np.any(np.all(arr <= np.array(k), axis=1) & np.any(arr < np.array(k), axis=1))]
+        return sorted(keep)
+
+    target = max(1, front_max - 3)
+    lo, hi = 1e-6, 1.0
+    chosen = select(hi)
+    for _ in range(40):                                  # smallest ε with ≤ target boxes
+        mid = (lo + hi) / 2.0
+        sel = select(mid)
+        if len(sel) <= target:
+            hi, chosen = mid, sel
+        else:
+            lo = mid
+    keep = sorted(set(chosen) | extremes)
+    return [front[i] for i in keep]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Tier 1 engine  (NAMOA* with node-level label dominance)
+#  Tier 1 engine  (NAMOA* with a label table)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TierOneEngine:
     """
-    Multi-Objective A*/Dijkstra Engine — Tier 1 Pareto Front Construction.
-
-    Uses NAMOA* node-level label dominance for tractable performance on
-    graphs with 50–500 nodes.
+    NAMOA* — Tier 1 Pareto front construction (exact unless truncated).
 
     Parameters
     ----------
-    G           : nx.DiGraph — airspace graph from Module 1.
+    G           : nx.DiGraph — airspace graph from Module 1 (edges carry distance, energy, risk).
     source      : source node ID.
     target      : destination node ID.
-    max_explored: safety cap on partial-path expansions (default 200 000).
+    max_explored: safety cap on label expansions (default 200 000).
+
+    After run(): pareto_front (list of ([d, ε, ρ], path), sorted), truncated, expanded,
+    generated, runtime_s; diagnostics() bundles them.
     """
+
+    TOL = 1e-9
 
     def __init__(self, G: nx.DiGraph, source, target, max_explored: int = 200_000):
         self.G            = G
@@ -118,106 +160,137 @@ class TierOneEngine:
         self.target       = target
         self.max_explored = max_explored
         self.pareto_front: list = []
+        self.truncated    = False
+        self.expanded     = 0
+        self.generated    = 0
+        self.runtime_s    = 0.0
+
+    def diagnostics(self) -> dict:
+        return {"truncated": self.truncated, "expanded": self.expanded,
+                "generated": self.generated, "runtime_s": round(self.runtime_s, 4),
+                "front_size": len(self.pareto_front), "max_explored": self.max_explored}
 
     # ------------------------------------------------------------------
-    #  Algorithm 1 + NAMOA* node-label optimisation
+    #  NAMOA*
     # ------------------------------------------------------------------
 
     def run(self) -> list:
         """
-        Execute NAMOA* and return the Pareto-optimal route set P.
+        Execute NAMOA* and return the Pareto-optimal route set.
 
         Returns
         -------
-        pareto_front : list of ([d, ε, ρ], path)
+        pareto_front : list of ([d, ε, ρ], path), sorted by cost vector
         """
-        G, s, t = self.G, self.source, self.target
+        G, s, t, tol = self.G, self.source, self.target, self.TOL
         self.pareto_front = []
+        self.truncated, self.expanded, self.generated = False, 0, 1
 
         if s not in G or t not in G:
             raise ValueError(f"Source {s} or target {t} not in graph.")
         if not nx.has_path(G, s, t):
             raise ValueError(f"No path from {s} to {t}.")
 
-        # ── Node-level label sets (NAMOA* key data structure) ───────────
-        # labels[v] = list of non-dominated g-vectors that reached node v
-        labels: dict = defaultdict(list)
+        t0 = time.perf_counter()
+        if s == t:                                            # trivial route
+            self.pareto_front = [([0.0, 0.0, 0.0], [s])]
+            self.runtime_s = time.perf_counter() - t0
+            print(f"[Module 2] Source equals target ({s}) — trivial front")
+            return self.pareto_front
+        # Label table: id → (node, g, parent id); dead labels are skipped when popped.
+        lab_node, lab_g, lab_parent, lab_dead = [s], [(0.0, 0.0, 0.0)], [-1], [False]
+        at_node = defaultdict(list)               # node → ids of live non-dominated labels
+        at_node[s].append(0)
+        h_cache: dict = {}
 
-        # ── OPEN set ────────────────────────────────────────────────────
-        # Each entry: (f_scalar, seq_counter, g_tuple, node, visited_set, parents_dict)
-        # seq_counter breaks ties without comparing dicts/sets
-        g0   = (0.0, 0.0, 0.0)
-        h0   = heuristic(G, s, t)
-        seq  = 0
-        open_set = [(np.linalg.norm(g0) + h0, seq, g0, s,
-                     frozenset([s]),              # visited: O(1) lookup
-                     {s: None})]                  # parent pointers
+        def h(v):
+            if v not in h_cache:
+                h_cache[v] = np.array(heuristic_vector(G, v, t))
+            return h_cache[v]
 
-        explored = 0
-        labels[s].append(list(g0))
+        front_ids: list = []                      # label ids of the current front
+        front_arr = np.empty((0, 3))
+
+        def front_dominates(vec) -> bool:
+            return front_arr.shape[0] > 0 and bool(np.any(np.all(front_arr <= vec + tol, axis=1)))
+
+        def f_scalar(gh) -> float:
+            return float(np.linalg.norm(gh))
+
+        seq = 0
+        open_set = [(f_scalar(h(s)), seq, 0)]
 
         print(f"[Module 2] NAMOA* | source={s}, target={t} | "
               f"graph={G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
 
         while open_set:
-            if explored >= self.max_explored:
-                print(f"[Module 2] Reached max_explored={self.max_explored:,}. "
-                      f"Stopping early with {len(self.pareto_front)} routes.")
+            if self.expanded >= self.max_explored:
+                # Truncated only if some live label could still improve the front.
+                self.truncated = any(
+                    not lab_dead[lid] and not front_dominates(np.array(lab_g[lid]) + h(lab_node[lid]))
+                    for _, _, lid in open_set)
                 break
 
-            f_val, _, g_tuple, u, visited, parents = heapq.heappop(open_set)
-            g = list(g_tuple)
-            explored += 1
-
-            # ── Prune: dominated by global Pareto front ──────────────
-            if any(weakly_dominates(ge, g) for (ge, _) in self.pareto_front):
+            _, _, lid = heapq.heappop(open_set)
+            if lab_dead[lid]:
                 continue
-
-            # ── Goal check ──────────────────────────────────────────
-            if u == t:
-                path = _reconstruct(parents, t)
-                update_pareto_front(self.pareto_front, g, path)
+            u, g = lab_node[lid], lab_g[lid]
+            if front_dominates(np.array(g) + h(u)):          # prune on g + h
                 continue
+            self.expanded += 1
 
-            # ── Expand neighbours ────────────────────────────────────
             for v in G.successors(u):
-                if v in visited:                   # O(1) frozenset lookup
+                edge = G[u][v]
+                g_new = (g[0] + edge["distance"], g[1] + edge["energy"], g[2] + edge["risk"])
+
+                # Node-level dominance (equal vectors count as dominated).
+                if any(all(a <= b + tol for a, b in zip(lab_g[o], g_new)) for o in at_node[v]):
+                    continue
+                gh_new = np.array(g_new) + h(v)
+                if front_dominates(gh_new):
                     continue
 
-                edge   = G[u][v]
-                c      = [edge["distance"], edge["energy"], edge["risk"]]
-                g_new  = [g[i] + c[i] for i in range(3)]
+                keep = []
+                for o in at_node[v]:                          # kill labels the new one dominates
+                    if all(a <= b + tol for a, b in zip(g_new, lab_g[o])):
+                        lab_dead[o] = True
+                    else:
+                        keep.append(o)
+                new_id = len(lab_node)
+                lab_node.append(v); lab_g.append(g_new); lab_parent.append(lid); lab_dead.append(False)
+                self.generated += 1
+                keep.append(new_id)
+                at_node[v] = keep
 
-                # ── Node-level label dominance (NAMOA* key check) ────
-                # Skip if g_new is dominated by ANY label already at v
-                # (equal vectors count as dominated: no duplicate labels)
-                if any(weakly_dominates(lv, g_new) for lv in labels[v]):
-                    continue
+                if v == t:                                    # complete route: update the front
+                    front_ids = [i for i in front_ids
+                                 if not all(a <= b + tol for a, b in zip(g_new, lab_g[i]))] + [new_id]
+                    front_arr = np.array([lab_g[i] for i in front_ids])
+                else:
+                    seq += 1
+                    heapq.heappush(open_set, (f_scalar(gh_new), seq, new_id))
 
-                # Remove labels at v that g_new now dominates
-                labels[v] = [lv for lv in labels[v]
-                             if not pareto_dominates(g_new, lv)]
-                labels[v].append(g_new)
+        # Rebuild routes from the label table.
+        routes = []
+        for fid in front_ids:
+            path, cur = [], fid
+            while cur != -1:
+                path.append(lab_node[cur])
+                cur = lab_parent[cur]
+            routes.append((list(lab_g[fid]), path[::-1]))
+        routes.sort(key=lambda r: tuple(r[0]))
+        self.pareto_front = routes
+        self.runtime_s = time.perf_counter() - t0
 
-                # Also skip if dominated by global Pareto front
-                if any(weakly_dominates(ge, g_new)
-                       for (ge, _) in self.pareto_front):
-                    continue
-
-                # Build new parent table (share structure, only add one entry)
-                new_parents = dict(parents)
-                new_parents[v] = u
-
-                h_new = heuristic(G, v, t)
-                f_new = float(np.linalg.norm(g_new)) + h_new
-                seq  += 1
-                heapq.heappush(open_set,
-                               (f_new, seq, tuple(g_new),
-                                v, visited | {v}, new_parents))
-
-        print(f"[Module 2] Explored {explored:,} partial paths")
-        print(f"[Module 2] Pareto front size: {len(self.pareto_front)} routes")
-        return self.pareto_front
+        print(f"[Module 2] Expanded {self.expanded:,} labels "
+              f"({self.generated:,} generated) in {self.runtime_s:.2f} s")
+        if self.truncated:
+            print(f"[Module 2] WARNING: reached max_explored={self.max_explored:,} with live labels "
+                  f"left — the front may be incomplete ({len(routes)} routes found). "
+                  f"Raise max_explored or coarsen the graph.")
+        print(f"[Module 2] Pareto front size: {len(routes)} routes"
+              + (" (TRUNCATED)" if self.truncated else " (complete)"))
+        return routes
 
     # ------------------------------------------------------------------
     #  Persistence
@@ -287,7 +360,8 @@ class TierOneEngine:
         print("\n" + "="*55)
         print("  MODULE 2 — Pareto Front Summary")
         print("="*55)
-        print(f"  Routes on front : {len(self.pareto_front)}")
+        print(f"  Routes on front : {len(self.pareto_front)}"
+              + ("   (TRUNCATED — may be incomplete)" if self.truncated else ""))
         print(f"  Distance  (km)  : min={costs[:,0].min():.4f}  max={costs[:,0].max():.4f}")
         print(f"  Energy          : min={costs[:,1].min():.4f}  max={costs[:,1].max():.4f}")
         print(f"  Cumulative Risk : min={costs[:,2].min():.4f}  max={costs[:,2].max():.4f}")

@@ -46,6 +46,7 @@ OUTPUT:
 import math
 import os
 import pickle
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
 
@@ -446,6 +447,7 @@ class AirspaceGraphBuilder:
                         d_h, brg, nj["alt_m"] - ni["alt_m"], obstacles(xm, ym)))
 
         weather = self.weather if self.weather is not None else seeded_weather(self.seed)
+        G.graph["built_at"] = datetime.now().isoformat(timespec="seconds")
         G.graph["spacing_km"] = haversine_km(cfg.SYN_ORIGIN_LAT, cfg.SYN_ORIGIN_LON,
                                              cfg.SYN_ORIGIN_LAT + cfg.SYN_SPACING_DEG, cfg.SYN_ORIGIN_LON)
         apply_weather(G, weather)
@@ -577,6 +579,7 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         apply_weather(G, weather)
         print(f"[Module 1] Wind conditions: {weather.describe()}")
         G.graph.update(source="lattice", location=self.location,
+                       built_at=datetime.now().isoformat(timespec="seconds"),
                        center=self.center, box_m=self.box_m, spacing_m=self.spacing_m,
                        **self.build_info)
         if self.restricted_zones is not None:
