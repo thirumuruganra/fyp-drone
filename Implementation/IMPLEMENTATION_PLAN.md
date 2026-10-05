@@ -77,7 +77,7 @@ Already in place:
 
 ## Phase 0: Sync + housekeeping
 
-- **Done.** `meghna` was cleaned (`.DS_Store` files and the stale `Review 1/` folder removed, `.gitignore` fixed) and fast-forwarded into `claude/epic-johnson-dqvqhg`. The 11 tests pass. `main` is not changed yet.
+- **Done.** `meghna` was cleaned (`.DS_Store` files and the stale `Review 1/` folder removed, `.gitignore` fixed) and merged into `main` via PR #1. The 11 tests pass.
 - Add `Implementation/config.py` for all tunables:
   - region centre (Thiruvanmiyur 12.9830, 80.2594), box size, lattice spacing
   - `H_CRUISE_AGL=60`, `CLEARANCE=15`, `H_MAX_AGL=120` (Drone Rules 2021)
