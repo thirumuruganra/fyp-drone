@@ -21,51 +21,52 @@ Semantic commits, all commits.
 
 FYP (B28) repo. **"Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery"** — Thirumurugan RA, Shrika SP Thota, Meghna Manimaran (Guide: Sujaudeen N), SSN College of Engineering, Dept. of CSE.
 
-Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Review 1/Implementation/`. No build system beyond LaTeX compile. No Python test suite.
+Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Implementation/`. No build system beyond LaTeX compile. Python tests use `unittest`.
 
-**Core idea:** split Pareto-front build (Tier 1) from mission route pick (Tier 2). Planner run once per delivery region, reused. Payload metadata picks point on front per mission — no manual weight re-tune between deliveries. Read `Review 1/FYP_B28_Project_Context.md` first — problem statement, lit gap, panel feedback history, tech decisions log. Canonical source for *why*, not just what. Read before touching algorithm concepts.
+**Core idea:** split Pareto-front build (Tier 1) from mission route pick (Tier 2). Planner run once per delivery region, reused. Payload metadata picks point on front per mission — no manual weight re-tune between deliveries. Read `FYP_B28_Project_Context.md` first — problem statement, lit gap, panel feedback history, tech decisions log. Canonical source for *why*, not just what. Read before touching algorithm concepts.
 
 ## Repository Layout
 
-- `Abstract/`, `Initial Screening PPT/`, `Review 0/` — early submission artifacts. Frozen/historical.
-- `Review 1/` — current phase deliverables:
-  - `FYP_B28_Project_Context.md` — canonical context (problem, arch, math, panel Q&A, timeline). Read first.
-  - `Implementation/` — Python sim (below).
-  - `Phase 1 Report/` — LaTeX thesis chapters (`ch1_intro.tex` … `ch5_timeline.tex`), compiled via `main.tex` (uses `Thesis.cls`, `bmacros.tex`).
-  - `Review 1 PPT/`, `Review 1 Report/` — LaTeX presentation/report, `ssnreview.cls`.
-- `Reference Material (From Seniors - just for format)/` — prior year thesis, format reference only. Not project content.
+- `Abstract/`, `Initial Screening PPT/`, `Review_0/` — early submission artifacts. Frozen/historical.
+- `Review_1/` — Review 1 deliverables (`Report/`, `PPT/`, `diagrams/`).
+- `Review_2/` — Review 2 templates (`Report/`, `PPT/`).
+- `Phase_1/` — Phase 1 report and seniors' format reference.
+- `Implementation/` — Python sim (below).
+- `Reference_Papers/` — cited papers and baseline references.
 
-## Implementation (`Review 1/Implementation/`)
+## Implementation (`Implementation/`)
 
-Python sim, four modules, no package structure — flat scripts, imported direct by two demo entry points.
+Python sim, five modules, no package structure — flat scripts, imported direct by demo and benchmark entry points.
 
 - `module1_graph_builder.py` — `AirspaceGraphBuilder`: builds airspace graph (synthetic, or subclass for OSM), assigns each edge 3-vector cost `[distance, energy, risk]`.
 - `run_demo_osm.py` — `OSMAirspaceGraphBuilder(AirspaceGraphBuilder)`: OSM-backed variant, `osmnx`, real-world edge costs (grade-based energy proxy, obstacle-proximity risk).
 - `module2_tier1_moastar.py` — `TierOneEngine`: multi-objective A*/Dijkstra search (`pareto_dominates`, `update_pareto_front`), produces non-dominated route set for source/target pair. Tier 1.
-- `module4_tier2_payload.py` — `TierTwoSelector` + `derive_weights(F, T, U)`: converts four payload tags (fragility, temp sensitivity, urgency, priority) into objective weights via fixed formula (project context doc), scores every Pareto point, picks `argmax(score)`. Tier 2.
+- `module3_baselines.py` — single-objective A* baselines and compact MOPSO-style baseline.
+- `module4_tier2_payload.py` — `TierTwoSelector` + `derive_weights(F, W, U)`: converts four payload tags (fragility, payload weight class, urgency, priority) into objective weights via fixed formula (project context doc), scores every Pareto point, picks `argmax(score)`. Tier 2.
+- `module5_evaluation.py` — hypervolume, IGD, spread, reference front, Tier 2 evidence helpers.
 - `run_demo_syn.py` / `run_demo_osm.py` — end-to-end demo scripts (`main()`), wire modules 1 → 2 → 4 on synthetic and OSM graphs, print step banners, render summary figures via Matplotlib.
+- `run_benchmarks.py` — benchmark entry point for synthetic scenarios and baselines.
 - `wind_integration_plan.md` — design doc, not-yet-built wind-aware extension (headwind/crosswind energy penalty, wind-speed risk term via Open-Meteo API). Read before touching wind-related edge costs — exact formulas, constants, which functions change.
 - `cache/`, `outputs/`, `pareto_front_storage/`, `__pycache__/` — generated artifacts, not source.
-
-Module numbering skips 3 (1, 2, 4 — no `module3`) — matches tier terms in report. Don't "fix" by renumbering.
 
 ### Running the simulation
 
 ```bash
-cd "Review 1/Implementation"
+cd Implementation
 pip install -r requirements.txt   # networkx, numpy, matplotlib, osmnx (osmnx optional — synthetic path falls back without it)
 python run_demo_syn.py            # synthetic airspace graph demo
 python run_demo_osm.py            # OpenStreetMap-backed demo (requires network access for OSM + optionally osmnx)
+python -m unittest discover -s tests
 ```
 
-No automated tests. Correctness check: run demo scripts, inspect printed Pareto front + generated summary figures under `outputs/`.
+Correctness check: run tests, run demo scripts, inspect printed Pareto front + generated summary figures under `outputs/`.
 
 ### Tier 1 → Tier 2 connection (matters when editing Tier 2 logic)
 
 Payload-tag-to-weight mapping: not lookup table, continuous formula. Deliberate — answers review-panel critique, documented `FYP_B28_Project_Context.md`:
 
 ```
-r_raw = F × 2        d_raw = U × 3        e_raw = T × 2
+r_raw = F × 2        d_raw = U × 3        e_raw = W × 2
 w_risk = r_raw / (r_raw + d_raw + e_raw)
 w_distance = d_raw / (r_raw + d_raw + e_raw)
 w_energy = e_raw / (r_raw + d_raw + e_raw)

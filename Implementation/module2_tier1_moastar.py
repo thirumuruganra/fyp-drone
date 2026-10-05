@@ -112,6 +112,8 @@ class TierOneEngine:
         self.target       = target
         self.max_explored = max_explored
         self.pareto_front: list = []
+        self.expanded     = 0
+        self.truncated    = False
 
     # ------------------------------------------------------------------
     #  Algorithm 1 + NAMOA* node-label optimisation
@@ -127,6 +129,8 @@ class TierOneEngine:
         """
         G, s, t = self.G, self.source, self.target
         self.pareto_front = []
+        self.expanded = 0
+        self.truncated = False
 
         if s not in G or t not in G:
             raise ValueError(f"Source {s} or target {t} not in graph.")
@@ -157,6 +161,7 @@ class TierOneEngine:
             if explored >= self.max_explored:
                 print(f"[Module 2] Reached max_explored={self.max_explored:,}. "
                       f"Stopping early with {len(self.pareto_front)} routes.")
+                self.truncated = True
                 break
 
             f_val, _, g_tuple, u, visited, parents = heapq.heappop(open_set)
@@ -208,6 +213,7 @@ class TierOneEngine:
                                (f_new, seq, tuple(g_new),
                                 v, visited | {v}, new_parents))
 
+        self.expanded = explored
         print(f"[Module 2] Explored {explored:,} partial paths")
         print(f"[Module 2] Pareto front size: {len(self.pareto_front)} routes")
         return self.pareto_front
