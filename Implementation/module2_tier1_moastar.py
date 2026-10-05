@@ -39,6 +39,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D          # noqa: F401
 from collections import defaultdict
 
+from module1_graph_builder import haversine_km
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Pareto dominance helpers  (unchanged — Algorithm 1 logic)
@@ -48,6 +50,11 @@ def pareto_dominates(g1: list, g2: list) -> bool:
     """True if g1 dominates g2 (≤ all objectives, < at least one)."""
     return (all(a <= b for a, b in zip(g1, g2)) and
             any(a <  b for a, b in zip(g1, g2)))
+
+
+def weakly_dominates(g1: list, g2: list, tol: float = 1e-9) -> bool:
+    """True if g1 ≤ g2 in every objective (within tol): g1 dominates g2 or equals it."""
+    return all(a <= b + tol for a, b in zip(g1, g2))
 
 
 def update_pareto_front(pareto_front: list, g_new: list, path_new: list) -> bool:
@@ -64,11 +71,10 @@ def update_pareto_front(pareto_front: list, g_new: list, path_new: list) -> bool
 
 
 def heuristic(G: nx.DiGraph, u, t) -> float:
-    """Euclidean lower-bound heuristic h(u,t)."""
+    """Great-circle lower-bound heuristic h(u,t); node x = lon, y = lat."""
     try:
-        dx = (G.nodes[u]["x"] - G.nodes[t]["x"]) * 111.0
-        dy = (G.nodes[u]["y"] - G.nodes[t]["y"]) * 111.0
-        d  = float(np.hypot(dx, dy))
+        d = haversine_km(G.nodes[u]["y"], G.nodes[u]["x"],
+                         G.nodes[t]["y"], G.nodes[t]["x"])
         return float(np.linalg.norm([d, d, 0.0]))
     except (KeyError, TypeError):
         return 0.0
@@ -164,7 +170,7 @@ class TierOneEngine:
             explored += 1
 
             # ── Prune: dominated by global Pareto front ──────────────
-            if any(pareto_dominates(ge, g) for (ge, _) in self.pareto_front):
+            if any(weakly_dominates(ge, g) for (ge, _) in self.pareto_front):
                 continue
 
             # ── Goal check ──────────────────────────────────────────
@@ -184,7 +190,8 @@ class TierOneEngine:
 
                 # ── Node-level label dominance (NAMOA* key check) ────
                 # Skip if g_new is dominated by ANY label already at v
-                if any(pareto_dominates(lv, g_new) for lv in labels[v]):
+                # (equal vectors count as dominated: no duplicate labels)
+                if any(weakly_dominates(lv, g_new) for lv in labels[v]):
                     continue
 
                 # Remove labels at v that g_new now dominates
@@ -193,7 +200,7 @@ class TierOneEngine:
                 labels[v].append(g_new)
 
                 # Also skip if dominated by global Pareto front
-                if any(pareto_dominates(ge, g_new)
+                if any(weakly_dominates(ge, g_new)
                        for (ge, _) in self.pareto_front):
                     continue
 
