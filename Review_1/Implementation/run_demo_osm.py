@@ -1,12 +1,12 @@
 """
-run_demo_2.py — Phase I Software Simulation  (Review 1 Demo — OSM Variant)
-===========================================================================
+run_demo_osm.py — Phase I Software Simulation  (Review 1 Demo — OSM Variant)
+============================================================================
 FYP: Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery
 
-Identical pipeline to run_demo.py but uses REAL OpenStreetMap road-network
+Identical pipeline to run_demo_syn.py but uses REAL OpenStreetMap road-network
 data (via osmnx) instead of the reproducible synthetic grid.
 
-Key differences from run_demo.py
+Key differences from run_demo_syn.py
 ─────────────────────────────────
   • Module 1 downloads a live OSM driving graph for Kalavakkam, Tamil Nadu
   • Node coordinates are kept as lat/lon degrees (no UTM projection) so the
@@ -24,7 +24,7 @@ HOW TO RUN:
   │    pip install networkx numpy matplotlib osmnx              │
   │                                                             │
   │  Then run:                                                  │
-  │    python run_demo_2.py                                     │
+  │    python run_demo_osm.py                                   │
   └─────────────────────────────────────────────────────────────┘
 
 OUTPUT FILES (all in  outputs/ folder):
@@ -335,7 +335,7 @@ def main():
     if not OSMNX_AVAILABLE:
         print("\n[ERROR] osmnx is not installed.")
         print("  Install it with:  pip install osmnx")
-        print("  Then re-run:      python run_demo_2.py")
+        print("  Then re-run:      python run_demo_osm.py")
         sys.exit(1)
 
     t_start = time.time()

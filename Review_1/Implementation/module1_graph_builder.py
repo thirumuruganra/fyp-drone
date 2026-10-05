@@ -27,7 +27,6 @@ OUTPUT:
 
 import os
 import pickle
-import random
 from typing import Optional
 import numpy as np
 import networkx as nx
@@ -238,7 +237,7 @@ class AirspaceGraphBuilder:
                     dx = positions[i][0] - positions[j][0]
                     dy = positions[i][1] - positions[j][1]
                     d   = float(np.hypot(dx, dy)) * 111.0   # rough km per degree
-                    eps = self._energy_cost(d, {})
+                    eps = self._synthetic_energy_cost(d, i, j, G)
                     rho = self._risk_score(i, j, G=G)
                     G.add_edge(i, j,
                                distance=round(d, 5),
@@ -249,6 +248,38 @@ class AirspaceGraphBuilder:
         print(f"[Module 1] Synthetic graph: {G.number_of_nodes()} nodes, "
               f"{G.number_of_edges()} edges")
         return G
+
+    def _synthetic_energy_cost(self, distance_km: float, u, v,
+                               G: nx.DiGraph) -> float:
+        """
+        Deterministic synthetic energy model.
+
+        Energy is not tied to distance alone: the synthetic region contains
+        climb-heavy central terrain, a diagonal headwind band, and lower-energy
+        corridors near the southern and eastern edges. This keeps the demo
+        reproducible while creating real distance/energy/risk trade-offs.
+        """
+        xm = (G.nodes[u]["x"] + G.nodes[v]["x"]) / 2.0
+        ym = (G.nodes[u]["y"] + G.nodes[v]["y"]) / 2.0
+        xs = [data["x"] for _, data in G.nodes(data=True)]
+        ys = [data["y"] for _, data in G.nodes(data=True)]
+        x_min, x_max = min(xs), max(xs)
+        y_min, y_max = min(ys), max(ys)
+        x_span = max(x_max - x_min, 1e-9)
+        y_span = max(y_max - y_min, 1e-9)
+        xn = (xm - x_min) / x_span
+        yn = (ym - y_min) / y_span
+
+        central_climb = 0.55 * np.exp(
+            -(((xn - 0.52) ** 2 + (yn - 0.48) ** 2) / (2 * 0.18 ** 2))
+        )
+        diagonal_headwind = 0.30 * max(0.0, 1.0 - abs(xn - yn) / 0.16)
+        ridge_crossing = 0.35 * max(0.0, 1.0 - abs(xn - 0.62) / 0.10)
+        low_energy_corridor = 0.28 if (yn < 0.24 or xn > 0.82) else 0.0
+
+        factor = 1.10 + central_climb + diagonal_headwind + ridge_crossing
+        factor -= low_energy_corridor
+        return round(distance_km * max(factor, 0.70), 5)
 
     def _energy_cost(self, distance_km: float, edge_data: dict) -> float:
         """

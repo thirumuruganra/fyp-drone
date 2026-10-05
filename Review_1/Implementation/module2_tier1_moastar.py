@@ -243,12 +243,12 @@ class TierOneEngine:
                         s=80, edgecolors="k", linewidths=0.5, alpha=0.85)
         ax.set_xlabel("Distance (km)", labelpad=10)
         ax.set_ylabel("Energy (proxy)", labelpad=10)
-        ax.set_zlabel("Flight Risk [0–1]", labelpad=10)
+        ax.set_zlabel("Cumulative Risk", labelpad=10)
         ax.set_title(
             f"Module 2 — Tier 1 Pareto Front\n"
             f"{len(self.pareto_front)} non-dominated routes  (source → target)",
             fontsize=12, fontweight="bold")
-        fig.colorbar(sc, ax=ax, shrink=0.45, pad=0.12, label="Flight Risk")
+        fig.colorbar(sc, ax=ax, shrink=0.45, pad=0.12, label="Cumulative Risk")
         plt.tight_layout()
         return fig
 
@@ -256,7 +256,7 @@ class TierOneEngine:
         if not self.pareto_front:
             return None
         costs  = np.array([g for (g, _) in self.pareto_front])
-        labels = ["Distance (km)", "Energy (proxy)", "Flight Risk [0–1]"]
+        labels = ["Distance (km)", "Energy (proxy)", "Cumulative Risk"]
         pairs  = [(0, 1), (0, 2), (1, 2)]
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         for ax, (i, j) in zip(axes, pairs):
@@ -283,7 +283,7 @@ class TierOneEngine:
         print(f"  Routes on front : {len(self.pareto_front)}")
         print(f"  Distance  (km)  : min={costs[:,0].min():.4f}  max={costs[:,0].max():.4f}")
         print(f"  Energy          : min={costs[:,1].min():.4f}  max={costs[:,1].max():.4f}")
-        print(f"  Risk [0-1]      : min={costs[:,2].min():.4f}  max={costs[:,2].max():.4f}")
+        print(f"  Cumulative Risk : min={costs[:,2].min():.4f}  max={costs[:,2].max():.4f}")
         print("="*55)
 
 

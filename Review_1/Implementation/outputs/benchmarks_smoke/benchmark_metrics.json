@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "scenarios": [
+      {
+        "name": "S1_50_sparse",
+        "nodes": 50,
+        "seed": 101,
+        "max_explored": 80000,
+        "source": 0,
+        "target": 49,
+        "reference": {
+          "reference_front_size": 4,
+          "ideal": [
+            8.58325,
+            9.456019999999999,
+            0.396
+          ],
+          "nadir": [
+            8.77168,
+            9.54892,
+            0.7561
+          ],
+          "hv_reference_point_normalized": [
+            1.1,
+            1.1,
+            1.1
+          ],
+          "notes": "Reference front = non-dominated union of all method outputs for the scenario. HV/IGD/spread use normalized objective space; HV reference point = normalized scenario nadir padded by 10%."
+        },
+        "method_route_counts_raw": {
+          "namoa": 2,
+          "astar_distance": 1,
+          "astar_energy": 1,
+          "astar_risk": 1,
+          "mopso": 2
+        }
+      }
+    ],
+    "configuration": {
+      "scenario": "S1",
+      "mopso_repetitions": 1,
+      "swarm_size": 10,
+      "iterations": 8,
+      "archive_size": 25,
+      "output_dir": "outputs/benchmarks_smoke"
+    }
+  },
+  "metrics": [
+    {
+      "method": "namoa",
+      "front_size": 2,
+      "runtime_s": 0.002503916999557987,
+      "hypervolume": 0.13100000000000014,
+      "igd": 0.0,
+      "spread_delta": 0.0,
+      "diversity_extent": 1.7320508075688772,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "method": "astar_distance",
+      "front_size": 1,
+      "runtime_s": 8.470800003124168e-05,
+      "hypervolume": 0.12099999999999803,
+      "igd": 1.2990381056766545,
+      "spread_delta": 0.0,
+      "diversity_extent": 0.0,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "method": "astar_energy",
+      "front_size": 1,
+      "runtime_s": 0.0001060840004356578,
+      "hypervolume": 0.12099999999999803,
+      "igd": 1.2990381056766545,
+      "spread_delta": 0.0,
+      "diversity_extent": 0.0,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "method": "astar_risk",
+      "front_size": 1,
+      "runtime_s": 6.054200002836296e-05,
+      "hypervolume": 0.01100000000000002,
+      "igd": 0.4330127018922193,
+      "spread_delta": 0.0,
+      "diversity_extent": 0.0,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "method": "mopso",
+      "front_size": 2,
+      "runtime_s": 0.03737116699994658,
+      "hypervolume": 0.13099999999999803,
+      "igd": 4.780292893972585e-15,
+      "spread_delta": 0.0,
+      "diversity_extent": 1.7320508075688663,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    }
+  ],
+  "tier2_evidence": [
+    {
+      "preset": "fragile_medical",
+      "F": 5,
+      "W": 1,
+      "U": 1,
+      "P": 3,
+      "w_risk": 0.6666666666666666,
+      "w_distance": 0.2,
+      "w_energy": 0.13333333333333333,
+      "dominant_weight": "risk",
+      "selected_index": 1,
+      "distance": 8.77168,
+      "energy": 9.54892,
+      "risk": 0.396,
+      "rank_distance": 2,
+      "rank_energy": 2,
+      "rank_risk": 1,
+      "dominant_objective_rank": 1,
+      "point_type": "min-risk",
+      "selection_latency_ms": 0.017249999473278876,
+      "score": 0.6666666666666666,
+      "unique_routes_across_presets": 2,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "preset": "emergency_medicine",
+      "F": 1,
+      "W": 1,
+      "U": 3,
+      "P": 5,
+      "w_risk": 0.14388489208633096,
+      "w_distance": 0.7122302158273381,
+      "w_energy": 0.14388489208633096,
+      "dominant_weight": "distance",
+      "selected_index": 0,
+      "distance": 8.58325,
+      "energy": 9.456019999999999,
+      "risk": 0.7561,
+      "rank_distance": 1,
+      "rank_energy": 1,
+      "rank_risk": 2,
+      "dominant_objective_rank": 1,
+      "point_type": "min-distance/min-energy",
+      "selection_latency_ms": 0.009082999895326793,
+      "score": 0.8561151079136691,
+      "unique_routes_across_presets": 2,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "preset": "disaster_relief",
+      "F": 1,
+      "W": 3,
+      "U": 1,
+      "P": 2,
+      "w_risk": 0.18181818181818182,
+      "w_distance": 0.2727272727272727,
+      "w_energy": 0.5454545454545454,
+      "dominant_weight": "energy",
+      "selected_index": 0,
+      "distance": 8.58325,
+      "energy": 9.456019999999999,
+      "risk": 0.7561,
+      "rank_distance": 1,
+      "rank_energy": 1,
+      "rank_risk": 2,
+      "dominant_objective_rank": 1,
+      "point_type": "min-distance/min-energy",
+      "selection_latency_ms": 0.008832999810692854,
+      "score": 0.8181818181818181,
+      "unique_routes_across_presets": 2,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    },
+    {
+      "preset": "mixed_cargo",
+      "F": 3,
+      "W": 2,
+      "U": 2,
+      "P": 3,
+      "w_risk": 0.375,
+      "w_distance": 0.375,
+      "w_energy": 0.25,
+      "dominant_weight": "risk",
+      "selected_index": 0,
+      "distance": 8.58325,
+      "energy": 9.456019999999999,
+      "risk": 0.7561,
+      "rank_distance": 1,
+      "rank_energy": 1,
+      "rank_risk": 2,
+      "dominant_objective_rank": 2,
+      "point_type": "min-distance/min-energy",
+      "selection_latency_ms": 0.007708999874012079,
+      "score": 0.625,
+      "unique_routes_across_presets": 2,
+      "scenario": "S1_50_sparse",
+      "nodes": 50
+    }
+  ]
+}

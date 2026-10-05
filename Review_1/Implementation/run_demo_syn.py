@@ -1,6 +1,6 @@
 """
-run_demo.py — Phase I Software Simulation  (Review 1 Demo)
-============================================================
+run_demo_syn.py — Phase I Software Simulation  (Review 1 Demo)
+===============================================================
 FYP: Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery
 
 This script runs the FULL end-to-end pipeline for the 30% Review 1
@@ -17,7 +17,7 @@ HOW TO RUN:
   │    pip install networkx numpy matplotlib osmnx              │
   │                                                             │
   │  Then run:                                                  │
-  │    python run_demo.py                                       │
+  │    python run_demo_syn.py                                   │
   └─────────────────────────────────────────────────────────────┘
 
 OUTPUT FILES (all in  outputs/ folder):
@@ -244,7 +244,7 @@ def build_summary_figure(G, source, target, engine, selector, results):
     ax_d.bar(x_pos,          norm(enrg_vals), bar_w,
              label="Energy",   color="#E67E22", edgecolor="k", alpha=0.85)
     ax_d.bar(x_pos + bar_w,  norm(risk_vals), bar_w,
-             label="Risk",     color="#E74C3C", edgecolor="k", alpha=0.85)
+             label="Cum. Risk", color="#E74C3C", edgecolor="k", alpha=0.85)
     ax_d.set_xticks(list(x_pos))
     ax_d.set_xticklabels(xlabels, fontsize=10)
     ax_d.set_ylabel("Normalised objective value")
