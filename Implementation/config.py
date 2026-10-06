@@ -47,6 +47,7 @@ OSM_FETCH_RADIUS_M = 4500.0      # features_from_point radius (covers the 6 km b
 OVERPASS_ENDPOINTS = (
     "https://overpass-api.de/api",
     "https://overpass.private.coffee/api",
+    "https://overpass.kumi.systems/api",
 )
 OVERPASS_USER_AGENT = (
     "FYP-B28-UAV-Route-Planner/1.0 "
