@@ -207,4 +207,6 @@ def parse_args(argv=None):
 
 
 if __name__ == "__main__":
+    from env_data import load_dotenv
+    load_dotenv()                                   # OPENTOPO_API_KEY etc. from <repo>/.env
     run_ablation(parse_args())

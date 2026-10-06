@@ -57,7 +57,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import config as cfg
 from env_data import (FIXTURE_DEM, LocalFrame, LocalRasterProvider, build_layer_indexes,
-                      default_elevation_providers, fetch_osm_layers, fetch_osm_roads)
+                      default_elevation_providers, fetch_osm_layers, fetch_osm_roads,
+                      load_dotenv)
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar  import TierOneEngine
 from pareto_store import ParetoStore, front_from_record
@@ -350,6 +351,7 @@ def _selection_request_from_args(args):
 
 
 def main(argv=None):
+    load_dotenv()                                   # OPENTOPO_API_KEY etc. from <repo>/.env
     args = parse_args(argv)
     selection_request = _selection_request_from_args(args)
     t_start = time.time()
