@@ -1,9 +1,15 @@
 """
 QGroundControl / Mission Planner mission export.
 
-Phase 7 integration choice: waypoint altitude uses MAV_FRAME_GLOBAL_RELATIVE_ALT
-(`frame=3`) with AGL metres. This keeps the export independent of missing DEM
-data in the current synthetic graph and lets tests enforce the 120 m AGL limit.
+Waypoint altitude uses MAV_FRAME_GLOBAL_RELATIVE_ALT (`frame=3`), i.e. metres
+above HOME, not above the local ground:
+
+    rel_alt = alt_amsl_m − home_alt_amsl        home row: frame 0, home_alt_amsl (AMSL)
+
+home_alt_amsl defaults to the ground under the first waypoint (alt_amsl_m − agl_m).
+Over varying terrain writing agl_m here would fly the wrong height (audit defect #3).
+Waypoints without alt_amsl_m (synthetic graphs, no DEM) fall back to agl_m, which
+is only correct on flat ground.  The 120 m AGL limit is checked on agl_m.
 """
 
 from __future__ import annotations
@@ -91,11 +97,13 @@ def _normalise_waypoint(waypoint: dict) -> dict:
         raise ValueError(f"Waypoint altitude below ground: {agl:.2f} m.")
     if agl > MAX_AGL_M:
         raise ValueError(f"Waypoint altitude exceeds {MAX_AGL_M:.0f} m AGL: {agl:.2f} m.")
+    amsl = waypoint.get("alt_amsl_m")
     return {
         "node": waypoint.get("node"),
         "lat": lat,
         "lon": lon,
         "agl_m": agl,
+        "alt_amsl_m": None if amsl is None else float(amsl),
     }
 
 
@@ -113,7 +121,8 @@ def _alt_slope(a: dict, b: dict) -> float:
     distance = math.hypot(b["lat"] - a["lat"], b["lon"] - a["lon"])
     if distance <= 1e-12:
         return 0.0
-    return (b["agl_m"] - a["agl_m"]) / distance
+    key = "alt_amsl_m" if a.get("alt_amsl_m") is not None and b.get("alt_amsl_m") is not None else "agl_m"
+    return (b[key] - a[key]) / distance
 
 
 def merge_collinear_waypoints(
@@ -144,6 +153,7 @@ def build_mission_items(
     *,
     merge_collinear: bool = True,
     end_with_rtl: bool = True,
+    home_alt_amsl: float | None = None,
 ) -> list[MissionItem]:
     pts = [_normalise_waypoint(wp) for wp in waypoints]
     if len(pts) < 2:
@@ -152,6 +162,16 @@ def build_mission_items(
         pts = merge_collinear_waypoints(pts)
 
     home = pts[0]
+    if all(p["alt_amsl_m"] is not None for p in pts):
+        if home_alt_amsl is None:
+            home_alt_amsl = home["alt_amsl_m"] - home["agl_m"]
+        home_alt = float(home_alt_amsl)
+        rel = [p["alt_amsl_m"] - home_alt for p in pts]
+    elif home_alt_amsl is not None:
+        raise ValueError("home_alt_amsl given but some waypoints lack alt_amsl_m.")
+    else:                                       # no DEM data: flat-ground assumption
+        home_alt = home["agl_m"]
+        rel = [p["agl_m"] for p in pts]
     items = [
         MissionItem(
             index=0,
@@ -164,7 +184,7 @@ def build_mission_items(
             p4=0.0,
             lat=home["lat"],
             lon=home["lon"],
-            alt=home["agl_m"],
+            alt=home_alt,
             autocontinue=1,
         )
     ]
@@ -182,7 +202,7 @@ def build_mission_items(
                 p4=0.0,
                 lat=waypoint["lat"],
                 lon=waypoint["lon"],
-                alt=waypoint["agl_m"],
+                alt=rel[seq],
                 autocontinue=1,
             )
         )
@@ -201,7 +221,7 @@ def build_mission_items(
                 p4=0.0,
                 lat=last["lat"],
                 lon=last["lon"],
-                alt=last["agl_m"],
+                alt=rel[-1],
                 autocontinue=1,
             )
         )
@@ -246,12 +266,14 @@ def export_qgc_wpl(
     *,
     merge_collinear: bool = True,
     end_with_rtl: bool = True,
+    home_alt_amsl: float | None = None,
 ) -> Path:
     waypoints = waypoints_from_selection(result)
     items = build_mission_items(
         waypoints,
         merge_collinear=merge_collinear,
         end_with_rtl=end_with_rtl,
+        home_alt_amsl=home_alt_amsl,
     )
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

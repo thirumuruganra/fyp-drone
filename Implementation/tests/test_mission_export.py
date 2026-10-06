@@ -78,5 +78,37 @@ class MissionExportTests(unittest.TestCase):
                 export_qgc_wpl(result, Path(tmpdir) / "mission.waypoints")
 
 
+class MissionAltitudeFrameTests(unittest.TestCase):
+    """Frame 3 is height above HOME: rel = alt_amsl − home ground, never agl_m (audit #3)."""
+
+    UPHILL = [
+        {"node": 1, "lat": 12.0, "lon": 80.0, "agl_m": 60.0, "alt_amsl_m": 70.0},    # ground 10
+        {"node": 2, "lat": 12.01, "lon": 80.0, "agl_m": 60.0, "alt_amsl_m": 95.0},   # ground 35
+    ]
+
+    def test_uphill_waypoint_is_relative_to_home_not_local_ground(self):
+        items = build_mission_items(self.UPHILL, merge_collinear=False, end_with_rtl=False)
+        self.assertEqual(items[0].frame, 0)
+        self.assertAlmostEqual(items[0].alt, 10.0)          # home row: AMSL
+        self.assertAlmostEqual(items[1].alt, 85.0)          # 95 AMSL − 10 home, not 60
+        self.assertEqual(items[1].frame, MAV_FRAME_GLOBAL_RELATIVE_ALT)
+
+    def test_explicit_home_altitude(self):
+        items = build_mission_items(self.UPHILL, merge_collinear=False, end_with_rtl=False,
+                                    home_alt_amsl=5.0)
+        self.assertAlmostEqual(items[0].alt, 5.0)
+        self.assertAlmostEqual(items[1].alt, 90.0)
+
+    def test_home_altitude_needs_amsl_waypoints(self):
+        with self.assertRaises(ValueError):
+            build_mission_items([{"lat": 12.0, "lon": 80.0, "agl_m": 60.0},
+                                 {"lat": 12.1, "lon": 80.0, "agl_m": 60.0}], home_alt_amsl=5.0)
+
+    def test_rtl_uses_relative_altitude(self):
+        items = build_mission_items(self.UPHILL, merge_collinear=False, end_with_rtl=True)
+        self.assertEqual(items[-1].command, MAV_CMD_NAV_RETURN_TO_LAUNCH)
+        self.assertAlmostEqual(items[-1].alt, 85.0)
+
+
 if __name__ == "__main__":
     unittest.main()

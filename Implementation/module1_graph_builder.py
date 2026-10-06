@@ -48,7 +48,7 @@ import os
 import pickle
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 
 import numpy as np
 import networkx as nx
@@ -553,6 +553,11 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
       population_index : ClassIndex — SORA-style exposure class, mean along the edge
       (the building index also gives comm/GPS canyon and turbulence density)
 
+    Hard feasibility (optional):
+      edge_filter(a, b) -> bool : called with the two node attribute dicts of every
+                                  candidate edge after the NFZ cut; False removes the
+                                  edge (e.g. Simulation/route_clearance.py roof check)
+
     Node attributes : x = lon, y = lat, lat, lon, x_m, y_m, ground_elev_m,
                       bldg_h_m, bldg_density, bldg_mean_h_m, agl_m, alt_amsl_m,
                       alt_m (= alt_amsl_m)
@@ -574,7 +579,8 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
                  building_index: Optional[BuildingIndex] = None,
                  restricted_zones: Optional[ZoneIndex] = None,
                  water_zones: Optional[ZoneIndex] = None,
-                 population_index: Optional[ClassIndex] = None):
+                 population_index: Optional[ClassIndex] = None,
+                 edge_filter: Optional[Callable[[dict, dict], bool]] = None):
         super().__init__(location=location, dist=int(box_m / 2), seed=seed, weather=weather)
         self.center = center
         self.box_m = box_m
@@ -586,6 +592,7 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
         self.restricted_zones = restricted_zones
         self.water_zones = water_zones
         self.population_index = population_index
+        self.edge_filter = edge_filter
         self.frame = LocalFrame(*center)
         self.build_info: dict = {}
 
@@ -743,6 +750,14 @@ class LatticeAirspaceBuilder(AirspaceGraphBuilder):
                 print(f"[Module 1] Removed {int(crossing.sum())} edge(s) crossing restricted zones")
             self.build_info["nfz_edges"] = int(crossing.sum())
             candidates = [e for e, hit in zip(candidates, crossing) if not hit]
+
+        if self.edge_filter is not None and candidates:         # hard feasibility hook
+            kept = [(u, v) for u, v in candidates if self.edge_filter(G.nodes[u], G.nodes[v])]
+            rejected = len(candidates) - len(kept)
+            if rejected:
+                print(f"[Module 1] Removed {rejected} edge(s) rejected by the edge filter")
+            self.build_info["filtered_edges"] = rejected
+            candidates = kept
 
         for u, v in candidates:
             a, b = G.nodes[u], G.nodes[v]

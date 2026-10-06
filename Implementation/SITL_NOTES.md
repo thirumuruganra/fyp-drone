@@ -2,6 +2,8 @@
 
 Status: not run. Phase 7 adds mission-file export and dashboard path only.
 
+**Gazebo + ArduPilot SITL simulation now lives in `../Simulation/` — see `Simulation/README.md`.**
+
 ## Planned validation
 
 1. Generate mission:
@@ -20,8 +22,10 @@ Status: not run. Phase 7 adds mission-file export and dashboard path only.
 
 ## Current implementation choice
 
-Mission export uses relative altitude (`MAV_FRAME_GLOBAL_RELATIVE_ALT`, frame `3`) with `agl_m`.
-If graph nodes lack `agl_m`, exporter uses 60 m AGL. Export rejects any waypoint above 120 m AGL.
+Mission export uses relative altitude (`MAV_FRAME_GLOBAL_RELATIVE_ALT`, frame `3`) = height above HOME:
+`rel_alt = alt_amsl_m − home_alt_amsl`, home row frame `0` in AMSL (home defaults to the ground under
+the first waypoint). Waypoints without `alt_amsl_m` (no DEM) fall back to `agl_m`, correct on flat
+ground only; missing `agl_m` → 60 m. Export rejects any waypoint above 120 m AGL.
 
 ## Not verified
 
