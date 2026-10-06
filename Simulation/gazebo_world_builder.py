@@ -186,7 +186,11 @@ def write_mesh_model(models_dir: Path, name: str, links: Sequence[tuple], descri
 
 def sitl_command(bundle: RegionBundle) -> str:
     lat, lon = bundle.depot
+    # ArduPilot >= 4.6 dev: the SITL binary picks per-frame defaults from --model, and --model JSON
+    # matches none, so FRAME_CLASS stays 0 ("Arm: Motors: Check frame class and type"). Layer them back.
+    pdir = "$HOME/ardupilot/Tools/autotest/default_params"
     return (f"sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console "
+            f"--add-param-file={pdir}/copter.parm --add-param-file={pdir}/gazebo-iris.parm "
             f"--custom-location={lat:.7f},{lon:.7f},{bundle.h_home:.3f},0")
 
 

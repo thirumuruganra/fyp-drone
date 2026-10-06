@@ -95,11 +95,15 @@ pip install -r requirements-simulation.txt
 
 ### Smoke test (must pass before the city)
 
+`--model JSON` hides the `gazebo-iris` frame from newer ArduPilot SITL binaries (defaults are looked up by model name), so `FRAME_CLASS` stays 0 and arming fails with `Motors: Check frame class and type`. The two `--add-param-file` options restore the defaults; `-w` wipes a stale `eeprom.bin` once.
+
 ```bash
 # terminal 1
 gz sim -v4 -r iris_runway.sdf
 # terminal 2
-sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console
+sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console -w \
+    --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/copter.parm \
+    --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/gazebo-iris.parm
 #   MAVProxy:  mode guided  →  arm throttle  →  takeoff 10
 ```
 
@@ -158,7 +162,9 @@ python run_sim_mission.py --baseline min-distance     # single-objective baselin
 
 # Phase 4: fly
 gazebo/launch_region.sh thiru_1500 missions/<run_id>                  # terminal 1: world + markers
-sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console \
+sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console -w \
+    --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/copter.parm \
+    --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/gazebo-iris.parm \
     --custom-location=<printed by the launcher>                         # terminal 2
 python sitl_mission_runner.py missions/<run_id>                       # terminal 3
 #   …or in Windows QGC: Plan → Open → mission.plan → Upload → Start Mission
