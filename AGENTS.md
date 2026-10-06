@@ -21,23 +21,22 @@ Semantic commits, all commits.
 
 FYP (B28) repo. **"Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery"** — Thirumurugan RA, Shrika SP Thota, Meghna Manimaran (Guide: Sujaudeen N), SSN College of Engineering, Dept. of CSE.
 
-Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Review 1/Implementation/`. No build system beyond LaTeX compile. No Python test suite.
+Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Implementation/`. No build system beyond LaTeX compile. Python tests use `unittest`.
 
-**Core idea:** split Pareto-front build (Tier 1) from mission route pick (Tier 2). Planner run once per delivery region, reused. Payload metadata picks point on front per mission — no manual weight re-tune between deliveries. Read `Review 1/FYP_B28_Project_Context.md` first — problem statement, lit gap, panel feedback history, tech decisions log. Canonical source for *why*, not just what. Read before touching algorithm concepts.
+**Core idea:** split Pareto-front build (Tier 1) from mission route pick (Tier 2). Planner run once per delivery region, reused. Payload metadata picks point on front per mission — no manual weight re-tune between deliveries. Read `FYP_B28_Project_Context.md` first — problem statement, lit gap, panel feedback history, tech decisions log. Canonical source for *why*, not just what. Read before touching algorithm concepts.
 
 ## Repository Layout
 
-- `Abstract/`, `Initial Screening PPT/`, `Review 0/` — early submission artifacts. Frozen/historical.
-- `Review 1/` — current phase deliverables:
-  - `FYP_B28_Project_Context.md` — canonical context (problem, arch, math, panel Q&A, timeline). Read first.
-  - `Implementation/` — Python sim (below).
-  - `Phase 1 Report/` — LaTeX thesis chapters (`ch1_intro.tex` … `ch5_timeline.tex`), compiled via `main.tex` (uses `Thesis.cls`, `bmacros.tex`).
-  - `Review 1 PPT/`, `Review 1 Report/` — LaTeX presentation/report, `ssnreview.cls`.
-- `Reference Material (From Seniors - just for format)/` — prior year thesis, format reference only. Not project content.
+- `Abstract/`, `Initial Screening PPT/`, `Review_0/` — early submission artifacts. Frozen/historical.
+- `Review_1/` — Review 1 deliverables (`Report/`, `PPT/`, `diagrams/`).
+- `Review_2/` — Review 2 templates (`Report/`, `PPT/`).
+- `Phase_1/` — Phase 1 report and seniors' format reference.
+- `Implementation/` — Python sim (below).
+- `Reference_Papers/` — cited papers and baseline references.
 
-## Implementation (`Review 1/Implementation/`)
+## Implementation (`Implementation/`)
 
-Python sim, four modules, no package structure — flat scripts, imported direct by two demo entry points.
+Python sim, five modules, no package structure — flat scripts, imported direct by demo and benchmark entry points.
 
 - `config.py` — every tunable (region, heights, wind consts, risk weights, battery/mass). Edit here, not inline.
 - `env_data.py` — `fetch_weather()` → `WeatherSnapshot` (Open-Meteo, no key; live → cache → calm). Terrain: `ElevationProvider` chain (`LocalRasterProvider` → `OpenTopographyProvider` [env `OPENTOPO_API_KEY`, optional] → `OpenMeteoElevationProvider` [keyless] → `FlatProvider`), `fetch_elevations()`. OSM: `fetch_osm_layers()` (buildings/restricted/water/landuse, GeoPackage cache), `BuildingIndex` (STRtree; heights, cell density), `building_height_m()` (height → levels×3 → type default), `ZoneIndex` (restricted zones / water: contains, distance, segment hit; `sea_polygons()` from coastline), `ClassIndex` + `population_class()` (SORA-style exposure), `build_layer_indexes()`, `WeatherSnapshot.no_go_reasons()` (weather gate). Disk cache in `cache/`.
@@ -48,19 +47,23 @@ Python sim, four modules, no package structure — flat scripts, imported direct
 - `module4_tier2_payload.py` — `TierTwoSelector` + `derive_weights(F, T, U)`: converts four payload tags (fragility, temp sensitivity, urgency, priority) into objective weights via fixed formula (project context doc), scores every Pareto point, picks `argmax(score)`. Tier 2.
 - `run_demo_syn.py` / `run_demo_osm.py` — end-to-end demo scripts (`main()`), wire modules 1 → 2 → 4 on synthetic and OSM graphs, print step banners, render summary figures via Matplotlib.
 - `run_ablation.py` — Phase 3 ablation: all / no_wind / no_terrain / no_buildings → Tier 1 fronts + edge-risk maps + component maps in `outputs/ablation/`.
+- `run_benchmarks.py` — benchmark entry point for synthetic scenarios and baselines.
 - `module4_tier2_payload.py` respects the weather gate: `TierTwoSelector(front, no_go_reasons)` → `select()` raises `WeatherNoGo`, `run_all_presets()` prints HOLD, returns `{}`.
+- `mission_export.py` — QGroundControl / Mission Planner `QGC WPL 110` export from `SelectionResult`; relative AGL altitude frame, RTL ending.
+- `dashboard.py` — minimal Tkinter operator dashboard: load stored graph/front, enter tags, show route, export mission.
+- `SITL_NOTES.md` — SITL validation checklist; hardware/SITL not run yet.
 - `wind_integration_plan.md` — v1.1, implemented. Wind formulas, constants, six v1.0 bugs fixed. Read before touching wind-related edge costs.
 - `cache/`, `outputs/`, `pareto_front_storage/`, `__pycache__/` — generated artifacts, not source.
-
-Module numbering skips 3 (1, 2, 4 — no `module3`) — matches tier terms in report. Don't "fix" by renumbering.
 
 ### Running the simulation
 
 ```bash
-cd "Review 1/Implementation"
+cd Implementation
 pip install -r requirements.txt   # networkx, numpy, matplotlib, osmnx (osmnx optional — synthetic path falls back without it)
 python run_demo_syn.py            # synthetic airspace graph demo
 python run_demo_osm.py            # OpenStreetMap-backed demo (requires network access for OSM + optionally osmnx)
+python dashboard.py               # local operator dashboard, exports .waypoints
+python -m unittest discover -s tests
 ```
 
 Tests (unittest, offline): `python -m unittest discover -s Implementation/tests`. Also run demo scripts, inspect printed Pareto front + figures under `outputs/`. Sandbox blocks Open-Meteo: use `--offline` or `--wind-override`.
@@ -70,7 +73,7 @@ Tests (unittest, offline): `python -m unittest discover -s Implementation/tests`
 Payload-tag-to-weight mapping: not lookup table, continuous formula. Deliberate — answers review-panel critique, documented `FYP_B28_Project_Context.md`:
 
 ```
-r_raw = F × 2        d_raw = U × 3        e_raw = T × 2
+r_raw = F × 2        d_raw = U × 3        e_raw = W × 2
 w_risk = r_raw / (r_raw + d_raw + e_raw)
 w_distance = d_raw / (r_raw + d_raw + e_raw)
 w_energy = e_raw / (r_raw + d_raw + e_raw)

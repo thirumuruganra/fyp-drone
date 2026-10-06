@@ -222,6 +222,85 @@ def objective_ranks(costs: np.ndarray, selected_cost: list[float]) -> dict[str, 
     return ranks
 
 
+def payload_alignment_score(weights: dict[str, float], ranks: dict[str, int], front_size: int) -> float:
+    """
+    Rank-based payload-alignment score.
+
+    A = Σ_k w_k * (1 - (rank_k - 1)/(K - 1)). For K=1 every rank is best.
+    """
+    if front_size <= 1:
+        return 1.0
+    return float(sum(
+        weights[name] * (1.0 - (ranks[name] - 1) / (front_size - 1))
+        for name in ("distance", "energy", "risk")
+    ))
+
+
+def _normalized_costs_for_front(pareto_front: list[tuple[list[float], list]]) -> np.ndarray:
+    costs = objective_matrix(pareto_front)
+    ideal = costs.min(axis=0)
+    span = np.maximum(costs.max(axis=0) - ideal, 1e-12)
+    return (costs - ideal) / span
+
+
+def knee_point_index(pareto_front: list[tuple[list[float], list]]) -> int:
+    """Knee = point farthest from line through min-distance and min-risk extremes."""
+    norm = _normalized_costs_for_front(pareto_front)
+    if len(norm) <= 2:
+        return 0
+    a = norm[int(np.argmin(norm[:, 0]))]
+    b = norm[int(np.argmin(norm[:, 2]))]
+    ab = b - a
+    denom = float(np.linalg.norm(ab))
+    if denom <= 1e-12:
+        centroid = norm.mean(axis=0)
+        return int(np.argmax(np.linalg.norm(norm - centroid, axis=1)))
+    distances = np.linalg.norm(np.cross(norm - a, ab), axis=1) / denom
+    return int(np.argmax(distances))
+
+
+def crowding_distance_index(pareto_front: list[tuple[list[float], list]]) -> int:
+    """Crowding picker = point with largest NSGA-II crowding distance."""
+    norm = _normalized_costs_for_front(pareto_front)
+    n = len(norm)
+    if n <= 2:
+        return 0
+    distances = np.zeros(n, dtype=float)
+    for obj_idx in range(3):
+        order = np.argsort(norm[:, obj_idx])
+        distances[order[0]] = np.inf
+        distances[order[-1]] = np.inf
+        for pos in range(1, n - 1):
+            distances[order[pos]] += norm[order[pos + 1], obj_idx] - norm[order[pos - 1], obj_idx]
+    return int(np.argmax(distances))
+
+
+def fixed_weight_index(pareto_front: list[tuple[list[float], list]]) -> int:
+    """Fixed Chokkalingam-style picker = equal weights over normalized utility."""
+    norm = _normalized_costs_for_front(pareto_front)
+    scores = (1.0 - norm).mean(axis=1)
+    return int(np.argmax(scores))
+
+
+def _rows_for_picker(
+    pareto_front: list[tuple[list[float], list]],
+    weights: dict[str, float],
+    picker: str,
+    route_idx: int,
+) -> dict:
+    costs = objective_matrix(pareto_front)
+    g, path = pareto_front[route_idx]
+    ranks = objective_ranks(costs, g)
+    return {
+        f"{picker}_index": int(route_idx),
+        f"{picker}_rank_distance": ranks["distance"],
+        f"{picker}_rank_energy": ranks["energy"],
+        f"{picker}_rank_risk": ranks["risk"],
+        f"{picker}_alignment": payload_alignment_score(weights, ranks, len(pareto_front)),
+        f"{picker}_point_type": TierTwoSelector(pareto_front).classify_point(route_idx),
+    }
+
+
 def tier2_evidence(pareto_front: list[tuple[list[float], list]]) -> list[dict]:
     """Payload-alignment evidence, no fake accuracy labels."""
     selector = TierTwoSelector(pareto_front)
@@ -239,8 +318,13 @@ def tier2_evidence(pareto_front: list[tuple[list[float], list]]) -> list[dict]:
         weights = {"risk": wr, "distance": wd, "energy": we}
         dominant = max(weights, key=weights.get)
         point_type = selector.classify_point(route_idx)
+        alignment = payload_alignment_score(weights, ranks, len(pareto_front))
+        shortest_idx = int(np.argmin(costs[:, 0]))
+        knee_idx = knee_point_index(pareto_front)
+        crowd_idx = crowding_distance_index(pareto_front)
+        fixed_idx = fixed_weight_index(pareto_front)
         selected_paths.add(tuple(path))
-        rows.append({
+        row = {
             "preset": name,
             "F": tags["F"],
             "W": tags["W"],
@@ -258,13 +342,122 @@ def tier2_evidence(pareto_front: list[tuple[list[float], list]]) -> list[dict]:
             "rank_energy": ranks["energy"],
             "rank_risk": ranks["risk"],
             "dominant_objective_rank": ranks[dominant],
+            "payload_alignment": alignment,
             "point_type": point_type,
             "selection_latency_ms": float(latency_s * 1000.0),
             "score": float(scores[route_idx]),
-        })
+        }
+        row.update(_rows_for_picker(pareto_front, weights, "astar_shortest", shortest_idx))
+        row.update(_rows_for_picker(pareto_front, weights, "knee", knee_idx))
+        row.update(_rows_for_picker(pareto_front, weights, "crowding", crowd_idx))
+        row.update(_rows_for_picker(pareto_front, weights, "fixed_equal", fixed_idx))
+        rows.append(row)
 
     for row in rows:
         row["unique_routes_across_presets"] = len(selected_paths)
+    return rows
+
+
+def tier2_sweep(pareto_front: list[tuple[list[float], list]]) -> list[dict]:
+    """Evaluate all 225 F/W/U/P tag combinations on one front."""
+    selector = TierTwoSelector(pareto_front)
+    costs = selector.costs
+    rows = []
+    for F in range(1, 6):
+        for W in range(1, 4):
+            for U in range(1, 4):
+                for P in range(1, 6):
+                    t0 = time.perf_counter()
+                    selected, wr, wd, we, scores = selector.select(F, W, U, P)
+                    latency_s = time.perf_counter() - t0
+                    g, path = selected
+                    idx = selector.selected_index(selected)
+                    ranks = objective_ranks(costs, g)
+                    weights = {"risk": wr, "distance": wd, "energy": we}
+                    rows.append({
+                        "F": F,
+                        "W": W,
+                        "U": U,
+                        "P": P,
+                        "selected_index": int(idx),
+                        "distance": float(g[0]),
+                        "energy": float(g[1]),
+                        "risk": float(g[2]),
+                        "rank_distance": ranks["distance"],
+                        "rank_energy": ranks["energy"],
+                        "rank_risk": ranks["risk"],
+                        "payload_alignment": payload_alignment_score(weights, ranks, len(pareto_front)),
+                        "point_type": selector.classify_point(idx),
+                        "selection_latency_ms": float(latency_s * 1000.0),
+                        "score": float(scores[idx]),
+                        "path": " ".join(str(node) for node in path),
+                    })
+    return rows
+
+
+def monotonicity_violations(sweep_rows: list[dict]) -> list[dict]:
+    """Find simple adjacent monotonicity violations across the full tag sweep."""
+    by_tags = {(r["F"], r["W"], r["U"], r["P"]): r for r in sweep_rows}
+    violations = []
+    for row in sweep_rows:
+        F, W, U, P = row["F"], row["W"], row["U"], row["P"]
+        checks = [
+            ("F", F < 5, (F + 1, W, U, P), "risk"),
+            ("W", W < 3, (F, W + 1, U, P), "energy"),
+            ("U", U < 3, (F, W, U + 1, P), "distance"),
+        ]
+        for field, enabled, next_key, objective in checks:
+            if not enabled:
+                continue
+            nxt = by_tags[next_key]
+            if nxt[objective] > row[objective] + 1e-9:
+                violations.append({
+                    "field": field,
+                    "from_tags": f"F={F},W={W},U={U},P={P}",
+                    "to_tags": f"F={next_key[0]},W={next_key[1]},U={next_key[2]},P={next_key[3]}",
+                    "objective": objective,
+                    "from_value": row[objective],
+                    "to_value": nxt[objective],
+                })
+    return violations
+
+
+def risk_component_shares(
+    G,
+    route_rows: list[tuple[str, tuple[list[float], list]]],
+) -> list[dict]:
+    """
+    Mean risk-component shares for routes.
+
+    Current checked-in graph uses a synthetic scalar risk. If edge-level
+    risk_components exist, use them; otherwise emit synthetic_risk=1.0.
+    """
+    rows = []
+    for label, (_cost, path) in route_rows:
+        totals: dict[str, float] = {}
+        total = 0.0
+        for u, v in zip(path[:-1], path[1:]):
+            edge = G[u][v]
+            exposure = float(edge.get("risk", 0.0))
+            components = edge.get("risk_components")
+            if isinstance(components, dict) and components:
+                comp_sum = max(sum(float(x) for x in components.values()), 1e-12)
+                for name, value in components.items():
+                    contribution = exposure * float(value) / comp_sum
+                    totals[name] = totals.get(name, 0.0) + contribution
+                    total += contribution
+            else:
+                totals["synthetic_risk"] = totals.get("synthetic_risk", 0.0) + exposure
+                total += exposure
+        if total <= 1e-12:
+            totals["synthetic_risk"] = 1.0
+            total = 1.0
+        for component, value in sorted(totals.items()):
+            rows.append({
+                "route": label,
+                "component": component,
+                "share": float(value / total),
+            })
     return rows
 
 

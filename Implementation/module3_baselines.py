@@ -98,6 +98,73 @@ def single_objective_astar(
     )
 
 
+def objective_scales_from_extremes(G: nx.DiGraph, source, target) -> np.ndarray:
+    """
+    Estimate objective scales from the three single-objective A* extremes.
+
+    Weighted-sum graph search is scalar, so raw distance/energy/risk units must
+    be normalised before weights are meaningful. Spans of zero fall back to 1.
+    """
+    extremes = [
+        single_objective_astar(G, source, target, objective).routes[0][0]
+        for objective in OBJECTIVES
+    ]
+    arr = np.array(extremes, dtype=float)
+    spans = arr.max(axis=0) - arr.min(axis=0)
+    return np.maximum(spans, 1.0)
+
+
+def weighted_sum_astar(
+    G: nx.DiGraph,
+    source,
+    target,
+    objective_weights: dict[str, float] | np.ndarray,
+    method_name: str = "astar_weighted",
+    scales: np.ndarray | None = None,
+) -> BaselineResult:
+    """
+    Weighted-sum A* baseline with normalized objectives.
+
+    Definition for report: scalar edge cost is
+    Σ_j w_j * c_j(e) / scale_j, where scales come from the distance/energy/risk
+    single-objective A* extremes for this graph unless passed explicitly.
+    """
+    if isinstance(objective_weights, dict):
+        weights = np.array([
+            objective_weights["distance"],
+            objective_weights["energy"],
+            objective_weights["risk"],
+        ], dtype=float)
+    else:
+        weights = np.asarray(objective_weights, dtype=float)
+    if weights.shape != (3,):
+        raise ValueError("objective_weights must have distance/energy/risk weights.")
+    total = float(weights.sum())
+    if total <= 0:
+        raise ValueError("objective_weights must sum to a positive value.")
+    weights = weights / total
+    scales = np.asarray(scales if scales is not None else objective_scales_from_extremes(G, source, target), dtype=float)
+    scales = np.maximum(scales, 1e-12)
+
+    def weight(u, v, attrs):
+        edge = np.array([attrs["distance"], attrs["energy"], attrs["risk"]], dtype=float)
+        return float(weights @ (edge / scales))
+
+    t0 = time.perf_counter()
+    path = nx.astar_path(G, source, target, heuristic=lambda _u, _v: 0.0, weight=weight)
+    runtime_s = time.perf_counter() - t0
+    return BaselineResult(
+        method=method_name,
+        routes=[(route_cost(G, path), path)],
+        runtime_s=runtime_s,
+        metadata={
+            "objective_weights": weights.tolist(),
+            "normalization_scales": scales.tolist(),
+            "definition": "sum_j w_j * c_j(edge) / scale_j",
+        },
+    )
+
+
 def _archive_add(archive: list[tuple[list[float], list]], item: tuple[list[float], list], limit: int):
     """Add path to non-dominated archive, dedupe by node sequence, trim by diversity."""
     g_new, path_new = item

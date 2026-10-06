@@ -1,0 +1,12 @@
+{
+  "_comment": "Offline Tier 2 hardening fixture. Synthetic lattice-style Pareto front with objective trade-offs and node-id paths; generated for deterministic unit tests, not real OSM/live data.",
+  "front": [
+    {"cost": [1.0, 10.0, 10.0], "path": [0, 1, 4]},
+    {"cost": [10.0, 1.0, 10.0], "path": [0, 2, 4]},
+    {"cost": [10.0, 10.0, 1.0], "path": [0, 3, 4]},
+    {"cost": [4.0, 4.0, 4.0], "path": [0, 5, 4]},
+    {"cost": [3.0, 5.0, 6.0], "path": [0, 6, 4]},
+    {"cost": [6.0, 3.0, 5.0], "path": [0, 7, 4]},
+    {"cost": [5.0, 6.0, 3.0], "path": [0, 8, 4]}
+  ]
+}
