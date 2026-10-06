@@ -273,6 +273,66 @@ class LocalFrame:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  .env (API keys) — loaded by the entry-point scripts, never at import
+# ═════════════════════════════════════════════════════════════════════════════
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def parse_dotenv(text: str) -> dict:
+    """KEY=VALUE lines; blank lines, '#' comments and an 'export ' prefix allowed; quotes stripped."""
+    out = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, sep, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if not sep or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        elif " #" in value:
+            value = value.split(" #", 1)[0].rstrip()
+        out[key] = value
+    return out
+
+
+def load_dotenv(paths: Optional[Sequence[str]] = None, override: bool = False) -> list:
+    """
+    Copy variables from .env files into os.environ (e.g. OPENTOPO_API_KEY).
+
+    Default files, in order: <repo>/.env, <repo>/Implementation/.env, ./.env.
+    A variable already set in the real environment wins unless override=True.
+    Returns the names set (values are never printed).
+    """
+    if paths is None:
+        paths = [os.path.join(REPO_ROOT, ".env"),
+                 os.path.join(REPO_ROOT, "Implementation", ".env"),
+                 os.path.join(os.getcwd(), ".env")]
+    seen, loaded = set(), []
+    for path in paths:
+        real = os.path.realpath(path)
+        if real in seen or not os.path.isfile(real):
+            continue
+        seen.add(real)
+        try:
+            with open(real, "r", encoding="utf-8") as fh:
+                values = parse_dotenv(fh.read())
+        except OSError:
+            continue
+        for key, value in values.items():
+            if override or key not in os.environ:
+                os.environ[key] = value
+                loaded.append(key)
+    if loaded:
+        print(f"[Env] Loaded {', '.join(sorted(set(loaded)))} from .env")
+    return loaded
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  Elevation providers
 # ═════════════════════════════════════════════════════════════════════════════
 

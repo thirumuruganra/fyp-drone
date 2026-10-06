@@ -142,7 +142,9 @@ ArduPilot's MAVProxy sends to **UDP 14550**. The PX4 link you made earlier used 
 ```bash
 cd ~/fyp-drone/Simulation
 
-# Phase 1: freeze the region (live OSM + Open-Meteo DEM, cached in Implementation/cache)
+# Phase 1: freeze the region (live OSM + DEM, cached in Implementation/cache)
+#   OPENTOPO_API_KEY is read automatically from <repo>/.env → Copernicus 30 m DEM;
+#   without a key the Open-Meteo 90 m DEM is used.
 python prepare_sim_region.py --strict                 # default: thiru_1500 (sim_config.py)
 #   other area:  --region-id my_area --center LAT LON --box-m 1500 --depot LAT LON --dest LAT LON --dest LAT LON
 

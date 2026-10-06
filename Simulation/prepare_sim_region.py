@@ -31,7 +31,7 @@ import config as cfg
 import sim_config as scfg
 from env_data import (ElevationGrid, LocalFrame, LocalRasterProvider, _first_number,
                       building_height_m, default_elevation_providers, fetch_elevations,
-                      fetch_osm_layers, fetch_osm_roads, FIXTURE_DEM)
+                      fetch_osm_layers, fetch_osm_roads, load_dotenv, FIXTURE_DEM)
 from sim_region import BundleError, region_dir, sample_grid
 
 BUNDLE_VERSION = 1
@@ -318,6 +318,7 @@ def build_bundle(region_id: str, center: Sequence[float], box_m: float, depot: S
 
 
 def main(argv=None):
+    load_dotenv()                                   # OPENTOPO_API_KEY etc. from <repo>/.env
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--region-id", default=scfg.SIM_REGION_ID)
     p.add_argument("--center", nargs=2, type=float, metavar=("LAT", "LON"), default=scfg.SIM_CENTER)
