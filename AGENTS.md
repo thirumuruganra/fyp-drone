@@ -32,6 +32,7 @@ Mostly academic deliverables (LaTeX reports, PPTs) + small Python sim under `Imp
 - `Review_2/` — Review 2 templates (`Report/`, `PPT/`).
 - `Phase_1/` — Phase 1 report and seniors' format reference.
 - `Implementation/` — Python sim (below).
+- `Simulation/` — Gazebo (Harmonic) + ArduPilot SITL city sim. Imports `Implementation/` (sys.path), no copies. Region bundle (`prepare_sim_region.py`, OSM bldgs + DEM, `bundle_hash`) → world (`gazebo_world_builder.py`) + clearance-checked lattice (`route_clearance.py`, via builder `edge_filter`) → Tier 1 cached / Tier 2 → `.plan`/`.waypoints` (`run_sim_mission.py`) → pymavlink fly (`sitl_mission_runner.py`) → `evaluate_gazebo_run.py`. Read `Simulation/README.md` (frame contract, WSL setup). Tests: `python -m unittest discover -s Simulation/tests`. Generated `regions/ worlds/ missions/ runs/` git-ignored.
 - `Reference_Papers/` — cited papers and baseline references.
 
 ## Implementation (`Implementation/`)
@@ -49,7 +50,7 @@ Python sim, five modules, no package structure — flat scripts, imported direct
 - `run_ablation.py` — Phase 3 ablation: all / no_wind / no_terrain / no_buildings → Tier 1 fronts + edge-risk maps + component maps in `outputs/ablation/`.
 - `run_benchmarks.py` — benchmark entry point for synthetic scenarios and baselines.
 - `module4_tier2_payload.py` respects the weather gate: `TierTwoSelector(front, no_go_reasons)` → `select()` raises `WeatherNoGo`, `run_all_presets()` prints HOLD, returns `{}`.
-- `mission_export.py` — QGroundControl / Mission Planner `QGC WPL 110` export from `SelectionResult`; relative AGL altitude frame, RTL ending.
+- `mission_export.py` — QGroundControl / Mission Planner `QGC WPL 110` export from `SelectionResult`; frame 3 = above HOME: `alt_amsl_m − home_alt_amsl` (home = ground under first wp unless given), `agl_m` fallback only without DEM; optional RTL ending.
 - `dashboard.py` — minimal Tkinter operator dashboard: load stored graph/front, enter tags, show route, export mission.
 - `SITL_NOTES.md` — SITL validation checklist; hardware/SITL not run yet.
 - `wind_integration_plan.md` — v1.1, implemented. Wind formulas, constants, six v1.0 bugs fixed. Read before touching wind-related edge costs.

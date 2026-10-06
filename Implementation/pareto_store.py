@@ -11,6 +11,8 @@ holds, so each record carries the metadata needed to decide that:
 get_or_build() reuses the record unless it is
     • missing                      • forced (--refresh)
     • built on a different static graph (graph_hash)
+    • built for a different caller-supplied identity (extra_identity, e.g. the
+      simulation region bundle hash and clearance settings)
     • expired (valid_until)
     • stale: the weather drifted past a threshold since the record was built
         |Δ wind speed| > 10 km/h       |Δ direction| > 45° when the wind > 10 km/h
@@ -139,7 +141,8 @@ class ParetoStore:
     # ------------------------------------------------------------------
 
     def staleness(self, record: Optional[dict], G: nx.DiGraph, weather: WeatherSnapshot,
-                  refresh: bool = False, now: Optional[datetime] = None) -> list:
+                  refresh: bool = False, now: Optional[datetime] = None,
+                  extra_identity: Optional[dict] = None) -> list:
         """Reasons the record cannot be reused (empty list = reuse it)."""
         if record is None:
             return ["no stored front"]
@@ -148,6 +151,8 @@ class ParetoStore:
         reasons = []
         if record.get("graph_hash") != graph_hash(G):
             reasons.append("static graph changed")
+        if extra_identity is not None and record.get("identity") != extra_identity:
+            reasons.append("identity changed")
         if _now(now) > _parse(record["valid_until"]):
             reasons.append(f"expired at {record['valid_until']}")
         reasons.extend(weather_drift(record["weather_snapshot"], weather))
@@ -161,6 +166,7 @@ class ParetoStore:
                      max_explored: int = 200_000,
                      front_max: Optional[int] = None,
                      now: Optional[datetime] = None,
+                     extra_identity: Optional[dict] = None,
                      verbose: bool = True):
         """
         Reuse the stored front for (location, source, target) or rebuild it.
@@ -170,6 +176,8 @@ class ParetoStore:
                   as they are).  A rebuild re-applies an explicitly given snapshot with
                   apply_weather().
         front_max : optionally thin the front by ε-dominance (off by default).
+        extra_identity : JSON-serialisable dict stored with the record; a record built
+                  for a different identity is rebuilt (None: not checked).
 
         Returns (record, rebuilt, reasons).  On reuse G is left untouched, so its edge
         costs may reflect a different (still representative) weather than the stored one.
@@ -180,7 +188,7 @@ class ParetoStore:
             weather = WeatherSnapshot.from_dict(G.graph["weather"]) if "weather" in G.graph \
                 else WeatherSnapshot.calm()
         record = self.load(location, source, target)
-        reasons = self.staleness(record, G, weather, refresh, now)
+        reasons = self.staleness(record, G, weather, refresh, now, extra_identity)
         if not reasons:
             if verbose:
                 print(f"[Store] Reusing stored front ({len(record['front'])} routes, built "
@@ -213,6 +221,8 @@ class ParetoStore:
             "diagnostics": engine.diagnostics(),
             "front": [{"g": list(g), "path": list(p)} for g, p in front],
         }
+        if extra_identity is not None:
+            record["identity"] = extra_identity
         path = self.save(record)
         if verbose:
             print(f"[Store] Saved {len(front)} routes → {path}")

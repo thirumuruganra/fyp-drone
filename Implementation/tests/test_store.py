@@ -243,6 +243,39 @@ class StoreTests(unittest.TestCase):
         self.assertIsNone(self.store.load("Region C", self.s, self.t))
 
 
+class IdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = ParetoStore(self.tmp.name)
+        self.G = lattice()
+        self.s, self.t = 0, self.G.number_of_nodes() - 1
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def get(self, **kw):
+        return quiet_get(self.store, self.G, self.s, self.t, now=T0, **kw)
+
+    def test_identity_is_stored_and_reused(self):
+        ident = {"bundle_hash": "abc", "hard_clearance": True}
+        record, rebuilt, _ = self.get(extra_identity=ident)
+        self.assertTrue(rebuilt)
+        self.assertEqual(record["identity"], ident)
+        _, rebuilt, _ = self.get(extra_identity=dict(ident))
+        self.assertFalse(rebuilt)
+
+    def test_changed_identity_rebuilds(self):
+        self.get(extra_identity={"bundle_hash": "abc"})
+        _, rebuilt, reasons = self.get(extra_identity={"bundle_hash": "def"})
+        self.assertTrue(rebuilt)
+        self.assertIn("identity changed", reasons)
+
+    def test_identity_is_ignored_when_not_given(self):
+        self.get(extra_identity={"bundle_hash": "abc"})
+        _, rebuilt, _ = self.get()
+        self.assertFalse(rebuilt)
+
+
 class RegionTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

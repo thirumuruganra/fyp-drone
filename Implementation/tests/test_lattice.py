@@ -119,5 +119,26 @@ class LatticeWindTests(unittest.TestCase):
         self.assertEqual(G.graph["weather"]["wind_dir_from_deg"], 90.0)
 
 
+class EdgeFilterTests(unittest.TestCase):
+    def test_default_keeps_every_edge(self):
+        G = build(box_m=600.0, spacing_m=200.0)
+        self.assertNotIn("filtered_edges", G.graph)
+
+    def test_filter_removes_rejected_edges_and_counts_them(self):
+        seen = []
+
+        def no_diagonals(a, b):
+            seen.append((a["x_m"], a["y_m"], b["x_m"], b["y_m"]))
+            return a["x_m"] == b["x_m"] or a["y_m"] == b["y_m"]
+
+        G = build(box_m=600.0, spacing_m=200.0, edge_filter=no_diagonals)   # 3 × 3
+        self.assertEqual(G.number_of_edges(), 24)           # 12 orthogonal pairs, both directions
+        self.assertEqual(G.graph["filtered_edges"], 16)     # 8 diagonal pairs, both directions
+        self.assertEqual(len(seen), 40)
+        for u, v in G.edges:
+            a, b = G.nodes[u], G.nodes[v]
+            self.assertTrue(a["x_m"] == b["x_m"] or a["y_m"] == b["y_m"])
+
+
 if __name__ == "__main__":
     unittest.main()

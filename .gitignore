@@ -17,3 +17,9 @@ Implementation/cache/
 
 Review_2/SecondReviewLaTeX.zip
 Implementation/pareto_front_storage/fronts/
+
+# Simulation generated artefacts
+Simulation/regions/
+Simulation/worlds/
+Simulation/missions/
+Simulation/runs/
