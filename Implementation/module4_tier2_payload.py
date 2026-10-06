@@ -59,6 +59,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D   # needed for 3D projection
 
@@ -554,8 +555,8 @@ class TierTwoSelector:
     def visualise_selected_routes_on_graph(
             self, G, results: dict, source, target) -> Figure:
         """
-        2×2 figure — each panel shows the UAV airspace graph with the
-        selected route for one payload preset drawn on top.
+        2×2 figure — each panel shows cached OSM roads, airspace nodes and
+        the selected route for one payload preset in longitude/latitude.
 
         Parameters
         ----------
@@ -570,6 +571,12 @@ class TierTwoSelector:
         fig.patch.set_facecolor("#F5F5F5")
         axes_flat = axes.flatten()
         pos = {n: (d["x"], d["y"]) for n, d in G.nodes(data=True)}
+        road_segments = []
+        for geometry in G.graph.get("road_geometries", []):
+            parts = geometry.geoms if geometry.geom_type == "MultiLineString" else [geometry]
+            for part in parts:
+                if part.geom_type == "LineString":
+                    road_segments.append(np.asarray(part.coords)[:, :2])
 
         for ax, name in zip(axes_flat, names):
             g_vec, path, wr, wd, we, _ = results[name]
@@ -577,6 +584,14 @@ class TierTwoSelector:
             label  = PAYLOAD_PRESETS[name]["label"].replace("\n", " ")
 
             ax.set_facecolor("#FAFAFA")
+
+            # OSM roads and lattice x/y both use EPSG:4326 (longitude, latitude).
+            if road_segments:
+                ax.add_collection(LineCollection(road_segments, colors="#737B87",
+                                                 linewidths=1.0, alpha=0.8, zorder=0))
+                ax.text(0.99, 0.01, "© OpenStreetMap contributors", transform=ax.transAxes,
+                        ha="right", va="bottom", fontsize=7, color="#596370",
+                        bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"})
 
             # ── Full airspace graph (grey background) ────────────────────
             nx.draw_networkx_edges(G, pos, ax=ax, edge_color="#DDDDDD",
@@ -624,6 +639,12 @@ class TierTwoSelector:
                 f"w_risk={wr:.2f}  w_dist={wd:.2f}  w_energy={we:.2f}",
                 fontsize=10, fontweight="bold", color=color, pad=6
             )
+            if road_segments:
+                xs, ys = np.asarray(list(pos.values())).T
+                padx, pady = np.ptp(xs) * 0.04, np.ptp(ys) * 0.04
+                ax.set_xlim(xs.min() - padx, xs.max() + padx)
+                ax.set_ylim(ys.min() - pady, ys.max() + pady)
+                ax.set_aspect(1.0 / np.cos(np.radians(ys.mean())))
             ax.axis("off")
 
         fig.suptitle(
