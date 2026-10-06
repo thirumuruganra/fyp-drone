@@ -4,9 +4,9 @@
 networkx>=3.1        # Graph data structure and algorithms
 numpy>=1.24          # Numerical operations
 matplotlib>=3.7      # Plotting and visualisation
-requests>=2.31       # Open-Meteo weather API (env_data.py)
+requests>=2.31       # Open-Meteo and verified Overpass HTTPS
 shapely>=2.0         # Building footprints, STRtree queries
 geopandas>=0.14      # OSM layers as GeoDataFrames, GeoPackage cache (needs pyogrio or fiona)
 pyogrio>=0.7         # GeoPackage / GeoJSON I/O for geopandas
-osmnx>=1.9           # OpenStreetMap layers via features_from_point
+osmnx>=1.9           # OpenStreetMap geometry via public features_from_xml
 # rasterio>=1.3      # optional: read a local SRTM / Copernicus GeoTIFF (LocalRasterProvider)

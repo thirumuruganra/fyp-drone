@@ -11,6 +11,7 @@ lattice (200 m spacing, 6 km box) centred on Thiruvanmiyur, Chennai, with
     Open-Meteo → flat),
   • OSM buildings (osmnx, cached as GeoPackage): node altitude clears the
     tallest building in its cell by 15 m, never above 120 m AGL.
+  • cached OSM road centre-lines beneath the airspace nodes and flight edges.
 The UAV flies the lattice, not the roads.  (The file keeps its historical name.)
 
 Key points
@@ -56,7 +57,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import config as cfg
 from env_data import (FIXTURE_DEM, LocalFrame, LocalRasterProvider, build_layer_indexes,
-                      default_elevation_providers, fetch_osm_layers)
+                      default_elevation_providers, fetch_osm_layers, fetch_osm_roads)
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar  import TierOneEngine
 from pareto_store import ParetoStore, front_from_record
@@ -161,6 +162,16 @@ def run_module1_osm(args):
         elevation_providers=providers, **layer_kwargs,
     )
     G = builder.fetch_graph()
+    # Roads provide geographic context without changing UAV connectivity/costs.
+    try:
+        roads = fetch_osm_roads(
+            cfg.CENTER_LAT, cfg.CENTER_LON,
+            dist_m=args.box_km * 1000.0 / np.sqrt(2.0) + args.spacing_m,
+            offline=args.offline,
+        )
+        G.graph["road_geometries"] = list(roads.geometry)
+    except ImportError as exc:
+        print(f"[Demo] Road overlay skipped ({exc}); pip install geopandas shapely osmnx")
     builder.save(path="pareto_front_storage/airspace_graph_osm.pkl")
 
     alts = [d["alt_amsl_m"] for _, d in G.nodes(data=True)]

@@ -56,6 +56,8 @@ import matplotlib
 matplotlib.use("Agg")          # non-interactive backend — safe on all OS
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
 
 import config as cfg
 from env_data import (BuildingIndex, ClassIndex, ElevationProvider, LocalFrame, WeatherSnapshot,
@@ -315,7 +317,7 @@ class AirspaceGraphBuilder:
                   route: Optional[list] = None,
                   title: str = "Module 1 — Airspace Graph") -> Figure:
         """
-        Draw the airspace graph.
+        Draw airspace nodes and flight edges over cached OSM road centre-lines.
 
         Parameters
         ----------
@@ -326,22 +328,34 @@ class AirspaceGraphBuilder:
         pos = {n: (d["x"], d["y"]) for n, d in self.G.nodes(data=True)}
 
         fig, ax = plt.subplots(figsize=(11, 9))
-        ax.set_facecolor("#F8F8F8")
+        ax.set_facecolor("#F5F7FA")
 
-        # All edges (grey, thin)
+        road_segments = []
+        for geometry in self.G.graph.get("road_geometries", []):
+            parts = geometry.geoms if geometry.geom_type == "MultiLineString" else [geometry]
+            for part in parts:
+                if part.geom_type == "LineString":
+                    road_segments.append(np.asarray(part.coords)[:, :2])
+        if road_segments:
+            ax.add_collection(LineCollection(road_segments, colors="#737B87",
+                                             linewidths=1.1, alpha=0.8, zorder=1))
+
+        # Flight lattice remains visible, with roads clearly distinguished.
         nx.draw_networkx_edges(self.G, pos, ax=ax,
-                               edge_color="#C0C0C0", arrows=False,
-                               width=0.6, alpha=0.7)
+                               edge_color="#72A9CC", arrows=False,
+                               width=0.45, alpha=0.35)
 
         # All nodes: shaded by altitude when it varies, else blue
         alts = [d.get("alt_m", 0.0) for _, d in self.G.nodes(data=True)]
         if max(alts) - min(alts) > 0.5:
             sc = nx.draw_networkx_nodes(self.G, pos, ax=ax, node_size=30,
-                                        node_color=alts, cmap=plt.cm.viridis, alpha=0.9)
+                                        node_color=alts, cmap=plt.cm.viridis, alpha=0.95,
+                                        edgecolors="white", linewidths=0.4)
             fig.colorbar(sc, ax=ax, shrink=0.6, pad=0.01, label="Node altitude AMSL (m)")
         else:
             nx.draw_networkx_nodes(self.G, pos, ax=ax,
-                                   node_size=25, node_color="#4A90D9", alpha=0.85)
+                                   node_size=30, node_color="#287CB5", alpha=0.95,
+                                   edgecolors="white", linewidths=0.4)
 
         # Restricted zones (hard no-fly): shaded outlines
         xs_all = [p[0] for p in pos.values()]
@@ -362,13 +376,13 @@ class AirspaceGraphBuilder:
             nx.draw_networkx_nodes(self.G, pos, nodelist=[source], ax=ax,
                                    node_size=180, node_color="#27AE60")
             ax.annotate("Source", xy=pos[source],
-                        xytext=(pos[source][0]+0.001, pos[source][1]+0.001),
+                        xytext=(10, 10), textcoords="offset points",
                         fontsize=9, color="#27AE60", fontweight="bold")
         if target is not None:
             nx.draw_networkx_nodes(self.G, pos, nodelist=[target], ax=ax,
                                    node_size=180, node_color="#E74C3C")
             ax.annotate("Target", xy=pos[target],
-                        xytext=(pos[target][0]+0.001, pos[target][1]+0.001),
+                        xytext=(-10, -16), textcoords="offset points", ha="right",
                         fontsize=9, color="#E74C3C", fontweight="bold")
 
         # Selected route (orange, thick)
@@ -388,6 +402,19 @@ class AirspaceGraphBuilder:
                      f"\n{self.G.number_of_nodes()} waypoints  |  "
                      f"{self.G.number_of_edges()} flight segments" + wind_line,
                      fontsize=13, fontweight="bold")
+        legend = [Line2D([], [], color="#72A9CC", linewidth=1, label="Flight connections"),
+                  Line2D([], [], marker="o", linestyle="none", color="#287CB5",
+                         markeredgecolor="white", label="Airspace nodes")]
+        if road_segments:
+            legend.insert(0, Line2D([], [], color="#737B87", linewidth=2, label="OSM roads"))
+            ax.text(0.99, 0.01, "© OpenStreetMap contributors", transform=ax.transAxes,
+                    ha="right", va="bottom", fontsize=8, color="#596370",
+                    bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"})
+        if route and len(route) > 1:
+            legend.append(Line2D([], [], color="#E67E22", linewidth=3, label="Selected UAV route"))
+        ax.legend(handles=legend, loc="lower left", framealpha=0.95, fontsize=9)
+        if self.G.graph.get("location"):
+            ax.set_aspect(1.0 / math.cos(math.radians(np.mean([p[1] for p in pos.values()]))))
         ax.axis("off")
         plt.tight_layout()
         return fig

@@ -42,6 +42,23 @@ EDGE_SAMPLE_STEP_M = 25.0        # along-edge sampling step for clearance / foot
 BUILDING_NEAR_M = 30.0           # "near a footprint" distance
 BUILDING_MARGIN_REF_M = 60.0     # vertical margin above a nearby roof at which risk is 0
 OSM_FETCH_RADIUS_M = 4500.0      # features_from_point radius (covers the 6 km box corners)
+# Global-data public instances; Private.coffee formerly used the Kumi hostname.
+# Base URLs, without /interpreter. Override here for a self-hosted deployment.
+OVERPASS_ENDPOINTS = (
+    "https://overpass-api.de/api",
+    "https://overpass.private.coffee/api",
+)
+OVERPASS_USER_AGENT = (
+    "FYP-B28-UAV-Route-Planner/1.0 "
+    "(SSN College of Engineering; academic OSM research)"
+)
+OVERPASS_QUERY_TIMEOUT_S = 60
+OVERPASS_CONNECT_TIMEOUT_S = 8
+OVERPASS_READ_TIMEOUT_S = 90     # allow server query timeout plus response transfer
+OVERPASS_ATTEMPTS_PER_ENDPOINT = 2
+OVERPASS_RETRY_DELAY_S = 2
+OVERPASS_BUSY_DELAY_S = 30       # minimum pause for HTTP 406/429/5xx
+OVERPASS_MAX_RETRY_WAIT_S = 60   # longer Retry-After: stop rather than retry early
 DEM_PROVIDER_TYPE = "COP30"      # OpenTopography global DEM (COP30 | COP90 | SRTMGL1 | ...)
 OPENTOPO_ENV_KEY = "OPENTOPO_API_KEY"
 DEM_RASTER_ENV = "DEM_RASTER_PATH"   # optional local GeoTIFF (SRTM / Copernicus)

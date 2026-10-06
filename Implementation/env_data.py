@@ -16,7 +16,8 @@ OpenTopographyProvider (needs OPENTOPO_API_KEY) → OpenMeteoElevationProvider
 node elevations in cache/elevation_<provider>.json keyed by rounded coordinates.
 
 OSM layers (Phase 2): fetch_osm_layers() returns buildings, restricted zones,
-water and land use/POIs from osmnx, cached as a GeoPackage.  BuildingIndex wraps
+water and land use/POIs through verified Overpass HTTPS with bounded retries
+and global endpoint failover, parsed by OSMnx and cached as a GeoPackage. BuildingIndex wraps
 the building footprints (STRtree) for node-cell and along-edge height queries.
 
 Wind height: the UAV cruises at H_CRUISE_AGL (60 m).  Open-Meteo gives
@@ -858,11 +859,11 @@ def fetch_osm_layers(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
     OSM layers around (lat, lon): {"buildings", "restricted", "water", "landuse"}
     as EPSG:4326 GeoDataFrames, cached as one GeoPackage in cache_dir.
 
-    Order: cached GeoPackage → live osmnx.features_from_point (skipped when
+    Order: cached GeoPackage → live Overpass/OSMnx geometry (skipped when
     offline) → hand-made fixture layers from fixture_dir (only if given;
     announced loudly) → empty layers.
 
-    fetcher(lat, lon, dist_m, tags) → GeoDataFrame replaces osmnx (tests).
+    fetcher(lat, lon, dist_m, tags) → GeoDataFrame replaces live download (tests).
     """
     import geopandas as gpd
     path = os.path.join(cache_dir, f"osm_{lat:.4f}_{lon:.4f}_{int(dist_m)}.gpkg")
@@ -880,8 +881,8 @@ def fetch_osm_layers(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
     if not offline:
         try:
             if fetcher is None:
-                import osmnx as ox
-                fetcher = lambda la, lo, d, tags: ox.features_from_point((la, lo), tags=tags, dist=d)
+                from overpass_client import fetch_osm_features
+                fetcher = fetch_osm_features
             layers = {}
             for name, tags in OSM_LAYER_TAGS.items():
                 try:
@@ -913,6 +914,46 @@ def fetch_osm_layers(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
     else:
         print("[OSM] No cached layers and no network — continuing without OSM layers")
     return layers
+
+
+def fetch_osm_roads(lat: float = cfg.CENTER_LAT, lon: float = cfg.CENTER_LON,
+                    dist_m: float = cfg.OSM_FETCH_RADIUS_M,
+                    cache_dir: str = cfg.CACHE_DIR, offline: bool = False):
+    """Road centre-lines for plotting only; cache independently of risk layers."""
+    import geopandas as gpd
+
+    path = os.path.join(cache_dir, f"roads_{lat:.4f}_{lon:.4f}_{int(dist_m)}.geojson")
+    if os.path.exists(path):
+        try:
+            roads = gpd.read_file(path).to_crs("EPSG:4326")
+            print(f"[OSM] Cached road overlay: {len(roads)} features")
+            return roads
+        except Exception as exc:
+            print(f"[OSM] Road cache unreadable ({exc})")
+    if not offline:
+        try:
+            from overpass_client import fetch_osm_features
+            roads = _clean_layer(fetch_osm_features(lat, lon, dist_m, {"highway": True}))
+            roads = roads[roads.geometry.geom_type.isin(["LineString", "MultiLineString"])]
+            if len(roads):
+                os.makedirs(cache_dir, exist_ok=True)
+                roads.to_file(path, driver="GeoJSON")
+            print(f"[OSM] Live road overlay: {len(roads)} features")
+            return roads
+        except Exception as exc:
+            print(f"[OSM] Road overlay unavailable ({type(exc).__name__}: {exc})")
+    reference = os.path.join(os.path.dirname(__file__), "map_data", "osm_roads_thiruvanmiyur.geojson")
+    if os.path.exists(reference):
+        delta_lat = math.degrees(dist_m / (cfg.EARTH_RADIUS_KM * 1000.0))
+        delta_lon = delta_lat / max(abs(math.cos(math.radians(lat))), 1e-6)
+        roads = gpd.read_file(reference, bbox=(lon - delta_lon, lat - delta_lat,
+                                               lon + delta_lon, lat + delta_lat))
+        if len(roads):
+            print(f"[OSM] Historical OSM road reference: {len(roads)} straight road segments "
+                  "(snapshot date unknown; display only)")
+            return roads
+    print("[OSM] No road overlay available; plot contains airspace nodes and flight edges")
+    return _empty_layer()
 
 
 def build_layer_indexes(layers: dict, frame: LocalFrame, buildings: bool = True,
