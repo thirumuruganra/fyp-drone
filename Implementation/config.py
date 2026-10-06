@@ -49,6 +49,8 @@ OVERPASS_ENDPOINTS = (
     "https://overpass.private.coffee/api",
     "https://overpass.kumi.systems/api",
 )
+# Comma-separated extra endpoints (e.g. keyed NextGIS URL) read from env/.env, not committed.
+OVERPASS_EXTRA_ENV = "OVERPASS_EXTRA_ENDPOINTS"
 OVERPASS_USER_AGENT = (
     "FYP-B28-UAV-Route-Planner/1.0 "
     "(SSN College of Engineering; academic OSM research)"

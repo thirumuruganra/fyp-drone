@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import html
 import math
+import os
 import re
 import tempfile
 import time
@@ -72,8 +73,11 @@ def request_overpass(query: str, *, output: str = "json", endpoints=None,
     """
     if output not in {"json", "xml"}:
         raise ValueError("output must be json or xml")
-    bases = tuple(dict.fromkeys(endpoint_base(u) for u in
-                                (cfg.OVERPASS_ENDPOINTS if endpoints is None else endpoints)))
+    if endpoints is None:
+        # Private/keyed mirrors (URL embeds a secret) come from env, never from tracked files.
+        extra = [u.strip() for u in os.environ.get(cfg.OVERPASS_EXTRA_ENV, "").split(",") if u.strip()]
+        endpoints = (*cfg.OVERPASS_ENDPOINTS, *extra)
+    bases = tuple(dict.fromkeys(endpoint_base(u) for u in endpoints))
     if not bases:
         raise ValueError("At least one Overpass endpoint is required")
     post = requests.post if post is None else post

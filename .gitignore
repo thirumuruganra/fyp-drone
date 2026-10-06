@@ -23,3 +23,6 @@ Simulation/regions/
 Simulation/worlds/
 Simulation/missions/
 Simulation/runs/
+
+# Local secrets (keyed Overpass URL, API keys)
+Implementation/.env
