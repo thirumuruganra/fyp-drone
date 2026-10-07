@@ -1,0 +1,38 @@
+@startuml node_selection
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #E8F1FB
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title Node Selection Rule for One Lattice Cell
+
+start
+:Candidate node k at local offset (x_m, y_m);
+:Convert to (lat, lon) with LocalFrame;
+:ground_k ← DEM elevation (cached, rounded key);
+:bldg_k ← tallest footprint touching the cell (STRtree);
+:AGL_k ← max(H_CRUISE = 60 m, bldg_k + CLEARANCE 15 m);
+if (AGL_k > 120 m legal ceiling?) then (yes)
+  #FFD6D6:Block node\n(counted in blocked_nodes);
+  stop
+else (no)
+endif
+if (node inside restricted polygon?) then (yes)
+  #FFD6D6:Remove node\n(counted in nfz_nodes);
+  stop
+else (no)
+endif
+:alt_AMSL_k ← ground_k + AGL_k;
+:Store x, y, lat, lon, ground, bldg_h,\nbldg_density, bldg_mean_h, agl, alt_amsl;
+:Node enters the airspace graph;
+note right
+  Edges are then built only
+  between surviving nodes;
+  an edge that crosses a zone,
+  fails the clearance filter,
+  or lies outside the largest
+  SCC is discarded.
+end note
+stop
+@enduml

@@ -17,7 +17,8 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 ## Status (2026-10-07)
 
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
-- Review 2 in prep. `Review_2/Report/r2_reviewreport.tex` + `Review_2/PPT/R2_UG_Project_Presentation_Template.tex` still blank templates. Report chapters needed: Introduction/Objectives, First Review Queries and Answers, Problem Statement, Methodology (architecture + modules), Implementation, Results and Discussion.
+- Review 2 report done → `Review_2/Report/BID_REPORT_28.tex` (70 pp). PR: thirumuruganra/fyp-drone#12, branch `claude/funny-brahmagupta-msf1ef`. Details: § Review 2 Report. Review 2 PPT still blank template.
+- Review 1 panel query + answer: § Review 1 — Panel Query.
 - All `Implementation/IMPLEMENTATION_PLAN.md` phases 0–7 merged to `main`. Merged ≠ validated: see Open Defects.
 - `Implementation/` built:
   - M1: shared wind-aware cost pipeline. `LatticeAirspaceBuilder` (200 m lattice, 6 km box, Thiruvanmiyur) + DEM terrain + OSM buildings → node altitude. 11-component weighted risk, hard restricted zones, weather go/no-go gate.
@@ -27,7 +28,7 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 - `Simulation/` built (2026-10-06): Gazebo Harmonic + ArduPilot SITL city sim. Frozen region bundle → world + clearance-checked lattice → Tier 1 cached / Tier 2 → `.plan`/`.waypoints` → pymavlink fly → eval (cross-track, clearance, landing offset). Read `Simulation/README.md`. Run in WSL2.
   - Verified: `sitl_mission_runner.py` flown vs real ArduCopter SITL 4.8.0-dev (built-in `quad`, fixture bundle): upload/read-back/AUTO/land OK, cross-track RMSE 0.11–0.13 m, landing offset ≤ 0.02 m.
   - NOT run: Gazebo itself, live OSM/Open-Meteo bundle build, world load/real-time-factor gate. Needs WSL machine.
-- Tests: `Implementation/tests` 223, `Simulation/tests` 42 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
+- Tests: `Implementation/tests` ~221, `Simulation/tests` 45 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
 - Not built: calibrated risk weights, real battery model, live-OSM-verified Review 2 results, Mission Planner/QGC import check, Gazebo flights, hardware flights.
 
 ### Open Defects (from `Implementation/IMPLEMENTATION_AUDIT_2026-10-06.md`; re-verified 2026-10-07 by grep)
@@ -44,7 +45,7 @@ Still open:
 
 Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`.
 
-**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
+**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`, `diagrams/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
 
 ## Problem
 
@@ -259,6 +260,8 @@ Stochastic baselines (MOPSO): 30 runs, mean ± std.
 | Q3 | Dec–Jan | Dashboard + mission file generator; integration + SITL validation; A*/MOPSO baseline comparison | Dashboard, mission generator, SITL integration, benchmark results |
 | Q4 | Feb–Mar | Outdoor flight tests, end-to-end measurement; analysis, final report | Flight data, performance measurements, final thesis |
 
+Current plan (post Review 1 query): core built by Review 2 (Oct). Oct–Dec = benchmark/evaluate/improve cycles ∥ sim fidelity. Phase 1 report Dec. Phase 2 hardware (RPi 5 + Pixhawk, outdoor flights) Jan–Mar unchanged.
+
 ## Review 0 — Panel Comments
 
 **Verbatim:**
@@ -274,6 +277,40 @@ Stochastic baselines (MOPSO): 30 runs, mean ± std.
 2. *Criteria don't map together* → same formula. Continuous, not lookup/rule. Each weight depends on all three raw scores; one tag change shifts all three weights.
 3. *Pareto rethink* → utility scoring over full front replaces extreme-point selection. `argmax` can be any point. Mixed payloads pick intermediate points single-objective A* cannot produce.
 4. *Complexity only in Tier 2* → Tier 1 = MO graph-search complexity; Tier 2 = metadata→weight mapping + full-front scoring, uses all three objectives. Neither tier reducible to single-objective.
+
+## Review 1 — Panel Query
+
+**Gist (not verbatim; exact words not recorded):** complexity not high enough → Phase 1 time till December not justified.
+
+**Answer (report Ch 2, only place allowed to talk history "Review I vs now"):**
+1. *Complexity* → raised via (a) better node choosing for airspace graph: 3-D lattice (200 m, 6 km box, 900 candidates), node rule = DEM ground + tallest bldg in cell → AGL = max(60, bldg+15), block > 120 m AGL, drop nodes in NFZ; edges: 8-neighbour both dirs, drop NFZ-crossing segments, optional clearance `edge_filter`, keep largest SCC, 25 m sampling → 7 static terms (~6,800 edges, ~75k samples, ~375k STRtree queries per build). (b) flight risk from wind speed + direction: 80 m wind (else 10 m × (h/10)^0.25), forward-azimuth bearing, HW/CW per edge → energy + crosswind/gust/turbulence risk, weather gate; edge costs directional. Knock-on: NAMOA* label table, `ParetoStore` drift refresh, Tier 2 battery + HOLD, Gazebo/SITL. Table R1-vs-R2 in report.
+2. *Time till Dec* → remaining work = iterative: benchmark → evaluate → improve cycle (4 graphs × 9 wind cases = 36 cases; MOPSO 100×200×30 = 600k particle updates/case, ~21.6 M/pass; 225-tag sweep × 4 pickers) + sim fidelity (live-OSM Gazebo world, RTF ≥ 0.8, wind in Gazebo, battery calib, repeat flights per preset). First pass already exposed defects 4–7 below → each fix = full re-run.
+3. Panel wanted complexity "puffed up": done with real numbers only. Never invent figures.
+
+## Review 2 Report
+
+**Files:** `Review_2/Report/` = `BID_REPORT_28.tex` (source of truth; edit directly), `ssnreview.cls` (Review 1 copy: has `L`/`Y` col types + microtype), `references.bib` (Review 1 set + r17–r24), `.latexmkrc`, `figures/` (`benchmark_hv.png`, `benchmark_runtime.png`, `edge_risk_maps.png`, `osm_module4_routes_on_graph.png` copied from `Implementation/outputs/`; `wind_direction_sweep.png` new). `Review_2/diagrams/` = PlantUML `*.puml` + `.png`: `arch`, `module1_pipeline`, `node_selection`, `wind_model`, `tier1`, `store`, `tier2`, `eval_cycle`, `simulation`, `mission_sequence`, `classes`; plus `methodology.pptx` + `.png` (Review 1 methodology diagram, text updated). `graphicspath = {../diagrams/}{figures/}`. Render puml: `java -jar plantuml.jar X.puml` (needs graphviz for component/class).
+
+**Chapters:** Abstract (R1 verbatim + keywords) · 1 Intro (R1 verbatim: Background, Motivation, Related Work + Research Gap as sections, Objectives, Scope) · 2 First Review Q&A · 3 Problem Statement (R1 verbatim + weather dependence + I/O/criteria table) · 4 Methodology (Fig 4.1 methodology diagram, arch, 7 modules w/ subtopics: M1 graph builder, M2 NAMOA* + store, M3 baselines, M4 Tier 2, M5 eval, M6 export + dashboard, M7 sim) · 5 Implementation (tools, files, classes, per-module impl, params, 2 listings, tests table) · 6 Results (bench, wind, ablation, Tier 2, SITL, comparison, next steps) · References.
+
+**Rules (user, keep):**
+- Outside Ch 2: describe system as it is now. No "since Review I", "earlier version", "was fixed", "Review II version".
+- Never name example area (Thiruvanmiyur/Chennai). Say "lattice", "real-region lattice", "example region".
+- No revised Phase 1 plan / Gantt section (removed on request).
+- R1 content reused verbatim; new text humanized (no em dashes, no AI vocab, sentence case subsections, Title Case chapters/sections like R1). Ran ai-writing-detection: clean.
+- `\flowchapter` ungrouped (`\let\origclearpage\clearpage\let\clearpage\relax\chapter{#1}\let\clearpage\origclearpage`). Grouped form → `\label` after it gets wrong number ("Chapter 2.2.2"). Review 1 still grouped → its chapter refs likely wrong; left (frozen).
+- Build: `latexmk -pdf BID_REPORT_28.tex` in dir, then `latexmk -c`. Last build: 0 overfull, 0 undefined.
+
+**Key numbers in report (keep consistent):**
+- First-pass bench (MOPSO reduced 24/30/2): NAMOA* IGD 0 all; S2 HV 1.2065 vs MOPSO 1.2061; S3 front 115 (MOPSO 38), HV 1.1235 vs 1.1146, Δ 0.666 vs 0.814, runtime 33.8 s vs 4.3 s.
+- Wind exp (S2 seed 202, 196 nodes, 25 km/h, gust 35, scratch script not committed): calm front 36 → 6–14 (8 dirs) / 6–15 (15° sweep); min ε 24.58 SW – 31.34 NE (27.5%; 31.60 max in sweep, 28.5%); opposite dirs same min ρ, diff ε; distinct preset picks 4 → 2. Flat 3 km lattice, E25: ε/d E-bound 1.278 vs W-bound 1.000 (27.8%); ρ_edge N–S 0.225 vs E–W 0.038 (gust only).
+- Ablation (fixture layers, 30 km/h from 225°): front all 196 / no_wind 205 / no_terrain 56 / no_buildings 190; mean ρ 0.199 vs 0.061 no wind; min ε −11% no wind.
+- Tier 2 S3: fragile ranks d91/ε81/ρ25 non-extreme; emergency d22 (1.9% longer than shortest) non-extreme; disaster min-energy; mixed non-extreme; 4 distinct routes; latency < 0.15 ms.
+- SITL: RMSE 0.11–0.13 m, landing ≤ 0.02 m.
+
+**Open checks before submit:** new refs r17–r24 typed from memory (verify); comparison table "Not reported" for wind in r1/r3/r10 unverified; `methodology.pptx` previewed in LibreOffice only → check wrap in PowerPoint (boxes 2.2, 2.4, SITL); panel query paraphrased.
+
+**Methodology diagram edits (vs Review 1 pptx):** Tier 2 subtitle "rule lookup" → "sub-second utility scoring" (rule lookup contradicts formula); airspace graph = 3-D lattice w/ node filter; 2.1 wind-aware costs, 11 risk terms; 2.2 NAMOA*; 2.3 label dominance + g+h; 2.4 hash + drift refresh; 3.4 battery-feasible argmax + HOLD; Gazebo SITL; eval "Selection Accuracy" → "Selection Evidence"; baselines + weighted-sum A*; scenarios + real-region lattice × 9 wind.
 
 ## Final Abstract (submitted in BID_28.docx, frozen)
 
@@ -306,6 +343,9 @@ Principal contribution: formula-driven mapping from payload metadata to objectiv
 | Env/API keys via `.env`, loaded in entry scripts only | Tests stay keyless/offline. Real env wins. |
 | Multi-endpoint Overpass w/ identifying User-Agent, cache first | Public endpoints flaky. Failed fetch → empty layers, so check layer counts. |
 | No GPU/cloud | Tier 1 on laptop, Tier 2 instant; field-deployable |
+| Direction-resolved wind (HW/CW per edge), tailwind no credit | Direction alone swings energy ~28% at fixed speed; ε ≥ d keeps heuristic admissible |
+| Tier 2 "evidence" (ranks, alignment score, sweep, monotonicity), never "accuracy" | No ground-truth route label; alignment rank-based, independent of utility |
+| Report never names example region | Region = example; method region-agnostic |
 
 ## Novelty Statement (Final)
 
@@ -313,7 +353,7 @@ Formula-driven mapping from payload metadata to objective weights: fragility cla
 
 ---
 
-*Compiled from Review 0 presentation (FYP_B27.pdf), BID_28.docx abstract, panel session, Review 1 deliverables, Implementation audit 2026-10-06, Simulation README. Last updated: 2026-10-07.*
+*Compiled from Review 0 presentation (FYP_B27.pdf), BID_28.docx abstract, panel session, Review 1 deliverables, Implementation audit 2026-10-06, Simulation README, Review 2 report build. Last updated: 2026-10-07.*
 
 *Post-Review-0 lit change: Datsko (2024), Ntakolia (2023) dropped from `BID_REPORT_28.tex`; Tsoutsouras `r10` + Ren `r3` added beside Chokkalingam `r1`. Real-world evidence + Gap 1/2/3 added to Background/Related Work. Reflected above.*
 

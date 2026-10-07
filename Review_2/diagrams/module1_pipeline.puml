@@ -1,0 +1,41 @@
+@startuml module1_pipeline
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #DDEEFF
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title Module 1 — Airspace Graph Builder Pipeline
+
+start
+partition "Environment data acquisition" {
+  fork
+    :fetch_weather()\nlive Open-Meteo → cache → calm;
+  fork again
+    :fetch_elevations()\nraster → OpenTopography\n→ Open-Meteo → flat;
+  fork again
+    :fetch_osm_layers()\nbuildings, restricted,\nwater, land use;
+  end fork
+  :build_layer_indexes()\nBuildingIndex, ZoneIndex (restricted, water),\nClassIndex (population) on STRtree;
+}
+partition "Node generation and selection" {
+  :Lay N × N lattice over the box\n(200 m spacing, 6 km box ≈ 900 candidates);
+  :Per node: ground elevation, tallest building in cell,\nbuilding density, mean building height;
+  :AGL = max(60 m, building + 15 m)\nalt_AMSL = ground + AGL;
+  :Remove nodes with AGL > 120 m\nor inside a restricted zone;
+}
+partition "Edge construction" {
+  :Candidate edges to the 8 neighbours (both directions);
+  :Drop edges whose segment intersects a restricted zone;
+  :Optional edge_filter (roof / terrain clearance);
+  :Sample every 25 m along each edge →\nbuilding, terrain, population, nfz,\nwater, comm, density terms;
+  :Keep the largest strongly connected component;
+}
+partition "Shared cost pipeline" {
+  :apply_weather(G, snapshot);
+  :Per edge: headwind / crosswind from bearing\n→ energy ε, 11 weighted risk terms → ρ;
+  :cost = [d, ε, ρ · d_h / spacing]\nweather gate → G.graph["no_go"];
+}
+:Serialise G for Tier 1;
+stop
+@enduml

@@ -1,0 +1,43 @@
+@startuml simulation
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultFontSize 12
+skinparam ArrowColor #555555
+
+title Module 7 — Gazebo + ArduPilot SITL Simulation Pipeline
+
+package "Planning side (Python, imports Implementation/)" #DDEEFF {
+  [prepare_sim_region.py\nfrozen bundle: DEM grid, OSM buildings,\nroads, pads, manifest + bundle_hash] as PREP
+  [route_clearance.py\nroof +15 m (5 m buffer), terrain +15 m,\n120 m AGL, pad columns] as CLR
+  [run_sim_mission.py\nlattice + edge_filter → Tier 1 (cached)\n→ Tier 2 pick] as RUN
+  [sim_mission_export.py\nmission.plan, .waypoints, mission.json\nTAKEOFF → route → LAND] as SEXP
+}
+
+package "Simulator side (WSL2, Ubuntu 24.04)" #FFE6CC {
+  [gazebo_world_builder.py\nSDF world, terrain mesh,\nLoD1 building tiles, route markers] as WB
+  [Gazebo Harmonic\n(gz sim)] as GZ
+  [ArduCopter SITL\nsim_vehicle.py --model JSON] as SITL
+}
+
+package "Flight and evaluation" #DDFFDD {
+  [sitl_mission_runner.py\npymavlink: identity checks, upload,\nread-back, GUIDED → arm → AUTO] as RUNNER
+  [simulation_logger.py\nMAVLink CSV + Gazebo pose] as LOG
+  [evaluate_gazebo_run.py\ncross-track error, clearance,\nviolations, landing offset] as EV
+}
+
+PREP --> WB : bundle
+PREP --> RUN : bundle
+CLR --> RUN : edge_filter
+RUN --> SEXP : SelectionResult
+WB --> GZ : world.sdf
+GZ <--> SITL : JSON physics link
+SEXP --> RUNNER : mission files
+RUNNER --> SITL : MAVLink (UDP)
+SITL --> LOG : telemetry
+GZ --> LOG : ground-truth pose
+LOG --> EV
+note bottom of RUNNER
+  Refuses to fly when bundle hashes differ
+  or SITL home is > 2 m / 1 m off the depot pad
+end note
+@enduml

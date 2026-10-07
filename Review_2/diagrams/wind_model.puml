@@ -1,0 +1,30 @@
+@startuml wind_model
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #E9F7EF
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title Wind-Aware Edge Energy and Risk (per edge u → v)
+
+start
+:Weather snapshot: v (80 m wind or 10 m wind\nlifted by (h/10)^0.25), θ_from, gust, rain, visibility;
+:Edge bearing θ_edge from the forward-azimuth formula\n(east component scaled by cos φ);
+:HW = v · cos(θ_edge − θ_from)   (+ headwind, − tailwind)\nCW = v · |sin(θ_edge − θ_from)|;
+fork
+  :Energy\nε = d · (1 + |grade|\n + 0.40 · max(0, HW) / V_cruise\n + 0.15 · CW / V_cruise);
+  note right: tailwind never lowers ε,\nso ε ≥ d and the\nheuristic stays admissible
+fork again
+  :Weather-dependent risk terms\nρ_wind = clip(CW / 40)\nρ_gust = clip(0.5 · max(0, gust − v) / 40)\nρ_turb = density · clip(v / 40)\nρ_weather = 0.5·rain + 0.5·visibility;
+fork again
+  :Static risk terms from Module 1\nobstacle, building, terrain,\npopulation, nfz, water, comm;
+end fork
+:ρ_edge = clip(Σ w_k · ρ_k, 0, 1)\n(weights in config.RISK_WEIGHTS);
+:risk = ρ_edge · d_h / spacing\n(cumulative exposure, objective 3);
+:time_s = d / ground speed (informational);
+if (thunderstorm, heavy rain, low visibility\nor gust > limit?) then (yes)
+  :G.graph["no_go"] = true\n(Tier 2 will HOLD);
+else (no)
+endif
+stop
+@enduml
