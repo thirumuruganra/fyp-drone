@@ -162,11 +162,11 @@ route depends on what is aboard.
 Three real operational scenarios motivate this work, and their routing requirements do
 not agree.
 
-Fragile medical samples such as tissue biopsies and blood specimens are sensitive to
-vibration and to temperature. The routing priority is to minimise flight risk, taken
-here as time spent in turbulent corridors, sudden altitude changes, and wind-exposed
-segments. A route that adds 40\% distance but halves the chance of vibration damage is
-the better one.
+Fragile medical samples such as tissue biopsies and blood specimens must arrive intact.
+The studies cited in the Background found no damage on ordinary flights, but an operator will still want such a payload kept out of rough air. The routing priority
+is to minimise flight risk, taken here as time spent in turbulent corridors, sudden
+altitude changes, and wind-exposed segments. For this payload a route that is noticeably
+longer but spends far less time in turbulent air is the better one.
 
 Emergency medicine such as insulin or antivenom has a strict time window. The priority
 is the shortest route, so transit time is lowest; flight risk and energy come second.
@@ -389,8 +389,8 @@ connected component is kept so that every depot and destination pair is reachabl
 
 Every edge that survives is then sampled every 25\,m along its length, and seven static
 terms are computed from those samples: building proximity scaled by vertical margin,
-terrain clearance and grade, population exposure (a SORA-style class lookup
-\cite{r22}), soft distance to restricted zones, fraction over water, urban-canyon
+terrain clearance and grade, population exposure (land-use classes that we
+scored ourselves, ranked in the spirit of the SORA ground-risk categories \cite{r22}), soft distance to restricted zones, fraction over water, urban-canyon
 communication loss, and building density. For the default region this is roughly 6,800
 directed edges, about 75,000 sample points and around 375,000 spatial-index queries per
 build. At Review~I, building the graph was a single library call.
@@ -857,7 +857,7 @@ Terrain & $\max\bigl(1-\operatorname{clip}(m_{\min}/15),\ \operatorname{clip}(\l
 Wind & $\operatorname{clip}(C\!W/40)$, crosswind against a 40\,km/h saturation speed & 0.30\\
 Gust & $\operatorname{clip}\bigl(0.5\max(0, \mathit{gust} - v)/40\bigr)$ & 0.30\\
 Weather & $0.5\operatorname{clip}(\mathit{rain}/7.5) + 0.5\operatorname{clip}(1 - \mathit{vis}/10\,\mathrm{km})$, uniform over the graph & 0.20\\
-Population & Mean SORA-style class along the edge \cite{r22}: assembly 1.0, commercial 0.7, major road 0.6, residential 0.5, industrial 0.3 & 0.50\\
+Population & Mean land-use class score along the edge (our values, ranked in the spirit of SORA \cite{r22}): assembly 1.0, commercial 0.7, major road 0.6, residential 0.5, industrial 0.3 & 0.50\\
 No-fly buffer & $\max_k \exp(-\delta_k/150\,\mathrm{m})$ to the nearest restricted zone, zero beyond 600\,m & 0.80\\
 Water & Fraction of samples over water (risk of payload loss) & 0.30\\
 Comm/GPS & $\operatorname{clip}(\mathit{density}/0.30)\cdot\operatorname{clip}(\bar{h}/30\,\mathrm{m})$, urban canyon & 0.20\\
