@@ -15,7 +15,7 @@
 \setlength{\emergencystretch}{2em}    % last-resort stretch, kills stray over/underfull hboxes
 \bibliographystyle{unsrtnat}
 \graphicspath{{../diagrams/}{figures/}}
-\newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{#1}}
+\newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{\nolinkurl{#1}}}
 \newcommand{\flowchapter}[1]{\par\addvspace{30pt}\let\origclearpage\clearpage\let\clearpage\relax\chapter{#1}\let\clearpage\origclearpage}  % no group: \label after it gets the chapter number
 \lstset{basicstyle=\ttfamily\footnotesize, keywordstyle=\color{blue!60!black}\bfseries,
   commentstyle=\color{gray}, stringstyle=\color{teal}, frame=single, breaklines=true,
