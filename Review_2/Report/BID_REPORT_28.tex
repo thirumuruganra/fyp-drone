@@ -16,7 +16,7 @@
 \bibliographystyle{unsrtnat}
 \graphicspath{{../diagrams/}{figures/}}
 \newcommand{\doi}[1]{doi: \href{https://doi.org/#1}{#1}}
-\newcommand{\flowchapter}[1]{\par\addvspace{30pt}{\let\clearpage\relax\chapter{#1}}}
+\newcommand{\flowchapter}[1]{\par\addvspace{30pt}\let\origclearpage\clearpage\let\clearpage\relax\chapter{#1}\let\clearpage\origclearpage}  % no group: \label after it gets the chapter number
 \lstset{basicstyle=\ttfamily\footnotesize, keywordstyle=\color{blue!60!black}\bfseries,
   commentstyle=\color{gray}, stringstyle=\color{teal}, frame=single, breaklines=true,
   showstringspaces=false, columns=fullflexible, captionpos=b}
@@ -668,7 +668,16 @@ is collected and cached. The airspace graph is built from it, with node and edge
 selection and a shared cost pipeline. Tier~1 computes the Pareto front and stores it.
 Tier~2 turns each payload tag into a route, and the route is exported as a mission and
 flown in simulation. Baseline planners and an evaluation module score every stage, and
-their findings flow back into the model.
+their findings flow back into the model. Figure~\ref{fig:methodology} gives an overview
+of this workflow.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{methodology.png}
+\caption[Methodology overview: Two-Tier Payload-Aware UAV Route Planning]{Methodology
+overview: Tier~1 Pareto front construction feeding Tier~2 payload-aware route
+selection, with mission output, UAV control and performance evaluation.}\label{fig:methodology}
+\end{figure}
 
 \section{Architectural Design for Proposed System}
 
