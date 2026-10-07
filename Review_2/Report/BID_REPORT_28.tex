@@ -40,33 +40,36 @@
 
 % ============================================================
 \begin{reviewabstract}
-In UAV systems for medical and emergency last-mile delivery, conflicting objectives
-must be balanced: higher flight risk is carried by shorter routes, more battery is
-drained by low-risk corridors, and the fastest paths are rarely achieved by
-energy-efficient routing. No single fixed trade-off serves all payload types, yet the
-same objective weights are applied by existing planners to every mission regardless of
-the payload. In existing multi-objective planners, including entropy-based, diversity-driven, and
-crowding-distance Pareto selection methods, objective weights are encoded as a fixed
-scalar before path search begins. No influence is exerted by payload properties such as
-fragility class, payload weight class, and delivery urgency over which Pareto-optimal
-route is chosen. When payloads change, weights must be manually re-tuned and planners
-re-run by operators, which is unworkable under field conditions. The proposed work is a Payload-Aware Two-Tier UAV Route Planning system, wherein
-Pareto front construction is separated from route selection and an explicit algebraic
-bridge is added between Tier 1 routing objectives and Tier 2 payload metadata.
-In Tier 1, a multi-objective A*/Dijkstra graph-search is executed over an OpenStreetMap
-airspace graph, producing a Pareto-optimal route set across distance, energy
-consumption, and flight risk. In Tier 2, four operator-assigned payload tags are read
-and objective weights derived: $w_\mathrm{risk}$ is scaled by fragility class,
-$w_\mathrm{distance}$ by delivery urgency, and $w_\mathrm{energy}$ by payload weight
-class. Every Pareto point is scored by these weights via a utility function, and the
-argmax is selected as the mission route. Evaluation will be conducted on synthetic
-graphs (50, 200, 500 nodes) against single-objective A* and MOPSO baselines using
-hypervolume, spread, and Tier 2 accuracy. Hardware validation will use a Pixhawk
-quadcopter via ArduPilot SITL simulation and outdoor flights. Planned experiments will quantify Tier 1 gains over both baselines, evaluating whether
-non-extreme Pareto points are selected for mixed-priority payloads. The principal contribution is a formula-driven mapping from metadata to routing weights,
-linking mission context directly to Pareto selection without expert intervention. Route
-choice is set by payload properties rather than context-blind diversity criteria. The
-Pareto front is rebuilt periodically, serving all missions between updates.
+In medical and emergency last-mile delivery, a UAV route planner has to trade distance,
+energy and flight risk against each other. A short route usually carries more risk, a
+low-risk corridor usually drains more battery, and the right balance depends on what the
+drone is carrying. Existing multi-objective planners, including entropy-based,
+diversity-driven and crowding-distance Pareto selection methods, fix the objective
+weights or the selection rule before the search starts. Payload properties have no say in
+which Pareto-optimal route is flown, so operators must re-tune the weights and re-run the
+planner whenever the payload changes, which is impractical in the field.
+We present a payload-aware two-tier planner that separates building the Pareto front from
+choosing the mission route. Tier~1 runs NAMOA*, an exact multi-objective A* search, over a
+three-dimensional airspace lattice (200\,m spacing, 6\,km box). Nodes and edges are
+admitted using terrain elevation, OpenStreetMap buildings and restricted zones, and the
+120\,m ceiling of the Drone Rules, 2021. Each edge carries distance, energy and an
+11-component risk score. Forecast wind is split into headwind and crosswind for every
+edge, so costs depend on the direction of travel, and a weather gate holds all flights in
+unsafe conditions. The front is stored and reused across missions, and is rebuilt only
+when the graph changes, its 3-hour validity lapses or the weather drifts. Tier~2 converts
+four operator tags (fragility, payload weight class, urgency and priority) into objective
+weights through a fixed algebraic formula, scores every route on the front, drops routes
+the battery cannot fly, and picks the highest-scoring one. The chosen route is exported as
+a QGroundControl mission.
+Benchmarking and evaluation have started. In a first pass on synthetic graphs of 50, 200
+and 500 nodes, the NAMOA* front contained every point of the reference front, while a
+reduced-setting MOPSO baseline recovered 38 of 115 routes on the largest graph, and on
+that front four payload presets selected four different routes. Software simulation with
+Gazebo and ArduPilot SITL has also started: planner missions flown in ArduCopter SITL
+followed the planned track with a cross-track RMS error of 0.11--0.13\,m. Much of the
+work is still ahead, including full-scale MOPSO runs with repeated seeds, calibration of
+the risk weights and battery constants, evaluation on live map data, and flights in a
+wind-enabled Gazebo model of the delivery area.
 
 \keywords{UAV route planning; multi-objective optimisation; NAMOA*; Pareto front; payload-aware selection; wind-aware risk; last-mile delivery}
 \end{reviewabstract}
