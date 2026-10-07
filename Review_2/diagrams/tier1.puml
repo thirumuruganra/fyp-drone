@@ -1,0 +1,43 @@
+@startuml tier1
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #DDEEFF
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title Tier 1 — NAMOA* with a Label Table
+
+start
+:Label 0 = (s, g = [0,0,0], parent = −1)\nOPEN ← {(‖h(s)‖, label 0)}, front F ← ∅;
+while (OPEN not empty?) is (yes)
+  if (expanded ≥ max_explored?) then (yes)
+    :truncated ← any live label not\ndominated by F after adding h;
+    break
+  endif
+  :Pop label ℓ = (u, g) with the smallest ‖g + h(u)‖;
+  if (ℓ dead, or F weakly dominates g + h(u)?) then (yes)
+    :skip;
+  else (no)
+    :expanded += 1;
+    repeat :for each successor v of u;
+      :g' = g + [d, ε, ρ](u, v);
+      if (some label at v weakly dominates g'?) then (yes)
+        :discard (cycles die here);
+      elseif (F weakly dominates g' + h(v)?) then (yes)
+        :discard (front pruning);
+      else (no)
+        :mark labels at v dominated by g' as dead;
+        :store label (v, g', parent ℓ);
+        if (v = t?) then (yes)
+          :add to F, drop routes it dominates;
+        else (no)
+          :push onto OPEN;
+        endif
+      endif
+    repeat while (more successors?)
+  endif
+endwhile (no)
+:Rebuild each route by following parent ids;
+:Return front, truncated, expanded,\ngenerated, runtime_s;
+stop
+@enduml

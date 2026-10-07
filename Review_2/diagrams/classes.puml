@@ -1,0 +1,79 @@
+@startuml classes
+!theme plain
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+hide empty members
+
+title Core Classes of the Planner
+
+class WeatherSnapshot <<dataclass>> {
+  wind_speed_kmh, wind_dir_from_deg
+  gust_kmh, precipitation_mm
+  visibility_m, weather_code, source
+  +no_go_reasons() : list
+  +with_wind(speed, dir)
+}
+class EdgeFeatures <<frozen>> {
+  d_h_km, distance_km, bearing_deg, grade
+  obstacle, building, terrain, population
+  nfz, water, comm, density
+  +build(...) / from_edge(data)
+}
+class AirspaceGraphBuilder {
+  seed, obstacle_density, weather
+  +fetch_graph() : DiGraph
+  +save() / load() / visualise()
+}
+class LatticeAirspaceBuilder {
+  center, box_m, spacing_m
+  elevation_providers, building_index
+  restricted_zones, water_zones
+  population_index, edge_filter
+  -_build_lattice()
+  -_edge_terms(a, b, d_h, grade)
+}
+class BuildingIndex
+class ZoneIndex
+class ClassIndex
+abstract class ElevationProvider {
+  +elevations(coords, offline)
+}
+class TierOneEngine {
+  G, source, target, max_explored
+  pareto_front, truncated
+  expanded, generated, runtime_s
+  +run() : list
+  +diagnostics()
+}
+class ParetoStore {
+  root
+  +get_or_build(G, s, t, ...)
+  +staleness(record, G, weather)
+}
+class TierTwoSelector {
+  pareto_front, no_go_reasons, costs
+  +select(F, W, U, P)
+  +select_detailed(...) : SelectionResult
+  +classify_point(i)
+}
+class SelectionResult <<dataclass>> {
+  tags, weights, selected_index
+  cost_vector, path, objective_ranks
+  point_type, latency_s
+  feasible_count, hold_advisory
+}
+class MissionItem {
+  +to_line()
+}
+
+AirspaceGraphBuilder <|-- LatticeAirspaceBuilder
+LatticeAirspaceBuilder o-- BuildingIndex
+LatticeAirspaceBuilder o-- ZoneIndex
+LatticeAirspaceBuilder o-- ClassIndex
+LatticeAirspaceBuilder o-- ElevationProvider
+AirspaceGraphBuilder ..> EdgeFeatures : creates
+AirspaceGraphBuilder ..> WeatherSnapshot : apply_weather
+ParetoStore ..> TierOneEngine : rebuilds with
+TierTwoSelector ..> SelectionResult : returns
+SelectionResult ..> MissionItem : exported as
+@enduml

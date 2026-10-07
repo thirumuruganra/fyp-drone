@@ -1,0 +1,39 @@
+@startuml mission_sequence
+!theme plain
+skinparam defaultFontSize 12
+skinparam sequenceMessageAlign center
+
+title Mission Sequence — Payload Tag to Flown Route
+
+actor Operator
+participant "Dashboard / CLI" as UI
+participant "ParetoStore" as ST
+participant "Tier 1\nNAMOA*" as T1
+participant "Tier 2\nSelector" as T2
+participant "Mission export" as EX
+participant "SITL runner" as RN
+participant "ArduCopter\n(SITL / Pixhawk)" as AC
+
+Operator -> UI : F, W, U, P
+UI -> ST : get_or_build(G, depot, dest)
+alt front stale or missing
+  ST -> T1 : run()
+  T1 --> ST : Pareto front
+end
+ST --> UI : current front + no_go_reasons
+UI -> T2 : select_detailed(F, W, U, P)
+alt weather NO-GO or no feasible route
+  T2 --> UI : HOLD advisory
+  UI --> Operator : HOLD
+else route found
+  T2 --> UI : SelectionResult (< 1 s)
+  UI -> EX : export mission
+  EX --> UI : .waypoints / .plan
+  UI -> RN : fly mission
+  RN -> AC : upload + read-back
+  AC --> RN : MISSION_ACCEPTED
+  RN -> AC : GUIDED → arm → AUTO
+  AC --> RN : telemetry until LAND
+  RN --> Operator : flight log + metrics
+end
+@enduml

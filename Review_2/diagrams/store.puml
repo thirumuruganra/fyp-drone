@@ -1,0 +1,32 @@
+@startuml store
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #FFF4D6
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title ParetoStore.get_or_build() — Reuse or Refresh Decision
+
+start
+:Load record for (location, source, target);
+if (record missing?) then (yes)
+  :reason: no stored front;
+elseif (--refresh requested?) then (yes)
+  :reason: refresh requested;
+else (no)
+  :Compare SHA-256 of static edge attributes;
+  :Compare identity (bundle hash, clearance settings);
+  :Check valid_until (3 h window);
+  :Check weather drift:\n|Δv| > 10 km/h, |Δθ| > 45° (v > 10),\n|Δgust| > 15 km/h, go/no-go flip;
+endif
+if (any reason?) then (no)
+  #DDFFDD:Reuse stored front\n(Tier 2 only, no search);
+  stop
+else (yes)
+  :apply_weather(G, new snapshot)\n(static layers stay cached);
+  :Run Tier 1 NAMOA*;
+  :Optional ε-dominance thinning (front_max);
+  :Write JSON record: front, graph_hash,\nweather snapshot, created_at, valid_until,\ntruncated, diagnostics;
+  stop
+endif
+@enduml

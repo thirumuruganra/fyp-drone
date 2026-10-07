@@ -1,0 +1,30 @@
+@startuml eval_cycle
+!theme plain
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #FFF4D6
+skinparam ActivityBorderColor #444444
+skinparam ArrowColor #333333
+
+title Benchmark → Evaluate → Improve Cycle (Phase I, Oct–Dec)
+
+start
+repeat
+  :Fix scenario set\nS1/S2/S3 synthetic (5/20/40 % obstacles)\n+ Thiruvanmiyur lattice\n× wind cases (calm, 8 directions, gusts);
+  fork
+    :Tier 1 NAMOA*\n(exact front, label counts);
+  fork again
+    :A* distance / energy / risk\nweighted-sum A* per preset;
+  fork again
+    :MOPSO 100 particles × 200 iterations\n× 30 seeded repeats;
+  end fork
+  :Union reference front per scenario;
+  :HV, IGD, spread Δ, runtime\n(mean ± std over repeats);
+  :Tier 2 evidence: 4 presets, 225-tag sweep,\nalignment vs knee / crowding / fixed weights,\nmonotonicity check, latency;
+  :Gazebo + SITL flights of the picks:\ncross-track error, clearance, landing offset;
+  :Analyse weak spots\n(front collapse, truncation,\nweights, risk calibration, sim gaps);
+  :Change model / parameters / simulator;
+repeat while (results stable and better\nthan every baseline?) is (no)
+->yes;
+:Freeze numbers for the Phase I report;
+stop
+@enduml

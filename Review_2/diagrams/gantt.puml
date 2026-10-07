@@ -1,0 +1,31 @@
+@startgantt gantt
+!theme plain
+skinparam defaultFontSize 11
+title Revised Project Timeline (July 2026 – March 2027)
+printscale monthly zoom 3
+Project starts 2026-07-01
+[Literature survey and problem formulation] starts 2026-07-01 and ends 2026-08-31
+[Literature survey and problem formulation] is colored in LightSteelBlue/SteelBlue
+[Review I] happens 2026-08-20
+[Airspace graph upgrade: node selection, terrain, buildings] starts 2026-08-15 and ends 2026-09-30
+[Airspace graph upgrade: node selection, terrain, buildings] is colored in LightSteelBlue/SteelBlue
+[Wind direction and multi-layer risk model] starts 2026-09-01 and ends 2026-10-10
+[Wind direction and multi-layer risk model] is colored in LightSteelBlue/SteelBlue
+[Tier 1 / Tier 2 hardening, front store, export] starts 2026-09-15 and ends 2026-10-10
+[Tier 1 / Tier 2 hardening, front store, export] is colored in LightSteelBlue/SteelBlue
+[Review II] happens 2026-10-09
+[Benchmark, evaluate and improve cycles] starts 2026-10-10 and ends 2026-12-20
+[Benchmark, evaluate and improve cycles] is colored in Orange/DarkOrange
+[Simulation fidelity: Gazebo world, wind, battery] starts 2026-10-10 and ends 2026-12-20
+[Simulation fidelity: Gazebo world, wind, battery] is colored in Orange/DarkOrange
+[Phase I report] starts 2026-12-01 and ends 2026-12-31
+[Phase I report] is colored in LightSteelBlue/SteelBlue
+[Phase I complete] happens 2026-12-31
+[Hardware integration (RPi 5 + Pixhawk)] starts 2027-01-01 and ends 2027-02-10
+[Hardware integration (RPi 5 + Pixhawk)] is colored in LightGreen/Green
+[Outdoor flight tests] starts 2027-02-01 and ends 2027-03-15
+[Outdoor flight tests] is colored in LightGreen/Green
+[Final thesis] starts 2027-02-15 and ends 2027-03-31
+[Final thesis] is colored in LightGreen/Green
+[Final review] happens 2027-03-31
+@endgantt

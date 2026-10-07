@@ -17,7 +17,9 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 ## Status (2026-10-07)
 
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
-- Review 2 in prep. `Review_2/Report/r2_reviewreport.tex` + `Review_2/PPT/R2_UG_Project_Presentation_Template.tex` still blank templates. Report chapters needed: Introduction/Objectives, First Review Queries and Answers, Problem Statement, Methodology (architecture + modules), Implementation, Results and Discussion.
+- Review 2 report done: `Review_2/Report/BID_REPORT_28.tex` (70 pp). Chapters: Intro (Review 1 text reused + Related Work/Gap as sections), First Review Q&A, Problem Statement (+ weather dependence, I/O criteria), Methodology (7 modules), Implementation, Results. PlantUML diagrams in `Review_2/diagrams/`. Review 2 PPT still blank template.
+- Review 1 panel query (verbatim gist): complexity not high enough → Phase 1 till December not justified. Answer in report: complexity raised via (a) lattice node selection (DEM + bldg height + 120 m AGL + NFZ, edge NFZ cut, clearance filter, SCC, 25 m edge sampling) and (b) wind speed + direction risk (HW/CW per edge, gust, shear, turbulence, weather gate). Remaining = benchmark/evaluate/improve cycles + sim fidelity (Gazebo world, wind in sim, battery calib). Revised Gantt: cycles Oct–Dec, Phase 1 report Dec, hardware Jan–Mar.
+- Wind experiment (report Sec 6.3, S2 seed 202, 25 km/h gust 35): calm front 36 → 6–15 routes windy; min ε 24.58 (SW) – 31.34/31.60 (NE), ~28% swing by direction only; distinct preset picks 4 → 2 under wind (open question: normalisation). Flat lattice E25: eastbound ε/d 1.278 vs westbound 1.000; N–S ρ 0.225 vs E–W 0.038.
 - All `Implementation/IMPLEMENTATION_PLAN.md` phases 0–7 merged to `main`. Merged ≠ validated: see Open Defects.
 - `Implementation/` built:
   - M1: shared wind-aware cost pipeline. `LatticeAirspaceBuilder` (200 m lattice, 6 km box, Thiruvanmiyur) + DEM terrain + OSM buildings → node altitude. 11-component weighted risk, hard restricted zones, weather go/no-go gate.
@@ -44,7 +46,7 @@ Still open:
 
 Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`.
 
-**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
+**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`, `diagrams/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
 
 ## Problem
 
