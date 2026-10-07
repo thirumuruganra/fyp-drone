@@ -9,7 +9,7 @@ title Benchmark → Evaluate → Improve Cycle (Phase I, Oct–Dec)
 
 start
 repeat
-  :Fix scenario set\nS1/S2/S3 synthetic (5/20/40 % obstacles)\n+ Thiruvanmiyur lattice\n× wind cases (calm, 8 directions, gusts);
+  :Fix scenario set\nS1/S2/S3 synthetic (5/20/40 % obstacles)\n+ real-region lattice\n× wind cases (calm, 8 directions, gusts);
   fork
     :Tier 1 NAMOA*\n(exact front, label counts);
   fork again

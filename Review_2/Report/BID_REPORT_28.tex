@@ -359,7 +359,7 @@ by the knock-on changes they forced in Tier~1, Tier~2 and the tooling around the
 
 The road graph has been replaced by a three-dimensional airspace lattice. A UAV is not
 bound to roads, so the candidate waypoints are laid out as a regular grid (200\,m spacing
-over a 6\,km box around Thiruvanmiyur, Chennai, which gives 900 candidates). A candidate
+over a 6\,km box around the region centre, which gives 900 candidates). A candidate
 does not enter the graph automatically. It has to pass a selection rule that combines
 four data sources:
 
@@ -514,7 +514,7 @@ each baseline holds up.
 \end{figure}
 
 One pass is not small. The scenario set has four graphs (the S1, S2 and S3 synthetic
-scenarios plus the real Thiruvanmiyur lattice) under nine wind cases (calm and eight
+scenarios plus the real-region lattice) under nine wind cases (calm and eight
 compass directions), which is 36 cases. In each case we compute the exact NAMOA* front,
 three single-objective A* routes, one weighted-sum A* route per payload preset, and the
 MOPSO baseline \cite{r6} at the settings promised in Review~I: 100 particles,
@@ -747,7 +747,7 @@ weather snapshot $\omega$. Its output is a directed NetworkX graph whose nodes c
 position and altitude and whose edges carry the static features, the per-component risk
 breakdown, and the cost vector $[d, \varepsilon, \rho]$. The global weather go/no-go state
 is stored on the graph itself so that Tier~2 can read it. Two builders share the same cost
-pipeline: a lattice builder over a real region (Thiruvanmiyur, Chennai) and a seeded
+pipeline: a lattice builder over a real region and a seeded
 synthetic builder used for controlled benchmarks. Figure~\ref{fig:m1-pipeline} gives the
 whole pipeline.
 
@@ -1506,7 +1506,7 @@ writes the snapshot and the gate result to \texttt{G.graph}.
 \toprule
 \textbf{Parameter} & \textbf{Value} & \textbf{Meaning}\\
 \midrule
-\texttt{CENTER\_LAT, CENTER\_LON} & 12.9830, 80.2594 & Thiruvanmiyur, Chennai\\
+\texttt{CENTER\_LAT, CENTER\_LON} & 12.9830, 80.2594 & Centre of the example region\\
 \texttt{BOX\_M}, \texttt{LATTICE\_SPACING\_M} & 6000\,m, 200\,m & Lattice extent and spacing\\
 \texttt{H\_CRUISE\_AGL}, \texttt{CLEARANCE} & 60\,m, 15\,m & Cruise height, margin above roofs\\
 \texttt{H\_MAX\_AGL} & 120\,m & Legal ceiling\\
@@ -1709,7 +1709,7 @@ so that the reader can judge how far it can be pushed.
 S1 small sparse & 50 nodes & Synthetic grid, seed 101, weather seeded\\
 S2 medium & 196--200 nodes & Synthetic grid, seed 202, weather seeded (benchmark) or set explicitly (wind experiment)\\
 S3 large dense & 500 nodes & Synthetic grid, seed 303, weather seeded\\
-Thiruvanmiyur lattice & 893 nodes, 6,752 edges & 6\,km box, 200\,m spacing, offline fixture layers (ablation)\\
+Lattice & 893 nodes, 6,752 edges & 6\,km box, 200\,m spacing, offline fixture layers (ablation)\\
 Flat lattice & 225 nodes, 1,624 edges & 3\,km box, 200\,m spacing, no layers (directional cost check)\\
 \bottomrule
 \end{tabularx}
@@ -1864,14 +1864,14 @@ buildings or restricted zones, which is what the next two results show.
 
 \section{Contribution of Each Risk Layer}
 
-The ablation runner rebuilt the Thiruvanmiyur lattice front with all layers and with
+The ablation runner rebuilt the lattice front with all layers and with
 wind, terrain or buildings removed, under a 30\,km/h wind from the south-west. These runs
 used the offline fixture layers, which are hand-made test data shaped like the real
 region, so the numbers show how each layer acts on the planner rather than real-world
 values. The live-data run is part of the next cycle.
 
 \begin{table}[H]
-\centering\caption{Ablation on the 6\,km Thiruvanmiyur lattice (fixture layers, 30\,km/h wind from 225$^\circ$)}\label{tab:ablation}\small
+\centering\caption{Ablation on the 6\,km lattice (fixture layers, 30\,km/h wind from 225$^\circ$)}\label{tab:ablation}\small
 \begin{tabular}{l r r r r r r}
 \toprule
 \textbf{Variant} & \textbf{Front} & \textbf{Time (s)} & \textbf{Min $\boldsymbol{\varepsilon}$} & \textbf{Min $\boldsymbol{\rho}$} & \textbf{Max $\boldsymbol{\rho}$} & \textbf{Mean $\boldsymbol{\rho_\mathrm{edge}}$}\\
@@ -1939,7 +1939,7 @@ relief share the minimum-energy route, which on this graph is also near the shor
 is the same pattern as in the wind experiment, and it points to the size of the front as
 the factor that limits how many distinct choices Tier~2 can make.
 
-Figure~\ref{fig:osm-routes} shows the four presets on a 2\,km lattice over Thiruvanmiyur
+Figure~\ref{fig:osm-routes} shows the four presets on a 2\,km lattice
 with OpenStreetMap roads drawn underneath for reference. The fragile medical and mixed
 cargo presets take a slightly longer path (2.6\,km) with a cumulative risk of 1.57, while
 emergency medicine and disaster relief take 2.5\,km paths with risks of 1.88 and 1.89.
@@ -1947,7 +1947,7 @@ emergency medicine and disaster relief take 2.5\,km paths with risks of 1.88 and
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{osm_module4_routes_on_graph.png}
-\caption{Tier~2 routes for the four presets on a 2\,km Thiruvanmiyur lattice}\label{fig:osm-routes}
+\caption{Tier~2 routes for the four presets on a 2\,km lattice}\label{fig:osm-routes}
 \end{figure}
 
 \section{Simulation Results So Far}
