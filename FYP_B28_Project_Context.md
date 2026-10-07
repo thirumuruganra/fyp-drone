@@ -14,16 +14,37 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 **Guide:** Dr. Sujaudeen N, Asst. Professor, CSE
 
-## Status (2026-10-06)
+## Status (2026-10-07)
 
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
-- Review 2 in prep. `Review_2/Report/r2_reviewreport.tex` + `Review_2/PPT/R2_UG_Project_Presentation_Template.tex` still blank college templates. Report chapters needed: Introduction/Objectives, First Review Queries and Answers, Problem Statement, Methodology (architecture + modules), Implementation, Results and Discussion.
-- Python sim under `Implementation/`. Built: M1 graph builder, M2 NAMOA* Tier 1, M3 baselines, M4 Tier 2 selector, M5 evaluation metrics, mission export, minimal dashboard, synthetic demo, OSM demo, benchmark smoke path, unit tests.
-- Phase 5 Tier 2 hardening done: input validation, battery feasibility filter, `SelectionResult`, JSON/CSV export, `run_demo_osm.py --payload/--preset`, tests.
-- Phase 7 integration extras done in code: `mission_export.py`, `dashboard.py`, `SITL_NOTES.md`. SITL/hardware not executed.
-- Not built: calibrated risk weights, real-data live verification, SITL execution, hardware.
+- Review 2 in prep. `Review_2/Report/r2_reviewreport.tex` + `Review_2/PPT/R2_UG_Project_Presentation_Template.tex` still blank templates. Report chapters needed: Introduction/Objectives, First Review Queries and Answers, Problem Statement, Methodology (architecture + modules), Implementation, Results and Discussion.
+- All `Implementation/IMPLEMENTATION_PLAN.md` phases 0–7 merged to `main`. Merged ≠ validated: see Open Defects.
+- `Implementation/` built:
+  - M1: shared wind-aware cost pipeline. `LatticeAirspaceBuilder` (200 m lattice, 6 km box, Thiruvanmiyur) + DEM terrain + OSM buildings → node altitude. 11-component weighted risk, hard restricted zones, weather go/no-go gate.
+  - M2: NAMOA* hardened (`truncated` flag, `g+h` pruning, no per-push copy) + `ParetoStore` (JSON fronts, 3 h expiry, weather-drift refresh).
+  - M3 baselines (A* ×3, compact MOPSO). M4 Tier 2: validation, battery feasibility filter (`select_detailed`), weather HOLD, `SelectionResult`, JSON/CSV export. M5 metrics (HV, IGD, spread, Tier 2 evidence, 225-tag sweep). Ablation (`run_ablation.py`). `mission_export.py` (frame 3 = AMSL − home AMSL), Tkinter dashboard.
+  - Env: `env_data.py` (Open-Meteo weather, DEM provider chain, OSM layers), `overpass_client.py` (multi-endpoint Overpass w/ retry; Kumi mirror + env extra endpoints; see `OVERPASS_NOTES.md`). API keys via `<repo>/.env` (`load_dotenv()` in entry scripts only).
+- `Simulation/` built (2026-10-06): Gazebo Harmonic + ArduPilot SITL city sim. Frozen region bundle → world + clearance-checked lattice → Tier 1 cached / Tier 2 → `.plan`/`.waypoints` → pymavlink fly → eval (cross-track, clearance, landing offset). Read `Simulation/README.md`. Run in WSL2.
+  - Verified: `sitl_mission_runner.py` flown vs real ArduCopter SITL 4.8.0-dev (built-in `quad`, fixture bundle): upload/read-back/AUTO/land OK, cross-track RMSE 0.11–0.13 m, landing offset ≤ 0.02 m.
+  - NOT run: Gazebo itself, live OSM/Open-Meteo bundle build, world load/real-time-factor gate. Needs WSL machine.
+- Tests: `Implementation/tests` 223, `Simulation/tests` 42 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
+- Not built: calibrated risk weights, real battery model, live-OSM-verified Review 2 results, Mission Planner/QGC import check, Gazebo flights, hardware flights.
 
-**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (repo root), this file at root.
+### Open Defects (from `Implementation/IMPLEMENTATION_AUDIT_2026-10-06.md`; re-verified 2026-10-07 by grep)
+
+Still open:
+1. `dashboard.py` builds `TierTwoSelector(front)` w/o `no_go_reasons` → bypasses weather HOLD.
+2. Dashboard loads synthetic `airspace_graph.pkl`, OSM demo overwrites shared `pareto_front.pkl` → graph/front mismatch. No file picker.
+3. `run_all_presets()` calls `select()` → ignores battery filter. Only `select_detailed()` filters. Use `--payload`/`--preset`.
+4. `module5_evaluation.monotonicity_violations` keys rows by F/W/U/P only; `run_benchmarks.py` mixes scenarios → false violations. Group by scenario.
+5. `run_benchmarks.py` omits `obstacle_density=density`; `_apply_density_risk()` scales final risk instead → S1/S2/S3 density labels not real obstacle coverage.
+6. Phase 6 gaps: no real-lattice benchmark, no calm-vs-windy comparison, MOPSO repeats pooled (no per-repeat HV/IGD/spread mean ± std). Report-scale run not done.
+7. Battery constants PLACEHOLDER (`config.py` ~l.153), `NO_GO_GUST_KMH` PLACEHOLDER. Risk weights uncalibrated. Default 6 km route → mixed-cargo battery HOLD expected.
+8. Offline OSM fixtures hand-made, not real evidence. Live OSM fetch intermittent (resets/504). Failed fetch falls back to empty layers → exit 0 ≠ real OSM. Check console layer counts.
+
+Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`.
+
+**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
 
 ## Problem
 
@@ -87,9 +108,12 @@ Multi-objective A*/Dijkstra (NAMOA*) over airspace graph, precomputes + stores w
 
 - Objectives: distance (km), energy proxy, cumulative risk proxy.
 - Per partial path keeps cost vector `g` (not scalar). Dominated paths pruned early via `UpdateParetoFront`. Node-level label-dominance check discards partial path whose cost vector dominated by earlier label at same node, before open set → avoids exponential blow-up of naive MO-A*.
-- Graph source: synthetic grid by default; `run_demo_osm.py` can fetch an OSM road-network graph via `osmnx` when dependency/network exist. Current checked-in code has no DEM, no OSM building layer, no 11-component risk pipeline.
-- Risk source today: synthetic obstacle-cluster proxy plus deterministic noise. Planned Review 2 risk upgrade (weather/terrain/building/water/no-fly components) not present in this branch.
-- Output: set of routes, none dominating another on all three objectives.
+- Graph source: two builders. Synthetic seeded grid (`AirspaceGraphBuilder`, benchmarks). Real-geography lattice (`LatticeAirspaceBuilder`, `run_demo_osm.py`): 200 m lattice, 6 km box, Thiruvanmiyur. Airspace = lattice, **not** road network; OSM supplies buildings/restricted/water/landuse layers, roads only drawn for visualisation.
+- Altitude: node alt = ground (DEM) + max(60 m, building + 15 m); > 120 m AGL → node blocked. Restricted zone: node inside removed, edge touching removed, soft buffer `exp(−d/λ)` outside.
+- Risk: weighted sum, 11 components in `config.RISK_WEIGHTS` (obstacle, building, terrain, wind, gust, weather, population, nfz, water, comm, turbulence). Weights **uncalibrated**. Cost vector `[d, ε, ρ]`, ρ = cumulative exposure. Wind: `wind_integration_plan.md` v1.1 (six v1.0 bugs fixed).
+- Weather gate: live Open-Meteo → cache → calm. Storm/gust over limit → `no_go` → Tier 2 HOLD.
+- Terrain: `LocalRasterProvider` → OpenTopography (key in `.env`) → Open-Meteo elevation → flat.
+- Output: set of routes, none dominating another on all three objectives. Stored by `ParetoStore`, reused until expiry/drift/graph change.
 
 ### Tier 2 — Payload-Driven Selection
 
@@ -162,9 +186,9 @@ Only emergency medicine picks extreme, correct for it. Others pick intermediate 
 
 ### Dataset: Synthetic Airspace Graph
 
-- Default dataset: synthetic grid airspace graph from `AirspaceGraphBuilder._build_synthetic_graph`.
-- Optional demo dataset: OSM road network via `run_demo_osm.py` and `osmnx`.
-- Edge costs: **distance** (Euclidean/geodesic), **energy** (distance × altitude-change factor proxy), **risk** (simulated threat zones, obstacle density, wind exposure, 0–1).
+- Benchmark dataset: synthetic grid airspace graph from `AirspaceGraphBuilder._build_synthetic_graph`.
+- Real-geography dataset: Thiruvanmiyur lattice (`run_demo_osm.py`, `Simulation/`), OSM buildings + DEM + live weather. Real lattice benchmark not yet run (defect 6).
+- Edge costs: **distance** (3-D geodesic), **energy** (wind-aware, grade-aware, payload-mass-aware proxy; battery constants PLACEHOLDER), **risk** (11-component weighted score, 0–1, cumulative exposure).
 - Obstacles/threats simulated programmatically → reproducible.
 - Other papers' datasets unavailable (custom/proprietary/unreleased: Chokkalingam, Datsko, Ntakolia). Building own synthetic env is field standard.
 
@@ -199,8 +223,9 @@ Stochastic baselines (MOPSO): 30 runs, mean ± std.
 
 1. **Tier 1:** MO A*/Dijkstra, precompute + store well-distributed Pareto set (distance, energy, risk) per region; periodic refresh, reuse across missions.
 2. **Tier 2:** payload metadata interpreter, four tags → one Pareto point, no weight re-tuning.
-3. **Ground-station dashboard:** tag entered once → `QGC WPL 110` mission file exported. Minimal Tkinter version built; Mission Planner/QGroundControl import not verified.
-4. **Hardware validation:** quadcopter outdoor flights; measure route adherence + end-to-end latency (tag → mission execution).
+3. **Ground-station dashboard:** tag entered once → `QGC WPL 110` mission file exported. Minimal Tkinter version built (defects 1–2 open); Mission Planner/QGroundControl import not verified.
+4. **Simulation validation:** Gazebo + ArduPilot SITL city flight of Tier 2 pick; measure cross-track error, clearance, landing offset. Mission runner proven on bare SITL; Gazebo world not yet run.
+5. **Hardware validation:** quadcopter outdoor flights; measure route adherence + end-to-end latency (tag → mission execution).
 
 ### Research
 
@@ -273,6 +298,13 @@ Principal contribution: formula-driven mapping from payload metadata to objectiv
 | Four-tag schema (fragility, weight, urgency, priority) | Maps to three objectives; priority amplifies dominant weight; covers all three mission types |
 | OSM airspace graph | Reproducible, public; real geography + controlled benchmarks |
 | ArduPilot SITL before real flight | Validate before hardware risk; sim = primary eval, flights = confirmation |
+| Gazebo Harmonic + ArduPilot SITL city sim (`Simulation/`) | 3-D buildings/terrain check flyability, not just graph math. Planner code imported, not copied. |
+| Airspace = lattice, not road graph | UAV not road-bound. Roads only visual + population-exposure layer. Abstract still says "OSM airspace graph": OSM = data source, graph = lattice. |
+| Hard clearance filter before NAMOA* (`route_clearance.py`) | Roof +15 m (5 m buffer), terrain +15 m, 120 m AGL. Waypoints never raised after selection. Infeasible → "NO FEASIBLE MISSION". |
+| Mission frame 3 = AMSL − home AMSL | `agl_m` wrong over varying terrain (audit defect). Sim mission = TAKEOFF → route → LAND, no unvalidated RTL. |
+| Bundle hash ties planner, front, mission, world | Runner refuses to fly on mismatch. Stops stale-data flights. |
+| Env/API keys via `.env`, loaded in entry scripts only | Tests stay keyless/offline. Real env wins. |
+| Multi-endpoint Overpass w/ identifying User-Agent, cache first | Public endpoints flaky. Failed fetch → empty layers, so check layer counts. |
 | No GPU/cloud | Tier 1 on laptop, Tier 2 instant; field-deployable |
 
 ## Novelty Statement (Final)
@@ -281,8 +313,8 @@ Formula-driven mapping from payload metadata to objective weights: fragility cla
 
 ---
 
-*Compiled from Review 0 presentation (FYP_B27.pdf), BID_28.docx abstract, panel session, Review 1 deliverables. Last updated: 2026-10-05.*
+*Compiled from Review 0 presentation (FYP_B27.pdf), BID_28.docx abstract, panel session, Review 1 deliverables, Implementation audit 2026-10-06, Simulation README. Last updated: 2026-10-07.*
 
-*Lit set changed post-Review-0: Datsko (2024), Ntakolia (2023) dropped from Review1_Report.tex; Tsoutsouras (2020) `r10` + Ren (2019) `r3` added beside Chokkalingam & Ganesan (2026) `r1`. Real-world evidence + Gap 1/2/3 framing added to Background/Related Work. Both reflected above.*
+*Post-Review-0 lit change: Datsko (2024), Ntakolia (2023) dropped from `BID_REPORT_28.tex`; Tsoutsouras `r10` + Ren `r3` added beside Chokkalingam `r1`. Real-world evidence + Gap 1/2/3 added to Background/Related Work. Reflected above.*
 
-*"Temperature sensitivity" in frozen abstract renamed "payload weight class" (tag `W`, 1–3) post-submission: temperature had no provable causal link to energy; heavier payload directly raises hover/lift power. All current text uses payload weight class.*
+*Frozen abstract "temperature sensitivity" → "payload weight class" (tag `W`, 1–3) post-submission: temperature no provable link to energy; heavier payload raises hover/lift power. Use `W` everywhere, never `T`.*
