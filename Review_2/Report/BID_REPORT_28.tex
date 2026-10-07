@@ -633,10 +633,10 @@ expert-set rule or a lookup table (Gap~3).
 
 \section{Weather Dependence of the Problem}
 
-Since Review~I the edge costs have become functions of the weather. Writing $\omega$ for a
+The edge costs are functions of the weather. Writing $\omega$ for a
 weather snapshot (wind speed, wind direction, gust, rain, visibility), the cost of an
 edge is $\mathbf{c}(e;\omega) = [d(e),\, \varepsilon(e;\omega),\, \rho(e;\omega)]$ and the
-front is $\mathcal{P}(\omega)$. Distance stays fixed, but energy and risk now depend on how
+front is $\mathcal{P}(\omega)$. Distance stays fixed, but energy and risk depend on how
 the wind meets each edge. This does not change the selection problem itself. It does mean
 that a stored front is only valid while $\omega$ stays close to the snapshot it was built
 for, which is why the front is refreshed on a schedule and on weather drift. If $\omega$
@@ -677,7 +677,7 @@ front is built once per delivery region and refreshed periodically, not per miss
 mission that arrives between refreshes runs only Tier~2, which reads the payload tag and
 returns a route from the current front in a fraction of a second.
 
-The work since Review~I has followed one workflow. Environment data for a delivery region
+The system follows one workflow. Environment data for a delivery region
 is collected and cached. The airspace graph is built from it, with node and edge
 selection and a shared cost pipeline. Tier~1 computes the Pareto front and stores it.
 Tier~2 turns each payload tag into a route, and the route is exported as a mission and
@@ -686,7 +686,7 @@ their findings flow back into the model.
 
 \section{Architectural Design for Proposed System}
 
-Figure~\ref{fig:architecture} shows the architecture at Review~II. It has five layers. The
+Figure~\ref{fig:architecture} shows the system architecture. It has five layers. The
 environment data layer fetches weather, terrain and OpenStreetMap layers and caches them
 on disk, so that a network failure falls back to the last good copy instead of stopping
 the planner. Module~1 turns these layers into a directed airspace graph whose edges carry
@@ -701,7 +701,7 @@ quality metrics used in Chapter~\ref{cha:results}.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.66\textwidth]{arch.png}
-\caption[System architecture at Review~II]{System architecture at Review~II. Tier~1 builds
+\caption[System architecture]{System architecture. Tier~1 builds
 and stores the front per region and weather window; Tier~2 selects a route per payload
 tag; Modules~6 and~7 export and fly it.}\label{fig:architecture}
 \end{figure}
@@ -763,8 +763,7 @@ shared cost pipeline}\label{fig:m1-pipeline}
 Weather comes from the Open-Meteo forecast API \cite{r20}, which needs no key. The module
 reads the current 10\,m wind, gust, precipitation, visibility and WMO weather code, and
 the hourly 80\,m wind speed and direction. The hourly row is chosen by matching the
-response's own local time string, which avoids the time-zone error of our first
-design. Results are cached; with no network the last cached snapshot is used, and with no
+response's own local time string, so no time-zone conversion is involved. Results are cached; with no network the last cached snapshot is used, and with no
 cache the planner assumes calm air so that runs stay deterministic.
 
 Terrain comes from an elevation provider chain tried in order: a local GeoTIFF if one is
@@ -822,7 +821,7 @@ $d = \sqrt{d_h^2 + \Delta\mathrm{alt}^2}$ are stored. The bearing uses
   \theta = \operatorname{atan2}\bigl(\sin\Delta\lambda\cos\varphi_2,\;
   \cos\varphi_1\sin\varphi_2 - \sin\varphi_1\cos\varphi_2\cos\Delta\lambda\bigr)
 \end{equation}
-so that the east component is scaled by $\cos\varphi$, which our first design missed.
+so that the east component is scaled by $\cos\varphi$.
 
 \subsubsection{Static risk terms}
 
@@ -973,7 +972,7 @@ single-objective extremes are always kept because Tier~2 normalises against them
 is off by default so that benchmarks use the exact front.
 
 \begin{algorithm}[H]
-\caption{NAMOA* with a label table (Tier~1, Review~II version)}\label{alg:tier1}
+\caption{NAMOA* with a label table (Tier~1)}\label{alg:tier1}
 \begin{algorithmic}[1]
 \Require Directed graph $G=(V,E)$, source $s$, target $t$, costs $\mathbf{c}(u,v)=[d,\varepsilon,\rho]$, cap $M$
 \Ensure Pareto front $\mathcal{P}$, flag $\mathit{truncated}$
@@ -1285,9 +1284,9 @@ from home, so the exporter writes
 \begin{equation}
   \mathit{alt}_\mathrm{rel} = \mathit{alt}_\mathrm{AMSL} - H_\mathrm{home}
 \end{equation}
-with $H_\mathrm{home}$ the ground elevation under the first waypoint. An earlier version
-wrote the height above local ground into frame~3, which is wrong wherever the terrain
-varies; the audit caught it and it has been fixed. An optional return-to-launch item can
+with $H_\mathrm{home}$ the ground elevation under the first waypoint. The height above
+local ground is never written into frame~3, because that would be wrong wherever the
+terrain varies. An optional return-to-launch item can
 close the mission.
 
 \subsubsection{Operator dashboard}
@@ -1648,10 +1647,10 @@ Gazebo plugin and an ArduCopter SITL build. A delivery is simulated in five step
   \item \texttt{evaluate\_gazebo\_run.py} computes the flight metrics and plots.
 \end{enumerate}
 
-Two compatibility fixes came out of the first SITL flights. ArduCopter 4.7 renamed the
-waypoint speed parameter from \texttt{WPNAV\_SPEED} (cm/s) to \texttt{WP\_SPD} (m/s), so the
-runner now sets whichever one exists, and ArduPilot echoes \texttt{DO\_CHANGE\_SPEED}
-with frame~0 on read-back, which the comparison now accepts.
+The runner handles two ArduPilot version details. ArduCopter 4.7 and later name the
+waypoint speed parameter \texttt{WP\_SPD} (m/s) instead of \texttt{WPNAV\_SPEED} (cm/s), so the
+runner sets whichever one exists, and ArduPilot echoes \texttt{DO\_CHANGE\_SPEED}
+with frame~0 on read-back, which the comparison accepts.
 
 \section{Testing}
 
@@ -1691,7 +1690,7 @@ Table~\ref{tab:tests} lists what they cover.
 % ============================================================
 \flowchapter{Results and Discussion}\label{cha:results}
 
-This chapter reports what the system produces at Review~II. The numbers come from the
+This chapter reports the results the system currently produces. The numbers come from the
 first pass of the evaluation cycle described in Chapter~\ref{cha:queries}, from a
 controlled wind experiment run for this report, from the ablation runner, and from the
 first SITL flights. They are preliminary in a specific sense: MOPSO was run at reduced
@@ -1716,7 +1715,7 @@ Flat lattice & 225 nodes, 1,624 edges & 3\,km box, 200\,m spacing, no layers (di
 \end{tabularx}
 \end{table}
 
-All runs used the code at the Review~II commit on a laptop-class CPU. In the first
+All runs used the current code on a laptop-class CPU. In the first
 benchmark pass MOPSO used 24 particles, 30 iterations and 2 repetitions per scenario; the
 report-scale run (100, 200, 30) is the next step of the cycle.
 
@@ -1786,7 +1785,7 @@ open areas). Figures~\ref{fig:bench-hv} and~\ref{fig:bench-time} plot the same d
 
 \section{Effect of Wind Speed and Direction}\label{sec:res-wind}
 
-This experiment isolates the new wind model. The S2 synthetic graph (196 nodes, 1,404
+This experiment isolates the wind model. The S2 synthetic graph (196 nodes, 1,404
 edges, seed 202) was costed under calm air and under a 25\,km/h wind with 35\,km/h gusts
 blowing from each of eight compass directions. Nothing else changed: the same graph, the
 same static layers, the same source and target. Table~\ref{tab:wind} shows the result.
@@ -1813,7 +1812,7 @@ Calm          & 36 & 869  & 24.41 & 0.07 & (26.78, 26.92, 0.11) & 4\\
 The first observation is that direction alone matters a great deal. At the same speed,
 the cheapest route on the front needs 24.58 energy units with the wind from the south-west
 and 31.34 with it from the north-east, a difference of 27.5\%. A planner that used wind
-speed without direction, as ours did at Review~I, could not see this.
+speed without direction could not see this.
 
 The risk and energy objectives also respond to different properties of the wind.
 Opposite directions (0$^\circ$ and 180$^\circ$, or 45$^\circ$ and 225$^\circ$) give the
@@ -1823,7 +1822,7 @@ axis the drone is flying. This is the behaviour Equation~(\ref{eq:hwcw}) predict
 is why both components are needed.
 
 Finally, wind changes the shape of the front as well as its position. The front shrinks from
-36 routes in calm air to between 6 and 14, and the four presets now land on only two
+36 routes in calm air to between 6 and 14, and the four presets land on only two
 distinct routes. Under a steady wind, edges with strong crosswind are both costlier and
 riskier, so energy and risk become correlated and there are fewer real trade-offs left.
 The fragile medical pick stays the lowest-risk option on every front, but its energy

@@ -8,7 +8,7 @@ skinparam packageFontSize 12
 skinparam nodesep 25
 skinparam ranksep 35
 
-title Payload-Aware Two-Tier UAV Route Planner — Review II System Architecture
+title Payload-Aware Two-Tier UAV Route Planner — System Architecture
 
 package "Environment Data Layer (env_data.py, overpass_client.py)" #EEEEEE {
   [Open-Meteo weather\nwind 80 m, gusts, rain,\nvisibility, WMO code] as WX
