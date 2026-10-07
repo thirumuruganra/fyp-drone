@@ -130,29 +130,32 @@ alters the per-edge energy model or triggers re-planning, unlike \cite{r10}'s co
 mass-driven physics adaptation. Tier~2 closes that gap by selecting among a fixed front
 from metadata, rather than adapting the model to continuous mass.
 
-Real-world deployments make the operational cost of payload-blind routing concrete.
-In January and May~2019, Swiss Post--Matternet M2 drones carrying clinical laboratory
-specimens on fixed, payload-invariant routes crashed in Z\"{u}rich; post-incident
-analysis confirmed that the aircraft flew identical corridors regardless of whether the
-cargo was a routine parcel or an irreplaceable blood specimen, with no routing
-adjustment for payload fragility~\cite{r12}. Independent laboratory work explains why
-this matters: controlled studies on drone-transported medicines have shown that the
-vibration and turbulence encountered along UAV flight paths cause measurable payload
-degradation---insulin exhibits fibrillation risk, biologics undergo protein denaturation,
-and blood samples show elevated haemolysis indices when the route includes high-vibration
-segments~\cite{r13,r14}. A comparative UAV blood-transport study confirmed that
-pre-analytic integrity varies significantly with flight-path characteristics, with routes
-of greater altitude variation and turbulence producing higher rates of sample rejection at
-the receiving laboratory~\cite{r15}. In every case the root cause is the same: the route
-planner had no knowledge of what was being carried, so it could not prefer smoother,
-lower-risk corridors for fragile payloads or shortest paths for time-critical medicine.
-Operational deployments such as Zipline's blood-delivery network in Rwanda---which serves
-remote clinics up to 80\,km away on a single battery charge---further illustrate the
-energy dimension of the gap: heavier blood-product payloads draw more hover and lift
-power and shorten effective range, yet the system plans the same fixed route regardless
-of payload weight, with no mechanism to select an energy-efficient detour for heavy cargo
-or a direct short route when an urgent, lighter payload makes that trade-off
-optimal~\cite{r16}.
+Real deployments show where payload matters, and how thin the public evidence still is.
+Swiss Post flew laboratory samples between hospitals on Matternet quadrotors until two
+incidents in 2019 led it to suspend the service. In January a short circuit cut power to
+the GPS and the drone made an emergency landing on Lake Z\"{u}rich. In May a parachute
+tether snagged on the airframe and the 22-pound drone fell into woods near a group of
+kindergarten children~\cite{r12}. Both were equipment failures, so they say nothing
+about route choice. They do show that lab samples are flown over water and populated
+ground, where the choice of corridor has consequences.
+
+The laboratory evidence on how sensitive these payloads are is mixed. Drone vibration is
+real: in-flight levels exceeded road transport by up to a factor of three, at much higher
+frequencies, yet insulin flown on fixed-wing and multi-copter drones showed no
+aggregation~\cite{r13}. Sixty flights carrying monoclonal antibody infusions, with
+vibration between 1.5 and 3\,g, left particle size and aggregation unchanged~\cite{r14}.
+A blood-sample study found drone transport comparable to car transport, with small
+differences in five of the analytes tested~\cite{r15}. The tested payloads survived
+ordinary flights. None of the three studies varied the route, so they cannot say whether
+a smoother corridor would protect a more fragile cargo. In this work the fragility tag is
+therefore a precaution the operator sets, not a degradation effect measured in the
+literature.
+
+Zipline's blood-delivery network in Rwanda serves hospitals up to about 80\,km from its
+distribution centre, and each aircraft follows a predetermined flight plan~\cite{r16}.
+Its engineers treat payload weight as a limit on range. That is the energy side of the
+problem Tier~2 addresses: a heavier load shortens how far the drone can go, so the best
+route depends on what is aboard.
 
 \section{Motivation}
 
