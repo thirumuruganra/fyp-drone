@@ -1,0 +1,281 @@
+\documentclass[a4paper, 14pt, oneside]{Thesis}
+\usepackage{ulem}
+\usepackage[square, numbers, comma, sort&compress]{natbib}  % Use the "Natbib" style for the references in the Bibliography
+\usepackage{verbatim} 
+\usepackage{pslatex} %To set the font as Times New Roman
+\usepackage{amsbsy} 
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{dcolumn}
+\usepackage{amsmath}
+\usepackage{latexsym}
+\usepackage{amssymb}
+\usepackage{epsfig}
+\usepackage{verbatim} 
+\usepackage{epsfig,graphics}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage{placeins}  % For FloatBarrier
+
+%\usepackage{fancyhdr}
+%\usepackage{lipsum}
+
+%To have 1. instead of [1] in the bibliographic entry
+\makeatletter
+\renewcommand\@biblabel[1]{#1.}
+\makeatother
+
+% To remove hyphenation
+\tolerance=1
+\emergencystretch=\maxdimen
+\hyphenpenalty=10000
+\hbadness=10000
+%
+%----To make sure the page numbers are in the top middle of each page.
+\fancypagestyle{Thesis}{
+\fancyhf{}
+\fancyhead[C]{\thepage}
+\%lfoot{\thepage}
+\pagestyle{fancy}
+}
+%redefine the plain pagestyle
+%\fancypagestyle{plain}{
+%\fancyhf{}
+%\fancyhead[C]{\thepage}
+%}
+%----------------------------------------------------------------------
+%% ------------------------s----------------------------------------
+\input{bmacros}
+\begin{document}
+
+\frontmatter	  % Begin Roman style (i, ii, iii, iv...) page numbering
+
+
+%  Title Page
+
+\title{ATTACK DETECTION IN SOCIAL PLATFORMS USING FUZZY AND INCREMENTAL NEURAL NETWORK}
+\authors  {{ HARINISHREE K \hspace{0.4in} 3122225001035\\ \vspace{0.1in}}
+{ MUTHUSELVI K  \hspace{0.4in} 3122225001074\\\vspace{0.1in}}
+}
+\addresses  {\\\Computer Science \& Engineering\\}
+\date       {\large {October 2026}}
+
+\maketitle
+%% ----------------------------------------------------------------
+
+\setstretch{1.3}
+\fancyhead{}  % Clears all page headers and footers
+\rhead{\thepage}  % Sets the right side header to show the page number
+\lhead{}  % Clears the left side page header
+
+\pagestyle{fancy}  % Finally, use the "fancy" page style to implement the FancyHdr headers
+
+
+\Declaration{ 
+%
+\quad Certified that this project report titled \textbf{``ATTACK DETECTION IN SOCIAL PLATFORMS USING FUZZY AND INCREMENTAL NEURAL NETWORKS''} is the \textit{bonafide} work of \textbf{HARINISHREE. K (312225001035)}, \textbf{MUTHUSELVI. K (312225001074)} who carried out the project work under my supervision.
+\\
+Certified further that to the best of my knowledge the work reported herein does not form part of any other thesis or dissertation on the basis of which a degree or award was conferred on an earlier occasion on this or any other candidate. \\
+  \newlength{\aulength} 
+  \settowidth{\aulength}{SSN College of Engineering,}
+  \newlength{\auclength} 
+  \settowidth{\auclength}{(HEAD OF THE DEPARTMENT)}
+
+\begin{flushleft}
+\begin{minipage}[t]{0.45\linewidth}
+    \textbf{Dr. T.T. MIRNALINEE}\\
+    \textbf{HEAD OF THE DEPARTMENT}\\
+    Professor\\
+    Department of CSE\\
+    SSN College of Engineering\\[6pt]
+    Kalavakkam - 603 110
+\end{minipage}
+\hfill 
+\begin{minipage}[t]{0.45\linewidth}
+    \textbf{Dr. SURESH JAGANATHAN}\\
+    \textbf{SUPERVISOR}\\
+    Associate Professor\\
+    Department of CSE\\
+    SSN College of Engineering\\[6pt]
+    Kalavakkam - 603 110
+\end{minipage}
+\end{flushleft}
+
+
+\medskip
+Submitted for project viva-voce examination held on\ldots\ldots\ldots\ldots
+\\
+\\
+\\
+{\bf EXTERNAL EXAMINER}\hfill
+{\bf INTERNAL EXAMINER}
+}
+\clearpage
+%% Abstract in Tamil
+
+% Acknowledgement
+%\setstretch{1.3}
+
+\clearpage
+%% ----------------------------------------------------------------
+
+% The Abstract Page
+
+\acknowledgements{
+We thank GOD, the almighty for giving our strength and knowledge to do this project.
+
+We would like to thank and deep sense of gratitude to my guide \textbf{Dr.SURESH JAGANATHAN}, Associate Professor, Department of Computer Science and Engineering, for his valuable advice and suggestions as well as his continued guidance, patience and support that helped our to shape and refine our work.
+
+Our sincere thanks to  \textbf{Dr. T.T. MIRNALINEE}, Professor and Head of the Department of Computer Science and Engineering, for her words of advice and encouragement. We would like to thank \textbf{Dr.B.Bharathi} project Coordinator, our Project panel members for their valuable suggestions throughout this project.
+
+ We also express our appreciation to \textbf{Dr. S. RADHA}, Principal, for all the help she has rendered during this course of study.
+
+ We would like to extend our sincere thanks to all the teaching and non-teaching staffs of our department who have contributed directly and indirectly during the course of my project work.
+Finally, We would like to thank our parents and friends for their patience, cooperation and moral support throughout our life. 
+\newline
+\newline
+\newline
+\newline
+{\bf HARINISHREE K}\hfill 
+{\bf MUTHUSELVI K}
+\clearpage  % Abstract ended, start a new page
+
+\addtotoc{ABSTRACT} % Add the "Abstract" page entry to the Contents
+\abstract{ \begin{spacing}{1.8}
+Social Platform attacks like Phishing, baiting, pretexting, whaling, and malicious URL spreading attacks are challenging due to unstructured text, diverse URL patterns, and ever-changing attack patterns. This paper presents a memory-efficient incremental learning approach for social engineering attack detection using email text and URL feature data from dynamically streaming data.The proposed system uses a dual-pipeline feature extraction architecture. The first pipeline uses TF-IDF and Truncated SVD with a Stacked Autoencoder (SAE) to extract 100-dimensional latent features that represent semantic and structural patterns. The second pipeline adds a Fuzzy Probability-Guided Feature Descriptor Generator (Fuzzy-PGFDG) that extracts five fuzzy membership descriptors: Typicality, Density, Homogeneity, Outlier Score, and Fuzzy Entropy, to represent uncertainty and class membership. The results are combined into a single 124-dimensional hybrid feature vector.To handle concept drift and catastrophic forgetting, a Data Augmented Incremental Learning (DAIL) approach is used to synthesize new data from previous batches using a column-alternating interleaving scheme, without requiring storage of raw historical data. An Extreme Learning Machine (ELM) classifier is incrementally updated with dynamically scaled hidden neurons to ensure scalability and efficiency.
+\end{spacing}
+}
+\clearpage
+%%% DUMMY PAGE FOR TAMIL ABSTRACT WHICH WILL BE PRINTED SEPARATELY
+%%% Since LaTeX can't print tamil characters, you've to type tamil 
+%%% abstract in some other editors and print it separately. When
+%%% binding the thesis place the tamil abstract in place of this blank page
+%%% I'm adding this blank page for Table of Contents to point to the right page
+
+%\pagestyle{empty}
+%\newpage
+%\mbox{}
+%\clearpage
+
+\pagestyle{plain}  %The page style headers have been "empty" all this time, now use the "fancy" headers as defined before to bring them back
+
+%% ----------------------------------------------------------------
+\lhead{\emph{Contents}}  % Set the left side page header to "Contents"
+
+\tableofcontents % Write out the Table of Contents
+
+
+%% ----------------------------------------------------------------
+\lhead{\emph{List of Tables}}  % Set the left side page header to "List of Tables"
+%\begin{spacing}{4}
+%\hspace{2.5in} \textbf{List of Tables} \par 
+\listoftables
+%\end{spacing}
+
+%% ----------------------------------------------------------------
+\lhead{\emph{List of Figures}}  % Set the left side page header to "List if Figures"
+\listoffigures  % Write out the List of Figures
+
+
+%2.1 LITERATURE SURVEY OF METAMORPHIC TESTING. . . . . . . . . . . .  13
+
+
+ % Write out the List of Tables
+
+
+\mainmatter	  % Begin normal, numeric (1,2,3...) page numbering
+\pagestyle{myheadings}  % Return the page headers back to the "fancy" style
+
+\begin{spacing}{1.5}
+\input{chapter1} % INTRODUCTION
+\input{chapter2} % LITERATURE SURVEY
+\input{chapter3} % DESIGN
+\input{chapter4} % IMPLEMENTATION
+\input{chapter5} % CONCLUSION AND FUTURE WORK
+\input{chapter6}
+
+\addtotoc{REFERENCES}
+\begin{thebibliography}{99}
+
+\bibitem{ref6}
+N.~Altwaijry \textit{et al.}, ``Advancing phishing email detection: A comparative study of deep learning techniques,'' \textit{PLoS One}, vol.~19, no.~3, p.~e0299216, Mar.~2024.
+
+\bibitem{ref17}
+N.~Alsufyani and A.~Alzahrani, ``Social engineering attack detection using machine learning,'' \textit{International Journal of Advanced Computer Science and Applications}, vol.~13, no.~2,2022.
+
+\bibitem{ref4}
+S.~Ariyadasa, S.~Fernando, and S.~Fernando, ``Detecting phishing attacks using a combined model of LSTM and CNN,'' \textit{Int. J. of Advanced and Applied Sciences}, vol.~7, no.~7, pp.~56--67, 2020.
+
+\bibitem{ref19}
+S.~Bagui, D.~Nandi, S.~Bagui, and R.~J.~White, 
+``Machine learning and deep learning for phishing email classification using one-hot encoding,'' 
+\textit{Journal of Computer Science}, vol.~17, pp.~610--623, 2021, doi:\url{https://doi.org/~10.3844/jcssp.2021.610.623}
+
+\bibitem{ref13}
+S.~Bahadoripour, H.~Karimipour, A.~N.~Jahromi, and A.~Islam, ``An explainable multi-modal model for advanced cyber-attack detection in industrial control systems,'' \textit{Internet of Things}, vol.~26, p.~101213, 2024.
+
+\bibitem{ref18}
+S.~Gupta, S.~Jain, V.~Awasthi, A.~Sabharwal, M.~Kumar, A.~Gaur, and W.~M.~Khan, 
+``Detection of phishing URL based on text feature extraction,'' 
+\textit{International Journal of Food and Nutritional Sciences (IJFANS)}, 
+vol.~11, Special Issue~6, pp.~465, 2022.
+
+\bibitem{ref10}
+``Multi-modal fusion for anomaly detection in cybersecurity: Integrating NLP with network traffic data and system logs,'' \textit{EasyChair Preprint}, 2024.
+
+\bibitem{ref11}
+``Multi-modal data fusion techniques for improved cybersecurity threat detection and prediction,'' \textit{Baltic Journal of Modern Learning}, Dec.~2024.
+
+\bibitem{ref7}
+S.~Jesmithaa and A.~P.~Eliyas, ``Detecting phishing attacks using convolutional neural network and LSTM,'' in \textit{Proc. 3rd Int. Conf. on Advance Computing and Innovative Technologies in Engineering (ICACITE)}, Greater Noida, India, 2023, pp.~802--807.
+
+\bibitem{ref2}
+M.~Lansley, S.~Kapetanakis, and N.~Polatidis, ``SEADer++ v2: Detecting social engineering attacks using natural language processing and machine learning,'' in \textit{Proc. 2020 Int. Conf. on Innovations in Intelligent Systems and Applications (INISTA)}, 2020, pp.~1--6.
+
+\bibitem{ref5}
+S.~Madhusudhanan and S.~Jaganathan, ``Data augmented incremental learning (DAIL) for unsupervised data,'' \textit{IEICE Transactions on Information and Systems}, vol.~105, no.~6, pp.~1185--1197, 2022.
+
+\bibitem{ref20}
+A.~Mahdieh Zabihimayvan, B.~Derek Doran, 
+``Fuzzy rough set feature selection to enhance phishing detection,'' 
+\textit{arXiv preprint arXiv:1903.05675}, 2019.
+
+\bibitem{ref16}
+A.~Namavar~Jahromi \textit{et al.}, ``A deep multi-modal cyber-attack detection model,'' \textit{arXiv preprint arXiv:2304.01440}, 2023.
+
+\bibitem{ref8}
+M.~K.~Prabakaran, P.~M.~Sundaram, and A.~D.~Chandrasekar, ``An enhanced deep learning-based phishing detection mechanism to effectively identify malicious URLs using variational autoencoders,'' \textit{IET Information Security}, vol.~17, pp.~423--440, 2023.
+
+\bibitem{ref3}
+A.~Prasad and S.~Chandra, ``PhiUSIIL: A diverse security profile empowered phishing URL detection framework based on similarity index and incremental learning,'' \textit{Computers \& Security}, vol.~136, p.~103539, 2024.
+
+\bibitem{ref9}
+O.~K.~Sahingoz, E.~Buber, and O.~Kugu, ``A dual-phase deep learning framework for advanced phishing detection using multiple algorithms,'' \textit{Scientific Reports}, vol.~15, p.~21986, Jul.~2025.
+
+\bibitem{ref21}
+B.~Senthilnayaki, K.~Venkatalakshmi, and A.~Kannan, 
+``Intrusion detection system using fuzzy rough set feature selection and modified KNN classifier,'' 
+\textit{The International Arab Journal of Information Technology}, 
+vol.~16, no.~4, Jul.~2019.
+
+\bibitem{ref15}
+M.~S.~V.~Tyagadurgam \textit{et al.}, ``Preventing phishing attacks using advanced deep learning techniques for cyber threat mitigation,'' \textit{Journal of Data Analysis and Information Processing}, vol.~13, pp.~314--330, 2025.
+
+\bibitem{ref12}
+C.~Xu, Y.~Zhan, Z.~Wang, and J.~Yang, ``Multimodal fusion based few-shot network intrusion detection system,'' \textit{Scientific Reports}, vol.~15, p.~21986, Jul.~2025.
+
+\bibitem{ref14}
+Y.~Zhang \textit{et al.}, ``Detection and classification of phishing websites using machine learning,'' \textit{Cybersecurity}, vol.~8, no.~1, pp.~1--18, May~2025.
+
+\bibitem{ref1}
+P.~Vidyasri and S.~Suresh, ``FDN-SA: Fuzzy deep neural-stacked autoencoder-based phishing attack detection in social engineering,'' \textit{Computers \& Security}, vol.~148, p.~104188, 2025.
+
+\end{thebibliography}
+
+\end{spacing}
+\end{document}
+`

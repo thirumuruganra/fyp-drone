@@ -1,0 +1,120 @@
+% Chapter 3
+
+\chapter{LITERATURE SURVEY} % Write in your own chapter title
+%
+\section{PAPERS RELATED TO THE PROBLEM IDENTIFIED}
+\subsection{Fuzzy Deep Neural Stacked Autoencoder (FDN-SA) 
+}
+The FDN-SA system, developed by Vidyasri and Suresh, combines fuzzy logic and deep learning to improve phishing detection in social engineering scenarios. The approach reduces dimensionality without sacrificing discriminative features by using a stacked autoencoder to learn layered, abstract representations from complicated datasets made up of URLs, email headers, and webpage elements. By addressing the vague and unpredictable character of attack signatures, fuzzy logic integration gives the classifier the ability to more robustly manage changing trends in threat behavior. In detecting sophisticated phishing attacks, empirical evaluation showed that FDN-SA performed better than traditional machine learning models, such as SVMs and Random Forests, by obtaining higher accuracy and lower false-positive rates. The method of combining deep autoencoding with fuzzy inference for sophisticated attack detection is validated by this model's capacity to capture both syntactic and semantic information.
+%
+\subsection{ LSTM-CNN Hybrid Deep Learning Architecture}
+For phishing detection, Ariyadasa et al. suggested a composite neural model that makes use of spatial and sequential analysis. By combining one-dimensional convolutional layers (CNNs) with long short-term memory (LSTM) networks, the design allows the framework to learn spatial properties in HTML content and temporal dependencies in URL character streams at the same time. This modular combination enables the system to detect malicious scripts contained in page structures as well as subtle modifications in web links. The system achieves great accuracy, outperforming earlier hybrid URL-HTML models, thanks to the separated training and subsequent merging of outputs via activation layers. Its applicability for real-time security applications is highlighted by its minimal preprocessing and lack of external feature engineering, as well as its increased robustness and generalization for threats that are not yet visible.
+%
+\subsection{ SEADer++ v2 
+}
+Lansley, Kapetanakis, and Polatidis: SEADer++ v2 uses machine learning and natural language processing to detect social engineering techniques in text messages. In order to identify linguistic elements indicative of malevolent activity, such as urgency cues, grammatical abnormalities, and manipulative language patterns, the system preprocesses chat and email data using tokenization, stop-word removal, stemming, and syntactic analysis. Both overt and covert signs of social engineering are captured by the seven-feature representation, which is then input into a variety of classifiers, such as Random Forest, feedforward neural networks, and support vector machines. Viability for organizational security deployment is established by testing on semi-synthetic datasets, which show notable gains in detection accuracy and false-negative reduction.
+%
+\subsection{Data Augmented Incremental Learning (DAIL)}
+DAIL, a completely unsupervised method for preserving model effectiveness in dynamic attack situations, was presented by Madhusudhanan and Jaganathan. By using augmentation to create synthetic datasets, the method gradually updates pre-existing models without the need for extensive retraining cycles or human labeling. While maintaining low computational costs, this approach significantly increases the classifiers' adaptability and scalability in the face of quickly changing social engineering patterns. Performance investigation shows that DAIL performs well in clustering and classification on continuously changing data distributions, which makes it especially useful in situations where attack vectors are constantly changing and labeled data is hard to come by.
+%
+\subsection{ Augmented 1D-CNN with Recurrent Layers}
+For phishing email detection, Altwaijry et al. suggested augmented one-dimensional CNN models (1D-CNNPD) combined with sophisticated recurrent architectures including LSTM, Bi-LSTM, GRU, and Bi-GRU. While bidirectional recurrent processing gathers contextual information from both forward and backward directions, allowing the model to acquire intricate attack signatures, one-dimensional convolution examines sequential text patterns. By achieving accuracy on benchmark datasets, our multi-layered recurrent technique shows how well it works to combine several neural paradigms for improved phishing detection.
+%
+\subsection{Variational Autoencoders for URL Analysis}
+Prabakaran et al. presented improved deep learning techniques for robust reconstruction and unsupervised URL feature learning using variational autoencoders (VAE). Through reconstruction error anomaly detection, VAE's probabilistic architecture makes it possible to develop compact, generative representations of URL patterns, which makes it easier to identify phishing variants that haven't been seen before. The method confirms VAE's better capacity to handle high-dimensional, complicated URL datasets in comparison to deterministic autoencoders, with 98.2\% accuracy and proven robustness to zero-day phishing patterns.
+%
+\subsection{Deep Learning for Cyber Threat Mitigation}
+Tyagadurgam et al. demonstrated cutting-edge deep learning methods created especially for mitigating cyberthreats and preventing phishing attacks. In order to achieve high-performance threat detection in production contexts, the research discusses cutting-edge neural architectures, training techniques, and deployment tactics.
+%
+\section{RESEARCH GAPS} 
+\textbf{Limited Study on Combining Multiple Types of Data} \\
+The majority of current systems exclusively analyze one kind of data, like text, URLs, or metadata. The procedure is typically straightforward and poorly assessed, even when several types are integrated. Very little study has been done on how sophisticated feature extraction strategies can enhance multi-class social engineering detection or which sort of data contributes most to detection accuracy.\\
+
+\textbf{Lack of Comparison Between Heavy Deep Models and Faster Learning Models}\\
+As stated in~\ref{tab:research_gaps_objectives}, complicated deep learning models are the main focus of current research, whilst quicker and simpler model like Extreme Learning Machines are seldom
+In order to determine the trade-off between accuracy, training time, and computational efficiency for real-world deployment, the several approaches discussed above are examined.\\
+
+\textbf{Limited Focus on Multi-Class Data}\\
+The majority of current research focuses on binary phishing/legitimate classification or, at most, ternary scenarios, ignoring the complex multi-class nature of real social engineering threats.The literature lacks a thorough assessment of detection systems' resilience across various organizational contexts, unequal real-world class distributions, and fine-grained attack categorizations (phishing, whaling, pretexting, baiting, legitimate), as summed up in~\ref{tab:research_gaps_objectives}. Furthermore, the majority of assessments rely on controlled, openly accessible datasets that might not accurately represent linguistic variances, industry-specific attack vectors, or organizational-specific communication patterns.\\
+
+\textbf{Insufficient Attention to Real-Time Deployment and Explainability}\\
+Practical deployment aspects including inference speed, computing overhead, and scalability for large-volume social platform data have received relatively little attention in the majority of previous studies, which primarily concentrate on accuracy measures.In addition, the majority of deep learning models function as black boxes with little support for explainability, as summed up in~\ref{tab:research_gaps_objectives}.Consequently, it is challenging for security analysts to comprehend and justify classification results.
+Furthermore, there is a gap in our knowledge of security because there is insufficient research on whether multi-modal systems provide greater resilience against hostile manipulation or evasion strategies.
+\section{RESEARCH OBJECTIVES}
+The primary goal of this study is to create a comprehensive multi-modal detection framework that combines information from multiple sources to more accurately and reliably identify and categorize social media attacks.
+\begin{itemize}
+    \item Develop two separate specialized neural models - autoencoders for each data
+The types are text, URL.
+    \item Extract the most relevant patterns from each data source independently.
+    \item Combine features from all two sources into a unified representation.
+\end{itemize}
+
+\begin{table}[h!]
+\centering
+\caption{{Identified Research Gaps and Proposed Research Objectives}}
+\label{tab:research_gaps_objectives}
+\renewcommand{\arraystretch}{1.4}
+\setlength{\tabcolsep}{4pt}
+
+
+\begin{tabular}{|p{3.5cm}|p{5.5cm}|p{7cm}|}
+\hline
+\textbf{Category} & \textbf{Identified Gaps} & \textbf{Proposed Direction \& Research Objectives} \\ \hline
+
+\textbf{Multi-Modal Integration \& Feature Fusion} &
+Limited multi-modal integration; insufficient evaluation of modality-specific feature extraction effectiveness. &
+\textbf{1.} Design stacked autoencoders for each modality (text, URL).  
+\newline \textbf{2.} Investigate feature-level fusion by concatinating modality specific stacked AutoEncoder and analyze the performance.  
+\newline \textbf{3.} Validate improvements in accuracy and generalization over single-modality approaches. \\ \hline
+
+\textbf{Multi-Class Granularity \& Generalization} &
+Binary/ternary dominance; limited multi-class evaluation; insufficient cross-domain robustness assessment; class imbalance challenges. &
+\textbf{1.} Develop five-class classifier (phishing, whaling, pretexting, baiting, legitimate).  
+\newline \textbf{2.} Use balanced dataset (500 per class).  
+\newline \textbf{3.} Identify modality contributions for distinguishing rare vs. common attacks. \\ \hline
+
+\textbf{Real-Time Deployment Feasibility \& Explainability} &
+Underreported efficiency metrics; lack of deployment feasibility analysis; limited explainability; no analysis of modality redundancy. &
+\textbf{1.} Report training time, latency, memory, throughput for ELM.  
+\newline \textbf{2.} Implement modality-specific feature attribution.  
+\newline \textbf{3.} Evaluate robustness when modalities are partially missing or degraded. \\ \hline
+
+
+\end{tabular}
+
+\end{table}
+
+The second aim is to provide practical guidance that can be used in the real world deployment, by doing a profound comparative analysis between two different
+Neural architectures for security practitioners.
+Implement and test ELM, which represents deep supervised learning.
+\begin{itemize}
+    \item Implement and test Extreme Learning Machine (ELM) representing fast analytical learning.
+    \item Measure and report training time, inference latency, memory usage, and detection accuracy
+    \item Clearly indicate to practitioners which architecture applies or choose based on their needs.
+    \item Help organizations select classifiers based on available computational resources and performance requirements.
+\end{itemize}
+The tertiary objective the  extends detection capability beyond binary classification to achieve fine-grained attack categorization and system transparency improvement and resiliance. 
+\begin{itemize}
+    \item Develop a five-class detection system distinguishing phishing, whaling, Pretexting, baiting, and legitimate datas. 
+    \item Measure performance metrics separately for each attack type to identify system strengths and weaknesses.
+\end{itemize}
+
+%directed acyclic graph (DAG) where each node is labeled by
+%a proposition letter from root, except for nodes that are
+%labeled by $0$ and $1$. From every node labeled by a proposition
+%letter, there are two outgoing edges, labeled 'left' and 'right',
+%to nodes labeled by $0$ or $1$, or a proposition letter strictly
+%higher in the ordering $>$ . The nodes labeled by $0$ and $1$ do not have outgoing edges as in figure \ref{fig:BDD}. The OBDDs of figure \ref{fig:BDD} have the ordering $[x, y, z]$ and so does any list having $x$, $y$ and $z$  it in order.
+
+%Ordered Binary Decision Diagrams (OBDDs in short) have been shown as a powerful paradigm in handling Boolean functions and have been applied to many fields such as VLSI, CSD, AI, combinatorics, ect. This is because OBDDs can represent many Boolean functions in very compact manner by an appropriate ordering of logical variables for the functions. Where each variable is evaluated at most once on each path (read-once property), the ordered in which the variable are evaluated does not depend on the input and the size of OBDDs depends on the order of the input. By applying reduction algorithm, OBDDs can be transformed into a canonical form called reduced OBDDs.
+
+%BDDs with multiple occurrences of a boolean variable along a path seem rather inefficient. Moreover, there seems no easy way to test for equivalence of BDDs.
+%So it can improve matters by imposing an ordering on the variables occurring
+%along any path and then adhere to that same ordering for all the BDDs.
+%
+
+
+%The advantage of an ROBDD is that it is canonical (unique) for a particular functionality. This property makes it useful in functional equivalence checking and other operations like functional technology mapping. A path from the root node to the $1$-terminal represents a (possibly partial) variable assignment for which the represented Boolean function is true otherwise false.
+%
+
+%

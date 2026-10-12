@@ -1,0 +1,8 @@
+\chapter{CONCLUSION AND FUTURE WORK}
+
+
+In conclusion, the proposed incremental learning approach provides an adaptive and scalable method for detecting social engineering attacks. The system integrates stacked autoencoder-based deep feature extraction with PGFDG fuzzy modeling to capture structural patterns, uncertainty, and anomalies. Additionally, the combination of normalized manual features with fuzzy features results in a robust hybrid feature representation that enhances class separability, particularly in scenarios involving overlapping attack classes.
+
+To overcome catastrophic forgetting, where a model loses previously learned information when trained on new data, the supervised DAIL data augmentation process helps reinforce previously learned class knowledge. The proposed system evolves over four stages, increasing from three to five attack classes. The consistency of the feature space is ensured by frozen encoders, which are neural network components that do not update during training. The Extreme Learning Machine (ELM), a type of single-layer feedforward neural network known for rapid training and efficient computation, makes the system suitable for near real-time applications. The proposed system effectively integrates deep learning, fuzzy modeling, data augmentation, and incremental classification.
+
+As future work, adding more new attack types, such as spear phishing and AI scams, can enhance the accuracy. Furthermore, adopting more advanced hybrid genetic approaches for data augmentation can improve learning for the minority class. 
