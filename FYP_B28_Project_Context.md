@@ -14,10 +14,12 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 **Guide:** Dr. Sujaudeen N, Asst. Professor, CSE
 
-## Status (2026-10-07)
+## Status (2026-10-12)
 
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
-- Review 2 report done → `Review_2/Report/BID_REPORT_28.tex` (70 pp). PR: thirumuruganra/fyp-drone#12, branch `claude/funny-brahmagupta-msf1ef`. Details: § Review 2 Report. Review 2 PPT still blank template.
+- Review 2 report done → `Review_2/Report/BID_REPORT_28.tex` (70 pp). PR thirumuruganra/fyp-drone#12 merged to `main`. Details: § Review 2 Report.
+- Review 2 PPT done → `Review_2/PPT/BID_PPT_28.tex` + `.pdf` (BID PPT 28 deck, ~26 slides, Beamer; figs in `Review_2/PPT/figures/`). Replaced blank UG template. Slide order: R1 Q&A → problem → objectives → arch/modules → methodology → algorithms → status → results (front vs baselines, wind dir, ablation, Tier 2, SITL) → comparison → next steps → team → refs. Numbers = same as report § Key numbers.
+- Phase 1 report (due Dec): not started in repo. `Phase_1/` now = `Guidelines-ReportPreparation.pdf`, `Guidelines-VideoPreparation.pdf`, `UCS2717-Poster.pptx`, `Phase_1_Report/UCS2717-ProjectReport-LaTeX/` (UCS2717 UG report template, `ug-project-report.tex` + `chapter1..6.tex`; sample content is another team's project "Attack Detection in Social Platforms" → format ref only, replace content). Old `Phase_1/Phase 1 Report/` (Review-1-era own draft: `main.tex`, `Thesis.cls`, `ch1..ch5_*.tex`) deleted from tree 2026-10-12; recover from git history (commit before this one) if needed.
 - Review 1 panel query + answer: § Review 1 — Panel Query.
 - All `Implementation/IMPLEMENTATION_PLAN.md` phases 0–7 merged to `main`. Merged ≠ validated: see Open Defects.
 - `Implementation/` built:
@@ -45,7 +47,7 @@ Still open:
 
 Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`.
 
-**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`, `diagrams/`), `Phase_1/` (`Phase 1 Report/`, seniors' format reference), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
+**Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`, `diagrams/`), `Phase_1/` (guidelines PDFs, poster, `Phase_1_Report/UCS2717-ProjectReport-LaTeX/` template), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
 
 ## Problem
 
