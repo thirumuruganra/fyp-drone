@@ -13,15 +13,15 @@ way for each flight to suit its cargo. Urgent antivenom can take the shortest co
 and a fragile sample a calmer one, without the operator knowing how the planner works.
 
 This matters most where trained staff are scarce. The person launching a drone at a
-district hospital or a relief camp is likely to be a nurse, a volunteer or a logistics
-worker, not a route-planning expert. Our system asks four simple questions about the
-payload (how fragile, how heavy, how urgent, how important) and handles the rest.
+district hospital or a relief camp is likely to be a nurse or a volunteer, not a
+route-planning expert. Our system asks four simple questions about the payload (how
+fragile, how heavy, how urgent, how important) and handles the rest.
 
 A delivery drone also flies over people who never agreed to it. Population exposure,
 restricted zones, water and building proximity are part of every edge's cost, nodes
 above the legal ceiling are removed, and a weather gate stops flights in storms, heavy
-rain, poor visibility or strong gusts. It keeps the planner from routing over a crowded market to
-save a few seconds.
+rain, poor visibility or strong gusts, so the planner does not route over a crowded
+market to save a few seconds.
 
 Every Tier~2 decision is recorded with its tags, weights, route and any HOLD reason, so
 it can be reproduced later. The benefit depends on honest limits, though. The fragility tag is a precaution, not a proven protection~\cite{r13,r14,r15},
@@ -45,5 +45,5 @@ every mission until it expires. Tier~2 takes a fraction of a millisecond and can
 a Raspberry Pi on board.
 
 Everything the system depends on is open data or open-source software, so there are no
-licence fees and the method can be set up for any region. With all constants in one file
-and about 265 offline tests, it can be recalibrated as real flight data comes in.
+licence fees, and with all constants in one file and about 265 offline tests it can be
+recalibrated as flight data comes in.

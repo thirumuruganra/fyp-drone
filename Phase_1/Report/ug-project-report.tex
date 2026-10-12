@@ -42,6 +42,8 @@
 \setcounter{bottomnumber}{2}
 \setcounter{totalnumber}{4}
 \hypersetup{hidelinks}
+% chapter without a page break (used for appendices B and C); no group, so \label after it works
+\newcommand{\flowchapter}[1]{\par\addvspace{30pt}\let\origclearpage\clearpage\let\clearpage\relax\chapter{#1}\let\clearpage\origclearpage}
 \newlength{\beforechapskip}\newlength{\topfiddle} % lengths used by \listofacronyms in Thesis.cls
 
 %To have 1. instead of [1] in the bibliographic entry
@@ -219,7 +221,9 @@ Pareto front; payload-aware selection; wind-aware risk; last-mile delivery
 \addtotoc{REFERENCES}
 % APA style, alphabetical by first author; numbers follow this order.
 \begin{spacing}{1.15}
+\small
 \begin{thebibliography}{99}
+\setlength{\itemsep}{2pt}
 
 \bibitem{r23}
 ArduPilot Development Team. (2026). \textit{ArduPilot software in the loop (SITL) simulator}. \url{https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html}

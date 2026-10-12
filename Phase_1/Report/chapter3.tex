@@ -9,13 +9,9 @@ choice of route depends on the payload, so it is made per mission, against whate
 front is current. A mission that arrives between refreshes runs only Tier~2, which
 reads the payload tags and returns a route in a fraction of a millisecond.
 
-The workflow is as follows. Environment data for the region is fetched and cached. The
-airspace graph is built from it, with rules for which nodes and edges are allowed and a
-shared pipeline that costs every edge. Tier~1 computes the Pareto front and stores it.
-Tier~2 turns each payload tag into a route, and the route is exported as an autopilot
-mission and flown in simulation. Baseline planners and an evaluation module score each
-stage, and what they find goes back into the model. Figure~\ref{fig:methodology} gives
-an overview.
+Figure~\ref{fig:methodology} gives an overview of the workflow, from environment data
+to the flown mission, with baseline planners and an evaluation module scoring each
+stage.
 
 \begin{figure}[!htbp]
 \centering
@@ -74,6 +70,8 @@ breakdown and the cost vector $[d, \varepsilon, \rho]$. The weather go/no-go sta
 stored on the graph itself so that Tier~2 can read it. Two builders share one cost
 pipeline: a lattice builder over a real region, described below, and a seeded synthetic
 builder for controlled benchmarks (Section~\ref{sec:dataset}).
+Algorithm~\ref{alg:m1} summarises the lattice builder, and the subsections that follow
+give the rules behind each step.
 
 \subsection{Environment data acquisition}
 
@@ -113,39 +111,30 @@ its height above ground and its altitude above mean sea level.
 \subsection{Edge construction and pruning}
 
 Each surviving node is linked to its eight neighbours in both directions, so the graph
-is directed from the start. Three filters then remove edges. The first drops any edge
-whose straight segment crosses a restricted polygon, which stops a route from clipping
-the corner of a zone between two legal nodes. The second is an optional hook,
-\texttt{edge\_filter}, which the simulation module uses for hard roof and terrain
-clearance. The third keeps only the largest strongly connected component, so that every
-remaining node can reach every other.
+is directed from the start. Three filters then remove edges: any edge whose segment
+crosses a restricted polygon, any edge rejected by the optional \texttt{edge\_filter}
+hook (used by the simulation module for roof and terrain clearance), and every edge
+outside the largest strongly connected component, so that all remaining nodes can reach
+each other.
 
 For each edge that survives, the module stores the horizontal haversine length $d_h$,
 the forward-azimuth bearing $\theta$, the grade $g = \Delta\mathrm{alt}/d_h$ and the
-three-dimensional length $d = \sqrt{d_h^2 + \Delta\mathrm{alt}^2}$. The bearing is
-\begin{equation}
-  \theta = \operatorname{atan2}\bigl(\sin\Delta\lambda\cos\varphi_2,\;
-  \cos\varphi_1\sin\varphi_2 - \sin\varphi_1\cos\varphi_2\cos\Delta\lambda\bigr)
-\end{equation}
-where $\varphi$ is latitude and $\lambda$ is longitude, so that the east component is
-correctly scaled by $\cos\varphi$.
+three-dimensional length $d = \sqrt{d_h^2 + \Delta\mathrm{alt}^2}$.
 
 \subsection{Static risk terms}
 
 Static terms do not depend on the weather, so they are computed once per build. Each
 edge is sampled every 25\,m along the straight line between its two endpoint
 altitudes. At each sample the module knows the flight altitude, the ground height, the
-tallest roof directly below and the tallest roof within 30\,m. For the default region
-this means roughly 6,800 directed edges, about 75,000 sample points and around 375,000
-spatial-index queries per build. Table~\ref{tab:risk} lists all eleven risk components,
+tallest roof directly below and the tallest roof within 30\,m. Table~\ref{tab:risk} lists all eleven risk components,
 static and weather-dependent, with the weight each carries in the edge score
 \begin{equation}
   \rho_\mathrm{edge} = \operatorname{clip}\Bigl(\sum_k w_k\,\rho_k,\; 0,\; 1\Bigr),
   \qquad \rho(e;\omega) = \rho_\mathrm{edge}\cdot\frac{d_h}{s} \label{eq:risk}
 \end{equation}
 where $s$ is the lattice spacing. Multiplying by $d_h/s$ turns the per-edge score into
-a cumulative exposure. A diagonal hop counts $\sqrt{2}$ times an axis hop, and the risk
-of a route grows with the distance flown through risky air.
+a cumulative exposure. The risk of a route therefore grows with the distance flown
+through risky air.
 
 \begin{small}
 \begin{longtable}{|P{2.4cm}|P{10.6cm}|P{1.0cm}|}
@@ -231,6 +220,39 @@ or when gusts exceed 45\,km/h, a provisional limit for an F450-class airframe. T
 reasons are written to the graph, and Tier~2 refuses to select a route while any reason
 is present.
 
+\begin{algorithm}[p]
+\caption{Lattice airspace graph construction and costing (Module~1)}\label{alg:m1}
+\begin{algorithmic}[1]
+\Require Region, box size, spacing $s$; DEM; buildings $\mathcal{B}$; restricted zones $\mathcal{Z}$; weather $\omega$; weights $w_k$; optional \texttt{edge\_filter}
+\Ensure Directed graph $G=(V,E)$ with costs $\mathbf{c}(e)=[d,\varepsilon,\rho]$ and no-go reasons $\mathcal{R}$
+\State $n \gets \mathrm{round}(\mathit{box}/s)$; place an $n \times n$ lattice in a local equirectangular frame
+\For{each lattice point $k$} \Comment{node selection}
+  \State $z_k \gets$ DEM elevation; \quad $b_k \gets$ tallest building in the cell of $k$ (from $\mathcal{B}$)
+  \State $\mathrm{AGL}_k \gets \max(H_\mathrm{cruise},\, b_k + C)$; \quad $\mathrm{alt}_k \gets z_k + \mathrm{AGL}_k$
+  \If{$\mathrm{AGL}_k \leq 120$\,m \textbf{and} $k$ lies outside every polygon in $\mathcal{Z}$} add $k$ to $V$ \EndIf
+\EndFor
+\For{each $u \in V$ and each of its eight lattice neighbours $v \in V$} \Comment{edge construction}
+  \State \textbf{if} segment $uv$ crosses a polygon in $\mathcal{Z}$ \textbf{or} \texttt{edge\_filter}$(u,v)$ rejects it \textbf{then continue}
+  \State add the directed edges $(u,v)$ and $(v,u)$ to $E$
+\EndFor
+\State keep only the largest strongly connected component of $G$
+\For{each edge $e=(u,v) \in E$} \Comment{static features and static risk}
+  \State $d_h \gets$ haversine length; \quad $\theta \gets$ forward azimuth; \quad $g \gets \Delta\mathrm{alt}/d_h$; \quad $d \gets \sqrt{d_h^2+\Delta\mathrm{alt}^2}$
+  \State sample $e$ every 25\,m; read flight altitude, ground height, roof below and roof within 30\,m
+  \State store $\rho_k$ for building, terrain, population, no-fly buffer, water and comm/GPS
+\EndFor
+\State $\mathcal{R} \gets$ reasons among: WMO code 95--99, rain $\geq 7.5$\,mm/h, visibility $< 1$\,km, gust $> 45$\,km/h
+\State $v \gets$ 80\,m wind forecast, else $v_{10}(h/10)^{\alpha}$ \Comment{this part re-runs per $\omega$}
+\For{each edge $e \in E$}
+  \State $H\!W \gets v\cos(\theta-\theta_\mathrm{from})$; \quad $C\!W \gets v\,\lvert\sin(\theta-\theta_\mathrm{from})\rvert$
+  \State $\varepsilon \gets d\,\bigl(1+\lvert g\rvert+\beta_h\max(0,H\!W)/V_c+\beta_c\,C\!W/V_c\bigr)$ \Comment{tailwind earns no credit}
+  \State compute $\rho_k$ for wind, gust, weather and turbulence
+  \State $\rho_\mathrm{edge} \gets \mathrm{clip}\bigl(\sum_k w_k\rho_k,\,0,\,1\bigr)$; \quad $\rho \gets \rho_\mathrm{edge}\,d_h/s$; \quad $\mathbf{c}(e) \gets [d,\varepsilon,\rho]$
+\EndFor
+\State store $\mathcal{R}$ on $G$; \Return $G$
+\end{algorithmic}
+\end{algorithm}
+
 % ------------------------------------------------------------
 \section{TIER 1 PARETO FRONT ENGINE (MODULE 2)}\label{sec:m2}
 
@@ -279,10 +301,11 @@ use the exact front.
 
 Algorithm~\ref{alg:tier1} gives the full procedure. Here $\preceq$ is weak dominance.
 
-\begin{algorithm}[H]
+\begin{algorithm}[p]
+\setstretch{1.58}% stretched to fill the page
 \caption{NAMOA* with a label table (Tier~1)}\label{alg:tier1}
 \begin{algorithmic}[1]
-\Require Directed graph $G=(V,E)$, source $s$, target $t$, costs $\mathbf{c}(u,v)=[d,\varepsilon,\rho]$, cap $M$
+\Require Graph $G=(V,E)$, source $s$, target $t$, costs $\mathbf{c}(u,v)=[d,\varepsilon,\rho]$, cap $M$
 \Ensure Pareto front $\mathcal{P}$, flag $\mathit{truncated}$
 \State $L \gets [(s, [0,0,0], -1)]$; $\mathit{at}[s] \gets \{0\}$; $F \gets \emptyset$; $\mathit{Open} \gets \{(\lVert\mathbf{h}(s)\rVert, 0)\}$
 \While{$\mathit{Open} \neq \emptyset$}
@@ -290,14 +313,12 @@ Algorithm~\ref{alg:tier1} gives the full procedure. Here $\preceq$ is weak domin
     \State $\mathit{truncated} \gets \exists$ live $\ell \in \mathit{Open}$ with $F \not\preceq \mathbf{g}_\ell + \mathbf{h}(u_\ell)$; \textbf{break}
   \EndIf
   \State $\ell = (u, \mathbf{g}) \gets$ \Call{PopMin}{$\mathit{Open}$}
-  \If{$\ell$ is dead \textbf{or} $F \preceq \mathbf{g} + \mathbf{h}(u)$} \textbf{continue} \EndIf
+  \State \textbf{if} $\ell$ is dead \textbf{or} $F \preceq \mathbf{g} + \mathbf{h}(u)$ \textbf{then continue}
   \State $\mathit{expanded} \gets \mathit{expanded} + 1$
   \For{each successor $v$ of $u$}
     \State $\mathbf{g}' \gets \mathbf{g} + \mathbf{c}(u,v)$
-    \If{$\exists\, o \in \mathit{at}[v] : \mathbf{g}_o \preceq \mathbf{g}'$} \textbf{continue} \Comment{node dominance}
-    \EndIf
-    \If{$F \preceq \mathbf{g}' + \mathbf{h}(v)$} \textbf{continue} \Comment{prune on $g+h$}
-    \EndIf
+    \State \textbf{if} $\exists\, o \in \mathit{at}[v] : \mathbf{g}_o \preceq \mathbf{g}'$ \textbf{then continue} \Comment{node dominance}
+    \State \textbf{if} $F \preceq \mathbf{g}' + \mathbf{h}(v)$ \textbf{then continue} \Comment{prune on $g+h$}
     \State mark dead every $o \in \mathit{at}[v]$ with $\mathbf{g}' \preceq \mathbf{g}_o$
     \State append label $(v, \mathbf{g}', \ell)$ to $L$ and to $\mathit{at}[v]$
     \If{$v = t$}
@@ -313,11 +334,11 @@ Algorithm~\ref{alg:tier1} gives the full procedure. Here $\preceq$ is weak domin
 
 \subsection{Why an exact method}
 
-A population method is usually faster on a large graph, and its front can look similar
-by hypervolume. We still chose an exact search because the same graph and weather always
-give the same front, because the interior routes that mixed payloads need are the
-ones a stochastic archive tends to miss (Section~\ref{sec:perf-front}), and because
-Tier~1 runs once per region and weather window, so a slower search is affordable.
+A population method is usually faster on a large graph. We chose an exact search because
+the same graph and weather always give the same front, because the interior routes that
+mixed payloads need are the ones a stochastic archive tends to miss
+(Section~\ref{sec:perf-front}), and because Tier~1 runs only once per region and weather
+window.
 
 \subsection{Pareto front store and refresh}
 
@@ -362,13 +383,11 @@ particles, 200 iterations, an archive of 100 and 30 seeded repetitions.
 Module~4 turns a description of the payload into a route. Its inputs are the stored
 front, the weather go/no-go reasons from the graph and the four tags
 $(F, W, U, P_\mathrm{lvl})$. Its output is a selection record: the tags, the derived
-weights, the selected route's index, cost vector and waypoints (latitude, longitude and
-altitude), the normalised scores, the selected route's rank on each objective, whether
-it is an extreme or non-extreme point, the latency, the number of battery-feasible
-routes and, when no route can be flown, a HOLD advisory. The record is written to JSON
-and CSV. Each tag must be an integer in its range, and a bad tag raises an error before
-any weight is derived, so a typing mistake at the ground station cannot quietly change
-the route.
+weights, the selected route's index, cost vector and waypoints, the normalised scores,
+its rank on each objective, whether it is an extreme or non-extreme point, the latency,
+the number of battery-feasible routes and, when no route can be flown, a HOLD advisory.
+The record is written to JSON and CSV. A tag outside its integer range raises an error
+before any weight is derived, so a typing mistake cannot quietly change the route.
 
 \subsection{Semantic mapping}
 
@@ -498,6 +517,48 @@ If the weather gate reports any reason, or if no route on the front is battery-f
 Tier~2 returns a HOLD advisory that says why, instead of a route. Otherwise it returns
 the feasible route with the highest score.
 
+Algorithm~\ref{alg:tier2} gives the full procedure. No search runs at this stage. The
+cost is one pass over the stored front, so the latency is a few milliseconds.
+
+\begin{algorithm}[p]
+\setstretch{1.07}% stretched to fill the page
+\caption{Payload-aware route selection on the stored front (Tier~2)}\label{alg:tier2}
+\begin{algorithmic}[1]
+\Require Front $\mathcal{P}=\{(\mathbf{c}_i,\pi_i)\}_{i=1}^{K}$, $\mathbf{c}_i=[d_i,\varepsilon_i,\rho_i]$; no-go reasons $\mathcal{R}$; tags $(F,W,U,P_\mathrm{lvl})$; $m_W$, $m_\mathrm{uav}$, $k_\mathrm{cal}$, $E_\mathrm{bat}$, reserve $\eta$
+\Ensure Mission route $\pi^*$ and its selection record, or a HOLD advisory
+\State \textbf{if} $F, P_\mathrm{lvl} \notin \{1,\ldots,5\}$ \textbf{or} $W, U \notin \{1,2,3\}$ \textbf{then raise} an error \Comment{before any weight is derived}
+\State $r_\mathrm{raw} \gets 2F$; \quad $d_\mathrm{raw} \gets 3U$; \quad $e_\mathrm{raw} \gets 2W$; \quad $S \gets r_\mathrm{raw}+d_\mathrm{raw}+e_\mathrm{raw}$
+\State $w_\mathrm{risk} \gets r_\mathrm{raw}/S$; \quad $w_\mathrm{dist} \gets d_\mathrm{raw}/S$; \quad $w_\mathrm{energy} \gets e_\mathrm{raw}/S$
+\If{$P_\mathrm{lvl} \geq 4$} \Comment{priority amplifier}
+  \State $w_\mathrm{max} \gets 1.1\,w_\mathrm{max}$ for the largest of the three weights
+  \State divide every weight by $w_\mathrm{risk}+w_\mathrm{dist}+w_\mathrm{energy}$
+\EndIf
+\For{each objective $j \in \{d,\varepsilon,\rho\}$} \Comment{front-wide ranges}
+  \State $\mathit{lo}_j \gets \min_i c_{i,j}$; \quad $\mathit{hi}_j \gets \max_i c_{i,j}$
+\EndFor
+\State $E_\mathrm{use} \gets E_\mathrm{bat}(1-\eta)$; \quad $\mathcal{F} \gets \emptyset$
+\For{$i = 1$ \textbf{to} $K$}
+  \For{each objective $j$} \Comment{min--max normalisation}
+    \State $\tilde{c}_{i,j} \gets 0$ if $\mathit{hi}_j = \mathit{lo}_j$, else $(c_{i,j}-\mathit{lo}_j)/(\mathit{hi}_j-\mathit{lo}_j)$
+  \EndFor
+  \State $s_i \gets w_\mathrm{dist}(1-\tilde{d}_i) + w_\mathrm{energy}(1-\tilde{\varepsilon}_i) + w_\mathrm{risk}(1-\tilde{\rho}_i)$
+  \State $E_{\mathrm{Wh},i} \gets k_\mathrm{cal}\,\varepsilon_i\,\big((m_\mathrm{uav}+m_W)/m_\mathrm{uav}\big)^{1.5}$ \Comment{battery proxy}
+  \If{$E_{\mathrm{Wh},i} \leq E_\mathrm{use}$} $\mathcal{F} \gets \mathcal{F} \cup \{i\}$ \EndIf
+\EndFor
+\If{$\mathcal{R} \neq \emptyset$}
+  \State \Return HOLD, with the weather reasons in $\mathcal{R}$
+\ElsIf{$\mathcal{F} = \emptyset$}
+  \State \Return HOLD, no route fits $E_\mathrm{use}$ at payload class $W$
+\EndIf
+\State $i^* \gets \arg\max_{i \in \mathcal{F}} s_i$, ties to the lower index \Comment{full front, not only extremes}
+\State $\mathit{rank}_j \gets$ position of $c_{i^*,j}$ among the sorted values of objective $j$
+\State $\mathit{type} \gets$ \textit{extreme} if $i^*$ is best on any objective, else \textit{non-extreme}
+\State $\mathit{wp} \gets$ (latitude, longitude, altitude) of every node on $\pi_{i^*}$
+\State write tags, weights, $i^*$, $\mathbf{c}_{i^*}$, $\mathit{wp}$, $\mathbf{s}$, $\mathit{rank}$, $\mathit{type}$, $|\mathcal{F}|$ and latency to JSON and CSV
+\State \Return $\pi_{i^*}$ and the selection record
+\end{algorithmic}
+\end{algorithm}
+
 % ------------------------------------------------------------
 \section{EVALUATION AND BENCHMARKING (MODULE 5)}\label{sec:m5}
 
@@ -589,7 +650,7 @@ planner modules directly; nothing is copied. Figure~\ref{fig:sim} shows the pipe
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.32\textheight,keepaspectratio]{images/simulation.png}
+\includegraphics[width=\textwidth,height=0.28\textheight,keepaspectratio]{images/simulation.png}
 \caption{Gazebo and ArduPilot SITL simulation pipeline}\label{fig:sim}
 \end{figure}
 
@@ -600,13 +661,20 @@ roads, the depot and destination pads, and a manifest. Its hash is written into 
 graph, the front, the mission file and the world, and the runner refuses to fly if they
 do not match. Before NAMOA* runs, a clearance checker passed in as \texttt{edge\_filter}
 removes every edge that passes less than 15\,m above a buffered roof or the terrain, or
-goes above 120\,m above ground; waypoints are never raised after selection. The world
-builder writes a Gazebo SDF world with a terrain mesh, LoD1 buildings, roads, pads and
-route markers, with its origin at the depot pad, where SITL also places home. The
-mission altitude therefore means the same height in the planner, the world and the
-autopilot. The runner, built on pymavlink, uploads the mission (take-off, route,
-landing on the pad), reads it back and compares it, arms, switches to AUTO and logs
-telemetry until the vehicle disarms.
+goes above 120\,m above ground. The Gazebo world has its origin at the depot pad, where
+SITL also places home, so a mission altitude means the same height in the planner, the
+world and the autopilot.
 
-An evaluator then computes the cross-track error against the planned polyline, the
+\subsection{Mission sequence}
+
+Figure~\ref{fig:sequence} follows one mission from the operator's tags to the flown
+route. Tier~1 runs only when the stored front is stale or missing. Tier~2 then returns
+either a HOLD advisory or a selection that is exported as a mission file. The runner uploads and reads back the mission, arms, switches to AUTO and
+logs telemetry until landing. An evaluator then computes the cross-track error, the
 minimum clearance, any rule breach and the landing offset from the pad.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.72\textwidth]{images/mission_sequence.png}
+\caption{Mission sequence from payload tag entry to the flown route}\label{fig:sequence}
+\end{figure}

@@ -8,15 +8,12 @@ first pass of the evaluation cycle in Section~\ref{sec:m5}, from a controlled wi
 experiment, from the ablation runner and from the first SITL flights. They are
 preliminary in a specific sense: MOPSO was run at reduced settings, the risk weights and
 battery constants are not yet calibrated, and the synthetic density labels have a known
-defect. We state each caveat next to the result it affects, so that the reader can judge
-how far the result can be pushed.
+defect. Each caveat is stated next to the result it affects.
 
 \section{DATASET DESCRIPTION}\label{sec:dataset}
 
-Route planning papers rarely publish their environments. The datasets of the works we
-reviewed are custom, proprietary or not released, so a direct numerical comparison on
-their data is not possible. As is common in this field, we built our own environments.
-There are two kinds: synthetic airspace graphs, generated from fixed seeds, for
+The datasets of the works we reviewed are custom or not released, so, as is common in
+this field, we built our own environments. There are two kinds: synthetic airspace graphs, generated from fixed seeds, for
 controlled benchmarks; and a real-region lattice built from public geographic and
 weather data. Table~\ref{tab:datasets} lists every graph used in this chapter.
 
@@ -89,12 +86,10 @@ Water and land use & OpenStreetMap via Overpass, coastline & Water fraction, pop
 \end{tabular}
 \end{table}
 
-Public Overpass servers are not always reliable. Live fetches sometimes reset or time
-out, and a failed fetch falls back to empty layers while the run still completes. For
-repeatable offline runs the project therefore includes fixture layers, hand-made test
-data shaped like the real region. The ablation in Section~\ref{sec:perf-ablation} used
-these fixtures. They show how each layer acts on the planner, but they are not
-real-world measurements, and the live-data run is part of the next pass.
+Public Overpass servers sometimes reset or time out, so for repeatable offline runs the
+project includes fixture layers, hand-made test data shaped like the real region. The
+ablation in Section~\ref{sec:perf-ablation} used these fixtures; they show how each
+layer acts on the planner but are not real-world measurements.
 
 \subsection{Payload tag space and simulation bundle}
 
@@ -121,14 +116,12 @@ telemetry link to the ground station.
 \subsection{Software environment}
 
 All code is written in Python~3. NetworkX~\cite{r5} holds the directed airspace
-graph and runs the A* baselines; NumPy handles vectorised dominance checks and metrics;
-Shapely~2 STRtree indexes hold buildings, zones, water and population classes;
-GeoPandas, pyogrio and OSMnx~\cite{r4} parse and cache the OpenStreetMap layers; and the
-requests library calls Open-Meteo, OpenTopography and Overpass. Figures are drawn with
-Matplotlib, the operator dashboard uses Tkinter, and the test suites use unittest and
-run offline without keys. Simulation uses Gazebo Harmonic~\cite{r24}, ArduPilot
-SITL~\cite{r23}, pymavlink over MAVLink~\cite{r7} and QGroundControl. Diagrams were
-drawn in PlantUML and the report typeset in \LaTeX.
+graph and runs the A* baselines; NumPy handles dominance checks and metrics; Shapely~2
+STRtree indexes hold the spatial layers; and GeoPandas, pyogrio and OSMnx~\cite{r4}
+parse and cache the OpenStreetMap layers. Figures use Matplotlib, the dashboard
+Tkinter, and the offline test suites unittest. Simulation uses Gazebo
+Harmonic~\cite{r24}, ArduPilot SITL~\cite{r23}, pymavlink over MAVLink~\cite{r7} and
+QGroundControl.
 
 \section{EXPERIMENTS CONDUCTED}\label{sec:experiments}
 
@@ -236,13 +229,10 @@ IGD stays between 0.44 and 1.12. Figure~\ref{fig:bench-hv} plots HV per method.
 \caption{Hypervolume per method and scenario (first pass)}\label{fig:bench-hv}
 \end{figure}
 
-Exactness has a price. On S3, NAMOA* took 33.8\,s against 4.3\,s for MOPSO, , and the
-runtime grows quickly with front size. Tier~1 runs once
-per region and weather window, not once per mission, so half a minute is acceptable,
-but it is still the main performance target for the next pass. Options include front
-thinning, a tighter heuristic and a coarser lattice over open areas.
-
-
+Exactness has a price. On S3, NAMOA* took 33.8\,s against 4.3\,s for MOPSO, and the
+runtime grows quickly with front size. Tier~1 runs once per region and weather window,
+not once per mission, so half a minute is acceptable, but it is still the main
+performance target for the next pass.
 
 On S2 the HV values of 1.2065 and 1.2061 are too close to claim superiority without
 the 30 seeded MOPSO repetitions and a statistical test, which the next pass will run.
@@ -304,7 +294,7 @@ between 6 and 15 routes.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{images/wind_direction_sweep.png}
+\includegraphics[width=0.9\textwidth]{images/wind_direction_sweep.png}
 \caption{Front size, minimum energy and minimum risk on S2 as a 25\,km/h wind turns
 through 360$^\circ$; the dashed line is calm air}\label{fig:wind-sweep}
 \end{figure}
@@ -417,10 +407,9 @@ lands between the two on every objective, which is what its balanced weights ask
 Every selection took about 0.14\,ms on S3, thousands of times inside the one-second
 target.
 
-On the smaller S2 front the picks are less spread out. Emergency medicine and disaster
-relief share the minimum-energy route, which on this graph is also nearly the shortest.
-This is the same pattern as in the wind experiment, and it points to front size as the
-factor that limits how many distinct choices Tier~2 can make.
+On the smaller S2 front, emergency medicine and disaster relief share the
+minimum-energy route, the same pattern as in the wind experiment: front size limits how
+many distinct choices Tier~2 can make.
 
 Figure~\ref{fig:osm-routes} shows the four presets on a 2\,km lattice (11-route front) with
 OpenStreetMap roads drawn underneath for reference. The fragile medical and mixed cargo
@@ -429,7 +418,7 @@ emergency medicine and disaster relief take 2.5\,km paths with risks of 1.88 and
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.72\textwidth]{images/osm_module4_routes_on_graph.png}
+\includegraphics[width=0.48\textwidth]{images/osm_module4_routes_on_graph.png}
 \caption{Tier~2 routes for the four presets on the 2\,km lattice}\label{fig:osm-routes}
 \end{figure}
 
@@ -447,13 +436,12 @@ the altitude frame, which is easy to get wrong over uneven terrain.
 
 Figure~\ref{fig:sitl} shows a Tier~2 mission flown in AUTO inside the Gazebo city world,
 with the MAVProxy console on the left and the mission in QGroundControl on the right.
-The quantitative results above come from the runs with ArduPilot's built-in physics. The
-Gazebo world has no wind yet, and the battery constants are still placeholders, so
-logged comparisons across wind cases in Gazebo are planned for the next pass.
+The Gazebo world has no wind yet, so logged comparisons across wind cases are planned
+for the next pass.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{images/sitl_gazebo_screenshot.jpg}
+\includegraphics[width=0.6\textwidth]{images/sitl_gazebo_screenshot.jpg}
 \caption{Gazebo Harmonic and ArduPilot SITL flying an uploaded Tier~2 mission in AUTO:
 MAVProxy console (left), QGroundControl mission view (right)}\label{fig:sitl}
 \end{figure}
@@ -489,6 +477,5 @@ Front reuse & Re-run per mission & Re-run per mission & Re-run per task & Not ap
 \end{longtable}
 \end{footnotesize}
 
-The comparison is qualitative for now, because their datasets and code are not public.
-The next pass applies their selection rules to our fronts and scores them with the
-payload-alignment measure of Section~\ref{sec:m5}.
+The comparison is qualitative, as their datasets and code are not public; the next pass
+scores their selection rules on our fronts (Section~\ref{sec:m5}).
