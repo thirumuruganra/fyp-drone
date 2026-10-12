@@ -4,6 +4,8 @@ Initial Screening PPT/
 ProjectWork-2627.docx
 Review_1/FYP_B28_Review1_Report.zip
 Review_1/FirstReviewLaTeX.zip
+Review_2/SecondReviewLaTeX.zip
+Phase_1\UCS2717-ProjectReport-LaTeX.zip
 
 # OS junk
 .DS_Store
@@ -14,8 +16,6 @@ __pycache__/
 tmp/
 Implementation/__pycache__/
 Implementation/cache/
-
-Review_2/SecondReviewLaTeX.zip
 Implementation/pareto_front_storage/fronts/
 
 # Simulation generated artefacts
@@ -23,4 +23,3 @@ Simulation/regions/
 Simulation/worlds/
 Simulation/missions/
 Simulation/runs/
-
