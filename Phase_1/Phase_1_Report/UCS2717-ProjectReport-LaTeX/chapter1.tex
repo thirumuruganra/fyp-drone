@@ -1,63 +1,224 @@
 % Chapter 1
 
-% Chapter 1
+\chapter{INTRODUCTION}\label{cha:intro}
 
-\chapter{INTRODUCTION} % Write in your own chapter title
-%\label{fig:INTRODUCTION}
-%\lhead{CHAPTER 1. \emph{INTRODUCTION}} % Write in your own chapter title to set the page header
-Social media platforms have been identified as the main channel of digital communication, but because of their open and unstructured nature, they are highly vulnerable to social engineering attacks like phishing, baiting, pretexting, whaling, and malicious URL attacks. These types of attacks use linguistic tricks, deceptive URLs, and behavioral patterns to target the security of users. The reason why it is difficult to detect these attacks is that the discriminative information is distributed across multiple heterogeneous channels like text semantics, URL graph properties. Moreover, the attack patterns keep on varying, leading to concept drift and catastrophic forgetting in the conventional static learning models.
+Unmanned aerial vehicles (UAVs) are a practical option for last-mile delivery where
+ground transport is slow or impossible: medical supplies for remote clinics, emergency
+drug drops after a disaster, and diagnostic samples that should not spend an hour
+shaking in the back of a van. In each case the UAV flies from a dispatch hub to a
+delivery point through airspace that has buildings, terrain, restricted zones and wind
+in it. A good route has to balance three things that pull against each other: how far
+the drone flies, how much battery it uses, and how much of the flight is spent in risky
+air.
 
-To overcome these issues, the proposed system brings forth a multi-phase detection framework with a structured architecture based on the text and URL information of the emails. The preprocessing phase of the system is responsible for the normalization, lemmatization, URL segmentation, and statistical standardization of the feature representation. The feature extraction phase is carried out using a two-pipeline approach. The first pipeline consists of TF-IDF vectorization and Truncated SVD, followed by the application of a Stacked Autoencoder (SAE) for the extraction of a 100-dimensional deep latent feature representation through unsupervised reconstruction learning.
+Multi-objective path planning was built for this kind of conflict. A multi-objective
+planner keeps distance, energy and risk separate during the search and returns a
+Pareto-optimal front, which is a set of routes where none can be improved on one
+objective without getting worse on another~\cite{r11}. The front tells the operator
+which trade-offs exist. It does not say which route to fly.
 
-The second pipeline provides a Fuzzy Probability-Guided Feature Descriptor Generator (Fuzzy-PGFDG) to capture the uncertainty and boundary effects that are typical of social engineering data. Based on the manually designed linguistic and URL feature descriptors, five fuzzy membership values are calculated: Typicality, Density, Homogeneity, Outlier Score, and Fuzzy Entropy, which capture the degree of belongingness to the classes in a probabilistic environment. The final feature vectors from the deep SAE-based pipeline and the fuzzy descriptor pipeline are combined to create a hybrid feature vector of dimension 124, which allows for complementary learning in the structured, statistical, and uncertainty domains.
+The usual shortcut is to fold the three objectives into one weighted sum and run an
+ordinary planner such as A* on the resulting scalar cost. The operator picks the
+weights before each flight to express what the mission cares about. For one fixed
+mission type this works. It stops working once the payload changes, because emergency
+medicine needs a very different weight profile from a fragile blood sample or a box of
+relief supplies~\cite{r1}. Re-tuning the weights and running the search again between
+missions is slow, needs someone who understands the planner, and is hard to justify in
+the middle of an emergency.
 
-To facilitate adaptability in the presence of dynamically changing data streams, the framework incorporates a Data Augmented Incremental Learning (DAIL) paradigm that retains knowledge of previous classes using representative samples instead of retaining the raw data. This approach helps to alleviate the problem of catastrophic forgetting while ensuring memory efficiency and scalability. Classification is carried out by an Extreme Learning Machine (ELM) with hyperparameter tuning for different hidden neuron settings and activation functions. Model selection is driven by a gap-penalized criterion that balances empirical risk minimization and generalization strength. The ELM is trained incrementally by replacing the existing models. The combination of deep representation learning, fuzzy probabilistic modeling, incremental learning, and optimized classification provides a scalable and robust framework for dynamic social engineering attack detection.
+This project proposes a Payload-Aware Two-Tier UAV Route Planning system that removes
+that step. Tier~1 builds the Pareto front for a delivery region once, with an exact
+multi-objective graph search over a three-dimensional airspace lattice whose edge costs
+depend on terrain, buildings, restricted zones and the direction of the wind. The front
+is stored and reused until the graph changes, the front expires or the weather drifts.
+Tier~2 runs per mission. It reads four payload tags entered by the operator, turns them
+into objective weights with a fixed formula, scores every route on the stored front and
+returns the best one in well under a millisecond. The chosen route is exported as an
+ArduPilot mission and flown in a Gazebo and ArduPilot software-in-the-loop (SITL)
+simulation.
 
+This report covers Phase~I: the software system, its benchmarks against
+single-objective A* and MOPSO, and the first simulated flights. Phase~II moves the same
+software onto a physical quadcopter.
 
 \section{MOTIVATION}
-The growing frequency of social media attacks on social media platforms has created an urgent demand for clever, automated detection solutions. Social engineering attacks exploit users' trust by using malicious URLs, false email subject lines, and manipulative message content. These assaults are far more difficult to detect since they target users' human psychology rather than the system's technical characteristics. This is why automated and adaptive detection is a key need in today's cyber security.
 
-The dynamic and unstructured nature of social media and email messages is one of the primary motivations for pursuing this topic. An attack can include multiple signs at the same time, including password-stealing phrases in everyday communication, urgent messages to press the user, and an attack URL embedded in the message. A system that can simultaneously assess the message content and URL structure information is necessary for identifying such assaults.
+Three delivery scenarios that come up again and again in medical and emergency drone
+work motivate this project, and their routing needs do not agree with each other.
 
-The existing machine learning solutions have been constrained by their reliance
-on manually designed features, which are time-consuming to design and do not effectively represent the deeply hidden and nonlinear patterns that exist in complex email and URL data. This drawback led to the incorporation of a Stacked Autoencoder(SAE) to automatically discover meaningful and compact
-representations from the raw input data through unsupervised reconstruction, without the need for manual feature selection.
+Fragile medical samples such as tissue biopsies and blood specimens must arrive intact,
+and an operator will want them kept out of rough air when a smoother corridor exists.
+The priority is low flight risk: little time in turbulent or crosswind-exposed corridors
+and few sudden altitude changes. A somewhat longer but much calmer route is better.
 
-Although the deep features obtained from the autoencoder are capable of
-representing the structural and statistical patterns, they do not represent the
-uncertainty or class membership of the ambiguous samples that are located near
-the decision boundaries. This drawback led to the incorporation of a Fuzzy
-Probability-Guided Feature Descriptor Generator (Fuzzy-PGFDG) to enhance the
-feature representation with meaningful fuzzy membership values such as
-Typicality, Density, Homogeneity, Outlier Score, and Fuzzy Entropy.
+Emergency medicine such as insulin or antivenom has a strict time window. The priority
+is the shortest route, so that transit time is as low as possible, and risk and energy
+come second. If the delivery window is fifteen minutes, the shortest path wins.
 
-The evolution of attack patterns over time is another, and no less significant, explanation. Attacks using social engineering are constantly evolving, with new tactics and types of attacks always emerging. The ability of an attack detection model to identify new, undiscovered attack types will soon be rendered obsolete if it was trained and fixed on a static dataset. Retraining the model from scratch each time fresh data is received is computationally impractical and renders all previously acquired knowledge unusable. To learn incrementally, DAIL (Data Augmented Incremental Learning) was used to update the model with new attack data. Additionally, a column-alternating augmentation technique was used to retain knowledge of previously seen classes by creating artificial data samples that represented attack data from previous classes without storing it.
+Disaster-relief supplies such as water purification tablets and ration packs are
+heavier than medical payloads, and they are neither fragile nor urgent. Here the
+priority is low battery drain, so that one charge covers as many drops as possible.
 
-Finally, the reason for choosing ELM as the classifier was its efficiency in computational calculation, analytical calculation of weights, and its outstanding generalization performance when dealing with high-quality hybrid features. The ability to be applied in situations where rapid updates of the model are needed with every new batch of data makes it a perfect fit for the proposed system’s application.
+A real delivery service sees all three, sometimes within the same hour. A planner with
+fixed weights treats them identically, and one that lets the operator change the weights
+pushes an optimisation task onto someone dispatching a drone in a hurry. We could not
+find a UAV delivery planner that
+switches between these routing strategies from a description of the payload, without
+an expert in the loop and without running the search again. That is what motivated the
+two-tier design.
 
-\section{BACKGROUND}
-With the growing popularity of social media and online communication platforms, the trend of social platform attacks has intensified. These platforms are used by social engineers to attack a large number of users at once by sending misleading text messages, inserting malicious URLs, and impersonating trusted sources. The issue of detecting harmful actions has remained difficult due to the unstructured, diversified, and continuously changing nature of social media information. Conventional detection techniques, such as blacklisting, rule-based filtering, and keyword matching systems, are inadequate as attackers often change their behavior patterns frequently, making it easy for them to evade detection by changing the wording, URL format, or source address.
+A second motivation is wind. None of the planners we reviewed resolve wind direction
+per edge, yet for a quadcopter cruising at 36\,km/h a 25\,km/h wind is not a detail:
+flying into it costs far more energy than flying with it, and crosswind makes the ride
+rough.
+Section~\ref{sec:res-wind} shows that at a fixed wind speed, the direction alone changes
+the energy of the cheapest available route by 27.5\%. A planner blind to direction gets this
+wrong on any windy day, and so does any payload-aware choice built on top of it.
 
-To make detection more accurate and robust, there has been a gradual movement in the research community toward the use of automated computational models that can process multiple data sources together. Early machine learning models relied heavily on manual feature engineering, where experts in the domain designed features manually. This is a time-consuming, domain-specific, and inadequate approach to feature engineering, as it is not capable of extracting the underlying, deeply hidden non-linear patterns that exist in the URL structure and natural language text content.
+\section{BACKGROUND}\label{sec:background}
 
-To address this drawback, deep learning-based feature extraction has been employed extensively. Among these, the Stacked Autoencoder (SAE) has been shown to be very successful. A Stacked Autoencoder is a dimensionality reduction technique that reduces high-dimensional input data into a compact, lower-dimensional encoded form by learning to reconstruct the input data using a bottleneck architecture of stacked encoder and decoder layers. For this project, individual autoencoders are trained for text features (reducing a 200-dimensional TF-IDF SVD feature to 50 dimensions) and URL features (reducing a 68-dimensional feature to 50 dimensions), resulting in a combined 100-dimensional deep feature vector. Importantly, the autoencoder is trained only on Day 1 data and its weights are locked for all subsequent incremental days, providing a stable feature space for the entire learning process.
+\subsection{Building a front versus choosing from it}
 
-Though autoencoders perform admirably on learning structural and distributional patterns, they are deterministic in nature and fail to capture the gradual and uncertain nature of class boundaries, which is a major drawback in distinguishing semantically similar attack categories like phishing and pretexting attacks. To overcome this, the Fuzzy-PGFDG pipeline has been introduced, which uses fuzzy logic-based feature generation. The concept of fuzzy sets, first proposed by Zadeh, allows the representation of partial membership in classes, as opposed to binary membership.Based on membership functions that are defined by the estimates of Mahalanobis distance, neighborhood density, and entropy, five fuzzy features: typicality, density, homogeneity, outlier score, and fuzzy entropy are derived for each sample in this setup. Once these features are incorporated into the manually designed 19-dimensional feature space, a 24-dimensional fuzzy-hybrid feature vector is formed. This feature vector is then concatenated with the output of the autoencoder to form the final 124-dimensional feature vector.
+Pareto fronts for routing are built either by exact graph search, such as
+NAMOA*~\cite{r17}, which keeps every non-dominated partial path at each node, or by
+population methods such as NSGA-II~\cite{r8} and MOPSO~\cite{r6}, which are faster on
+large spaces but stochastic. Building the front is well studied. Picking one route from
+it gets far less attention: the usual options are a crowding-distance rule~\cite{r8,r3},
+an entropy criterion followed by a hand-set weighted sum~\cite{r1}, or a person. None of
+them looks at what the drone is carrying. Payload does appear in the literature as
+continuous mass inside the energy model~\cite{r10}, which changes the costs, not the
+choice between trade-offs. What is missing is any use of payload metadata to
+\emph{select} a point on a precomputed front.
 
-The assumption of static data distributions, in which the models are trained just once and are not modified, is one of the most important missing assumptions in the detection systems in use today. In actuality, new attack patterns are created throughout time, and social engineering assault patterns are always changing. This necessitates the use of an incremental 7 learning strategy, which allows the detection model to be updated with each new batch of data while retaining the knowledge gained from earlier batches.In order to solve this problem, Madhusudhanan and Jaganathan's DAIL (Data Augmented Incremental Learning) architecture uses column-alternating data augmentation, a method that creates new data by switching the values of the feature columns of pairs of pre-existing samples. This prevents catastrophic forgetting while being memory-efficient since it guarantees that the new samples are always in the same feature space as their parent cluster, enabling the model to retain its prior class knowledge without having to store the actual data.
+\subsection{Evidence from real deployments}
 
-As an incremental learning classifier for classification, the Extreme Learning Machine (ELM) is used. Unlike conventional backpropagation-based networks, ELM is a single-hidden-layer feedforward network that trains much more quickly since the input weights are randomly allocated and the output weights are calculated analytically using the Moore-Penrose pseudoinverse. In this project, an automated hyperparameter search is used to test different hidden layer sizes and activation functions. The best combination is chosen based on a gap-penalized scoring metric that prioritizes test accuracy over large train-test splits across all four days of incremental learning.
+Real deployments show where payload matters, and also how thin the public evidence
+still is. Swiss Post flew laboratory samples between hospitals on Matternet quadrotors
+until two incidents in 2019 led it to suspend the service. In January a short circuit
+cut power to the GPS and the drone made an emergency landing on Lake Z\"{u}rich. In May
+a parachute tether snagged on the airframe and the 22-pound drone fell into woods near a
+group of kindergarten children~\cite{r12}. Both were equipment failures, so they say
+nothing about route choice. They do show that laboratory samples are routinely flown
+over water and populated ground, where the choice of corridor has consequences.
 
-\section{PROBLEM DEFINITION}
-Massive volumes of unstructured and diverse data are generated every second by social media platforms, which makes them an ideal target for malicious URL distribution, phishing, baiting, pretexting, and whaling attacks. Conventional rule- and signature-based security systems struggle to identify these kinds of assaults since they rely on human trust and behavior patterns. A learning model based on historical data becomes obsolete very quickly since the patterns of these attacks are not static; new patterns and attack types are constantly emerging.
+Laboratory studies of medicines and blood samples flown by drone found no damage on
+ordinary flights~\cite{r13,r14,r15}, but none of them varied the route
+(Section~\ref{sec:lit-papers}), so in this work the fragility tag is a precaution the
+operator sets, not a measured degradation effect.
 
-The data's high dimensionality and multimodality present the first technical difficulty. Two distinct modalities—the language and structure of the URL and the email text—are used to characterize the attack elements. Preprocessing pipelines and feature extraction techniques vary per modality. The modalities' unprocessed features are redundant, noisy, and high-dimensional. This necessitates the use of efficient representation learning methods capable of converting raw features into a low-dimensional representation that is noise-free and retains discriminative information.
+Zipline's blood-delivery network in Rwanda serves hospitals up to about 80\,km from its
+distribution centre, and each aircraft follows a predetermined flight plan~\cite{r16}.
+Its engineers treat payload weight as a limit on range. That is the energy side of the
+problem Tier~2 addresses: a heavier load shortens how far the drone can go, so the best
+route depends on what is on board.
 
-Due to the combined need to adjust to changing attack patterns, different kinds of data, and the shortcomings of traditional models, a system must be able to execute incremental learning in addition to deep feature learning and fuzzy-based feature extraction. All three needs cannot be met at the same time by the current methods since they rely on feature set knowledge, ignore the ambiguity of class boundaries, or necessitate retraining the entire system if new attack classes emerge. Through the integration of a DAIL-based incremental learning framework with column-alternating augmentation, a Fuzzy-PGFDG for interpretable membership function modeling, and a Stacked Autoencoder for deep feature learning, the suggested system simultaneously satisfies all three objectives.
+\subsection{Regulation}
+
+In India, small civil drones fly under the Drone Rules, 2021~\cite{r21}, which treat
+120\,m above ground as the ceiling for flight without special permission. Ground risk is
+commonly ranked with the SORA framework~\cite{r22}. Our airspace model uses both.
+
+\section{PROBLEM DEFINITION}\label{sec:problem}
+
+Existing UAV route planners either apply a fixed geometric selection rule over the
+Pareto front that ignores the payload, or fold the objectives into one hand-tuned
+weighted sum before the search begins, which fixes the trade-off regardless of what is
+being carried. When the payload changes, an expert has to re-tune the weights and run the search again,
+because no explicit mapping exists from a payload description to the trade-off it
+implies. In the field, that expert is not available.
+
+\subsection{Formal statement}
+
+We are given:
+\begin{enumerate}
+  \item an airspace graph $G = (V, E)$ in which every edge carries a three-objective cost
+  vector $\mathbf{c}(e) = [d(e),\, \varepsilon(e),\, \rho(e)]$ for flight distance,
+  estimated energy and flight risk;
+  \item a Pareto front $\mathcal{P}$ of non-dominated routes computed in advance over
+  $G$; and
+  \item a payload metadata tuple $(F, W, U, P_\mathrm{lvl})$ holding fragility class
+  $F \in \{1,\ldots,5\}$, payload weight class $W \in \{1,2,3\}$, delivery urgency
+  $U \in \{1,2,3\}$ and priority level $P_\mathrm{lvl} \in \{1,\ldots,5\}$.
+\end{enumerate}
+The problem is to select the route $p^* \in \mathcal{P}$ that best meets the
+requirements implied by the payload metadata, without expert re-tuning and without
+running the multi-objective search again.
+
+The inputs are values an operator can assign from domain knowledge (``this vial is
+fragile, $F = 5$; the delivery is not urgent, $U = 1$''). Selection must be
+deterministic and reproducible, and it must finish within one second of the tags being
+entered. Three further conditions follow from the gaps identified in
+Chapter~\ref{cha:lit}. The selected route must depend on $(F, W, U, P_\mathrm{lvl})$ and
+not on the geometry of the front alone. The front must be reused across missions
+between refreshes instead of being rebuilt each time. The map from
+$(F, W, U, P_\mathrm{lvl})$ to $p^*$ must be an explicit formula, not a set of rules
+written by an expert and not a lookup table.
+
+\subsection{Weather dependence}
+
+The edge costs depend on the weather. Writing $\omega$ for a weather snapshot (wind
+speed, wind direction, gust, rain and visibility), the cost of an edge is
+$\mathbf{c}(e;\omega) = [d(e),\, \varepsilon(e;\omega),\, \rho(e;\omega)]$ and the
+front becomes $\mathcal{P}(\omega)$. Distance stays the same, but energy and risk
+change with how the wind meets each edge. The selection problem itself does not change.
+What changes is that a stored front is only valid while $\omega$ stays close to the
+snapshot it was built for. That is why the front is refreshed on a schedule and on
+weather drift. When $\omega$ crosses the go/no-go limits, no route is selected at all
+and the mission is held.
+
+\subsection{Inputs, outputs and success criteria}
+
+Table~\ref{tab:ps-io} lists what the system takes in, what it returns and how each part
+is judged.
+
+\begin{table}[!htbp]
+\centering
+\caption{Inputs, outputs, constraints and success criteria}\label{tab:ps-io}
+\small
+\begin{tabular}{|P{3.3cm}|P{11.2cm}|}
+\hline
+\textbf{Item} & \textbf{Definition}\\
+\hline
+Region input & Centre point and box size; terrain (DEM), OpenStreetMap buildings, restricted zones, water and land use for that box\\
+\hline
+Weather input & Snapshot $\omega$ from Open-Meteo: wind at 80\,m, gust, rain, visibility, WMO weather code\\
+\hline
+Mission input & Depot, destination and payload tuple $(F, W, U, P_\mathrm{lvl})$\\
+\hline
+Tier~1 output & Stored Pareto front $\mathcal{P}(\omega)$ with graph hash, weather snapshot and expiry time\\
+\hline
+Tier~2 output & Selected route $p^*$ with waypoints (latitude, longitude, altitude), weights, ranks and point type, or a HOLD advisory\\
+\hline
+Mission output & QGC WPL~110 \texttt{.waypoints} and QGroundControl \texttt{.plan} files\\
+\hline
+Hard constraints & Cruise at least 60\,m above ground and 15\,m above roofs; at most 120\,m above ground; no entry into restricted zones; route energy within 80\% of battery capacity\\
+\hline
+Tier~1 criteria & Hypervolume and IGD at least as good as every baseline on each scenario; no dominated or duplicate routes in the front\\
+\hline
+Tier~2 criteria & Selection under 1\,s; zero monotonicity violations over all 225 tag combinations; non-extreme picks for mixed payloads\\
+\hline
+Simulation criteria & Cross-track error, clearance margin and landing offset of the flown route in SITL and Gazebo\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Scope}
+
+Phase~I, covered by this report, delivers the full software system and its simulation.
+Phase~II moves the system onto a Pixhawk-equipped
+F450 quadcopter with a Raspberry Pi~5 companion computer and validates it with outdoor
+flights. The Tier~1 front is treated as valid for a bounded window. It is rebuilt when
+the window expires or when the weather drifts past set thresholds, and every mission
+inside the window is served by Tier~2 alone. The project does not cover multi-UAV
+coordination, avoidance of moving obstacles during flight, or real-time replanning.
 
 \section{ORGANIZATION OF THE REPORT}
-This project report is divided into chapters, with each chapter describing a significant component of the work performed for the detection of social engineering attacks through multi-modal data processing, feature extraction, and neural network classification. The project report starts with Chapter 1, which describes the introduction to the project by explaining the motivation, introducing the background of the study, describing the problem statement, and finally explaining the contents of the report. Chapter 2 of the report discusses the literature survey, which includes an explanation of the existing literature on social engineering attack detection, multi-modal data analysis, data preprocessing techniques, autoencoder-based feature extraction,fuzzy feature extraction and neural network classifiers.
 
-Chapter 3 explains the proposed methodology in detail. It discusses the system architecture, the modules, and the preprocessing tasks involved in URL, text data. The chapter also deals with the operation of the stacked autoencoder and the classification process using ELM. Pseudocode and flowcharts are used to explain the implementation process in detail. Chapter 4 deals with the experimental setup. It explains the dataset, the software and hardware environment, and the experiments performed. The results are also discussed, followed by performance analysis, observations, and key inferences.
-
-Chapter 5 discusses the social effects and sustainability of the proposed system, focusing on its role in ensuring safe online communication and developing a long-term awareness of cybersecurity. Chapter 6 presents the conclusion of this research effort and suggests possible future improvements, such as better model accuracy, real-time analysis, and the ability to handle larger datasets or other types of attacks. Finally, Chapter 7 presents a list of all the references cited in this report, following the proper format for academic citation. These chapters, therefore, provide a comprehensive and organized way of presenting the research process, from problem identification to the development of the system and analysis of its results.
+The report has six chapters, followed by the references and three appendices. Chapter~\ref{cha:intro} sets out the motivation, background and
+problem. Chapter~\ref{cha:lit} reviews the closest papers, the gaps in them and our
+research objectives. Chapter~\ref{cha:method} describes the architecture and its seven
+modules with the algorithms behind them. Chapter~\ref{cha:results} covers the datasets,
+the hardware and software, the experiments and what the results show. Chapter~\ref{cha:social} discusses the social impact and sustainability
+of the work. Chapter~\ref{cha:conclusion} concludes and lists the work planned for the
+rest of Phase~I and for Phase~II. The references follow, and the appendices give the
+main configuration parameters, the automated test suites and the code organisation.

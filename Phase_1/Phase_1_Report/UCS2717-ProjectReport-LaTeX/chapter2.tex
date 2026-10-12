@@ -1,120 +1,250 @@
-% Chapter 3
+% Chapter 2
 
-\chapter{LITERATURE SURVEY} % Write in your own chapter title
-%
-\section{PAPERS RELATED TO THE PROBLEM IDENTIFIED}
-\subsection{Fuzzy Deep Neural Stacked Autoencoder (FDN-SA) 
-}
-The FDN-SA system, developed by Vidyasri and Suresh, combines fuzzy logic and deep learning to improve phishing detection in social engineering scenarios. The approach reduces dimensionality without sacrificing discriminative features by using a stacked autoencoder to learn layered, abstract representations from complicated datasets made up of URLs, email headers, and webpage elements. By addressing the vague and unpredictable character of attack signatures, fuzzy logic integration gives the classifier the ability to more robustly manage changing trends in threat behavior. In detecting sophisticated phishing attacks, empirical evaluation showed that FDN-SA performed better than traditional machine learning models, such as SVMs and Random Forests, by obtaining higher accuracy and lower false-positive rates. The method of combining deep autoencoding with fuzzy inference for sophisticated attack detection is validated by this model's capacity to capture both syntactic and semantic information.
-%
-\subsection{ LSTM-CNN Hybrid Deep Learning Architecture}
-For phishing detection, Ariyadasa et al. suggested a composite neural model that makes use of spatial and sequential analysis. By combining one-dimensional convolutional layers (CNNs) with long short-term memory (LSTM) networks, the design allows the framework to learn spatial properties in HTML content and temporal dependencies in URL character streams at the same time. This modular combination enables the system to detect malicious scripts contained in page structures as well as subtle modifications in web links. The system achieves great accuracy, outperforming earlier hybrid URL-HTML models, thanks to the separated training and subsequent merging of outputs via activation layers. Its applicability for real-time security applications is highlighted by its minimal preprocessing and lack of external feature engineering, as well as its increased robustness and generalization for threats that are not yet visible.
-%
-\subsection{ SEADer++ v2 
-}
-Lansley, Kapetanakis, and Polatidis: SEADer++ v2 uses machine learning and natural language processing to detect social engineering techniques in text messages. In order to identify linguistic elements indicative of malevolent activity, such as urgency cues, grammatical abnormalities, and manipulative language patterns, the system preprocesses chat and email data using tokenization, stop-word removal, stemming, and syntactic analysis. Both overt and covert signs of social engineering are captured by the seven-feature representation, which is then input into a variety of classifiers, such as Random Forest, feedforward neural networks, and support vector machines. Viability for organizational security deployment is established by testing on semi-synthetic datasets, which show notable gains in detection accuracy and false-negative reduction.
-%
-\subsection{Data Augmented Incremental Learning (DAIL)}
-DAIL, a completely unsupervised method for preserving model effectiveness in dynamic attack situations, was presented by Madhusudhanan and Jaganathan. By using augmentation to create synthetic datasets, the method gradually updates pre-existing models without the need for extensive retraining cycles or human labeling. While maintaining low computational costs, this approach significantly increases the classifiers' adaptability and scalability in the face of quickly changing social engineering patterns. Performance investigation shows that DAIL performs well in clustering and classification on continuously changing data distributions, which makes it especially useful in situations where attack vectors are constantly changing and labeled data is hard to come by.
-%
-\subsection{ Augmented 1D-CNN with Recurrent Layers}
-For phishing email detection, Altwaijry et al. suggested augmented one-dimensional CNN models (1D-CNNPD) combined with sophisticated recurrent architectures including LSTM, Bi-LSTM, GRU, and Bi-GRU. While bidirectional recurrent processing gathers contextual information from both forward and backward directions, allowing the model to acquire intricate attack signatures, one-dimensional convolution examines sequential text patterns. By achieving accuracy on benchmark datasets, our multi-layered recurrent technique shows how well it works to combine several neural paradigms for improved phishing detection.
-%
-\subsection{Variational Autoencoders for URL Analysis}
-Prabakaran et al. presented improved deep learning techniques for robust reconstruction and unsupervised URL feature learning using variational autoencoders (VAE). Through reconstruction error anomaly detection, VAE's probabilistic architecture makes it possible to develop compact, generative representations of URL patterns, which makes it easier to identify phishing variants that haven't been seen before. The method confirms VAE's better capacity to handle high-dimensional, complicated URL datasets in comparison to deterministic autoencoders, with 98.2\% accuracy and proven robustness to zero-day phishing patterns.
-%
-\subsection{Deep Learning for Cyber Threat Mitigation}
-Tyagadurgam et al. demonstrated cutting-edge deep learning methods created especially for mitigating cyberthreats and preventing phishing attacks. In order to achieve high-performance threat detection in production contexts, the research discusses cutting-edge neural architectures, training techniques, and deployment tactics.
-%
-\section{RESEARCH GAPS} 
-\textbf{Limited Study on Combining Multiple Types of Data} \\
-The majority of current systems exclusively analyze one kind of data, like text, URLs, or metadata. The procedure is typically straightforward and poorly assessed, even when several types are integrated. Very little study has been done on how sophisticated feature extraction strategies can enhance multi-class social engineering detection or which sort of data contributes most to detection accuracy.\\
+\chapter{LITERATURE SURVEY}\label{cha:lit}
 
-\textbf{Lack of Comparison Between Heavy Deep Models and Faster Learning Models}\\
-As stated in~\ref{tab:research_gaps_objectives}, complicated deep learning models are the main focus of current research, whilst quicker and simpler model like Extreme Learning Machines are seldom
-In order to determine the trade-off between accuracy, training time, and computational efficiency for real-world deployment, the several approaches discussed above are examined.\\
+Multi-objective UAV path planning draws on both graph search and evolutionary
+optimisation~\cite{r11}. We read the literature with one question in mind: once a
+planner has a set of good routes, how does it pick the one to fly, and does the payload
+have any say in that choice? This chapter reviews the papers closest to that question,
+the algorithms our system builds on or competes with, and the small body of work on how
+drone transport affects medical payloads. It then states the gaps we found and the
+objectives that follow from them.
 
-\textbf{Limited Focus on Multi-Class Data}\\
-The majority of current research focuses on binary phishing/legitimate classification or, at most, ternary scenarios, ignoring the complex multi-class nature of real social engineering threats.The literature lacks a thorough assessment of detection systems' resilience across various organizational contexts, unequal real-world class distributions, and fine-grained attack categorizations (phishing, whaling, pretexting, baiting, legitimate), as summed up in~\ref{tab:research_gaps_objectives}. Furthermore, the majority of assessments rely on controlled, openly accessible datasets that might not accurately represent linguistic variances, industry-specific attack vectors, or organizational-specific communication patterns.\\
+\section{PAPERS RELATED TO THE PROBLEM IDENTIFIED}\label{sec:lit-papers}
 
-\textbf{Insufficient Attention to Real-Time Deployment and Explainability}\\
-Practical deployment aspects including inference speed, computing overhead, and scalability for large-volume social platform data have received relatively little attention in the majority of previous studies, which primarily concentrate on accuracy measures.In addition, the majority of deep learning models function as black boxes with little support for explainability, as summed up in~\ref{tab:research_gaps_objectives}.Consequently, it is challenging for security analysts to comprehend and justify classification results.
-Furthermore, there is a gap in our knowledge of security because there is insufficient research on whether multi-modal systems provide greater resilience against hostile manipulation or evasion strategies.
-\section{RESEARCH OBJECTIVES}
-The primary goal of this study is to create a comprehensive multi-modal detection framework that combines information from multiple sources to more accurately and reliably identify and categorize social media attacks.
-\begin{itemize}
-    \item Develop two separate specialized neural models - autoencoders for each data
-The types are text, URL.
-    \item Extract the most relevant patterns from each data source independently.
-    \item Combine features from all two sources into a unified representation.
-\end{itemize}
+\subsection{Pareto-optimal particle swarm optimisation with entropy selection}
 
-\begin{table}[h!]
-\centering
-\caption{{Identified Research Gaps and Proposed Research Objectives}}
-\label{tab:research_gaps_objectives}
-\renewcommand{\arraystretch}{1.4}
-\setlength{\tabcolsep}{4pt}
+Chokkalingam and Ganesan~\cite{r1} propose a Pareto-optimal particle swarm optimisation
+(POPSO) algorithm for UAV path planning in changing environments. Their framework
+combines four ideas. The swarm is initialised with a mix of grid-based and random
+particles to start from a spread of paths. The cost function covers path length, energy,
+an inverse safety term, a moving-obstacle penalty and a weather factor. The inertia
+weight and learning coefficients of the swarm are updated during the run, so the search
+explores more when it stalls and exploits more when it is improving. Finally, a hybrid
+Pareto-entropy mechanism ranks archive members by Pareto rank and by an entropy measure
+computed from distances between solutions, which keeps the archive diverse. On real terrain images with added obstacles it produced well-distributed fronts and
+better path efficiency and safety than the methods it was compared with.
 
+Two details matter for our work. The weather factor is
+$W = \gamma\,(1 + v_\mathrm{wind}/v_\mathrm{max})$, which depends on wind speed only,
+so a path flown into the wind and the same path flown with it are costed alike. And the
+final route is not chosen by the entropy mechanism. The paper defines an auxiliary
+weighted sum over the normalised objectives, with weights ``typically determined
+empirically based on mission priorities'', and uses it both for particle updates and to
+select the representative solution that is actually deployed. So the last step is still
+a hand-set weighted sum, and the payload does not enter it.
 
-\begin{tabular}{|p{3.5cm}|p{5.5cm}|p{7cm}|}
+\subsection{Crowding-distance NSGA-II for urban UAV path planning}
+
+Ren et al.~\cite{r3} plan UAV paths in an urban environment with two objectives,
+distance and safety. The city is stored as an octree, which subdivides 3-D space
+hierarchically and keeps memory low in large open regions, and a safety index map
+scores how close each cell is to obstacles. The population is seeded with A* paths and
+evolved with NSGA-II. The authors point out a case where the standard crowding distance
+prefers a counter-intuitive point, and they redefine crowding as the average distance to
+the $k$ nearest solutions. The resulting CDNSGA-II finds well-spread, collision-free
+Pareto paths efficiently.
+
+The authors argue that a weighted sum needs its weights fixed in advance, which is
+hard, so they build a front first and pick from it. The pick, though, is made by
+crowding distance, which measures how isolated a point is on the front and has no notion
+of urgency, fragility or payload weight.
+
+\subsection{Multi-strategy improved NSGA-II for 3-D trajectory planning}
+
+Deng et al.~\cite{r11} address two known weaknesses of evolutionary planners in 3-D:
+getting stuck in local optima, and the tension between converging quickly and keeping
+the population diverse. Their MS-INSGA2 framework seeds the population with linearly
+interpolated trajectories that pass a safety check, couples a dynamic guidance step
+with crossover and mutation rates that adapt to the state of the population, and adds a
+local search that refines the Pareto front and smooths the trajectories. Three
+objectives are optimised: path length, collision risk from terrain and cylindrical
+obstacles, and smoothness measured as the change in curvature between segments. On the
+ZDT, DTLZ and WFG benchmark suites, with a Wilcoxon signed-rank test, the framework
+outperformed its baselines, and on two 3-D planning tasks it beat eleven other
+algorithms, lowering the average fitness by 27.87\% and 32.06\% and the best fitness by
+6.91\% and 14.18\%.
+
+The paper is about search quality and trajectory smoothness. Payload and delivery
+context do not appear among the objectives, and wind is listed as future work rather
+than modelled. As with the other evolutionary planners, the front is rebuilt for each
+planning task.
+
+\subsection{NSGA-II and MOPSO}
+
+NSGA-II~\cite{r8} is still the reference evolutionary algorithm for several objectives.
+It brought fast non-dominated sorting, elitism by merging parents and offspring, and the
+crowding distance, which prefers solutions in sparse regions of the front. MOPSO~\cite{r6}
+extended particle swarm optimisation with an external archive of non-dominated
+solutions, leader selection on an adaptive grid and a mutation operator. Both are fast,
+stochastic and widely used as baselines. Our MOPSO baseline adapts the second to graph
+routes (Section~\ref{sec:m3}), and the crowding distance is one of the competing
+selection rules that Tier~2 is compared against (Section~\ref{sec:m5}).
+
+\subsection{Exact multi-objective A* search}
+
+Mandow and P\'{e}rez de la Cruz~\cite{r17} analyse NAMOA*, a multi-objective extension
+of A*. Instead of one cost per node, NAMOA* keeps a set of non-dominated cost vectors
+(labels) per node and expands labels, not nodes. With an admissible heuristic it returns
+the complete set of Pareto-optimal solution costs. The paper proves that, when the heuristic is
+consistent, NAMOA* expands no more labels than any other admissible multi-objective
+search algorithm given the same heuristic, and that a better-informed heuristic never
+makes it expand more. NAMOA* is the basis of our Tier~1 engine. Its
+exactness is the reason we chose it over a population method: the front is the same on
+every run, and interior points that a payload might need are never lost to chance.
+
+\subsection{Payload-mass-aware trajectory planning}
+
+Tsoutsouras et al.~\cite{r10} look at drones shared by several users, where packages of
+different mass are dropped at different waypoints before their deadlines. They build a
+power model in which propulsion power depends on both payload mass and flight speed,
+and formulate trajectory planning as minimising deadline misses under energy,
+waypoint and mass constraints, a problem close to the travelling salesman problem. A
+greedy heuristic produces a first trajectory and an optimiser improves it, and the whole
+computation runs on the drone, in under about 320\,ms on an ARM Cortex-A9.
+
+This is the closest work to ours in that payload matters to the route. The way it
+matters is different, though. Mass is a continuous physical parameter inside the
+energy and speed model, and the planner returns one trajectory. There is no Pareto
+front, and no discrete payload description such as fragility or urgency that chooses
+between trade-offs.
+
+\subsection{Quality indicators for Pareto fronts}
+
+Zitzler and Thiele~\cite{r18} introduced the size of the dominated space, now called the
+hypervolume (HV): the volume of objective space a front dominates up to a reference
+point. It rewards both closeness and spread, and it is the main front-quality measure in
+our benchmarks.
+
+\subsection{Effect of drone transport on medical payloads}
+
+Three studies measure what drone flight does to medical cargo. Oakey et al.~\cite{r13}
+recorded vibration on fixed-wing and multi-copter drones and found levels up to three
+times those of road transport, at higher frequencies, but insulin carried on those
+flights showed no aggregation. Theobald et al.~\cite{r14} flew monoclonal antibody
+infusions on sixty flights with vibration between 1.5 and 3\,g and found no change in
+particle size or aggregation. Stierlin et al.~\cite{r15} compared drone and car
+transport of blood samples and found them comparable, with small differences in five
+analytes.
+
+Taken together, these results say the tested payloads survive ordinary flights. They
+do not say what happens to a more fragile cargo, or whether a calmer corridor would
+help, because none of the studies changed the route. We read this as a reason to treat
+fragility as an operator's precaution in the planner, not as a proven damage model.
+
+\subsection{Summary of the reviewed work}
+
+Table~\ref{tab:related-work} summarises the reviewed papers.
+
+\begin{footnotesize}
+\begin{longtable}{|P{0.5cm}|P{2.6cm}|P{4.1cm}|P{3.5cm}|P{3.6cm}|}
+\caption{Summary of the reviewed work}\label{tab:related-work}\\
 \hline
-\textbf{Category} & \textbf{Identified Gaps} & \textbf{Proposed Direction \& Research Objectives} \\ \hline
+\textbf{No.} & \textbf{Author / Year} & \textbf{Method} & \textbf{Findings} & \textbf{Limitation for our problem}\\
+\hline
+\endfirsthead
+\hline
+\textbf{No.} & \textbf{Author / Year} & \textbf{Method} & \textbf{Findings} & \textbf{Limitation for our problem}\\
+\hline
+\endhead
+1 & Chokkalingam and Ganesan (2026)~\cite{r1} & POPSO with hybrid initialisation, adaptive swarm parameters and Pareto-entropy archive & Well-distributed fronts; better path efficiency, safety and adaptability than compared methods & Final route chosen by a weighted sum with empirically set weights; wind enters as a speed-only factor; payload absent\\
+\hline
+2 & Ren et al. (2019)~\cite{r3} & CDNSGA-II over an octree city model with a safety index map; A* seeding & Spread-out, collision-free paths for distance and safety & Selection by crowding distance only; no mission context; no wind\\
+\hline
+3 & Deng et al. (2026)~\cite{r11} & MS-INSGA2 with safe interpolated seeding, adaptive operators and local search & Beats eleven algorithms on 3-D tasks; better benchmark indicators & No payload or delivery context; wind left to future work; front rebuilt per task\\
+\hline
+4 & Deb et al. (2002)~\cite{r8} & NSGA-II: fast non-dominated sorting, elitism, crowding distance & Better spread and convergence than PAES and SPEA on test problems & Crowding distance is purely geometric\\
+\hline
+5 & Coello Coello et al. (2004)~\cite{r6} & MOPSO with external repository, adaptive grid and mutation & Competitive fronts at low cost & Stochastic; may miss interior points of the front\\
+\hline
+6 & Mandow and P\'{e}rez de la Cruz (2010)~\cite{r17} & NAMOA*: label-based multi-objective A* & Exact front with admissible heuristics; efficiency results under consistent heuristics & Says nothing about which route to fly\\
+\hline
+7 & Tsoutsouras et al. (2020)~\cite{r10} & Mass- and speed-aware power model; heuristic plus optimiser for deadline-constrained multi-drop trajectories & Near-optimal trajectories on board in about 320\,ms & One trajectory, no front; mass is a physical parameter, not a selector\\
+\hline
+8 & Zitzler and Thiele (1999)~\cite{r18} & Comparative study of MOEAs; SPEA; dominated-space indicator & Hypervolume as a front-quality measure & Evaluation tool only\\
+\hline
+9 & Oakey et al. (2021); Theobald et al. (2023); Stierlin et al. (2024)~\cite{r13,r14,r15} & Vibration and sample-quality measurements on drone flights & Tested medicines and blood samples unaffected by ordinary flights & Route never varied; no evidence for or against route-based protection\\
+\hline
+\end{longtable}
+\end{footnotesize}
 
-\textbf{Multi-Modal Integration \& Feature Fusion} &
-Limited multi-modal integration; insufficient evaluation of modality-specific feature extraction effectiveness. &
-\textbf{1.} Design stacked autoencoders for each modality (text, URL).  
-\newline \textbf{2.} Investigate feature-level fusion by concatinating modality specific stacked AutoEncoder and analyze the performance.  
-\newline \textbf{3.} Validate improvements in accuracy and generalization over single-modality approaches. \\ \hline
+\section{GAPS IDENTIFIED}\label{sec:gap}
 
-\textbf{Multi-Class Granularity \& Generalization} &
-Binary/ternary dominance; limited multi-class evaluation; insufficient cross-domain robustness assessment; class imbalance challenges. &
-\textbf{1.} Develop five-class classifier (phishing, whaling, pretexting, baiting, legitimate).  
-\newline \textbf{2.} Use balanced dataset (500 per class).  
-\newline \textbf{3.} Identify modality contributions for distinguishing rare vs. common attacks. \\ \hline
+Two of the planners we reviewed make the diversity of the front their central design
+concern, and only one of those two uses it to \emph{select} a route. The crowding
+distance of Ren et al.~\cite{r3} picks a point directly from the front. Chokkalingam and
+Ganesan~\cite{r1} use entropy only to keep the archive diverse during optimisation, and
+fall back on a weighted sum, with weights set per mission, to make the final pick.
+Deng et al.~\cite{r11} improve the front itself and leave the choice open.
+Tsoutsouras et al.~\cite{r10} do not build a front at all: they put continuous payload
+mass into the energy model and adapt speed as mass changes, but never choose between
+competing trade-offs by payload.
 
-\textbf{Real-Time Deployment Feasibility \& Explainability} &
-Underreported efficiency metrics; lack of deployment feasibility analysis; limited explainability; no analysis of modality redundancy. &
-\textbf{1.} Report training time, latency, memory, throughput for ELM.  
-\newline \textbf{2.} Implement modality-specific feature attribution.  
-\newline \textbf{3.} Evaluate robustness when modalities are partially missing or degraded. \\ \hline
+So none of these works lets a payload property act as an input to a Pareto-point
+selection step. This follows from how the mechanisms are defined: entropy and crowding
+distance are functions of the front's geometry, and mass-aware adaptation is a function
+of the physical model. Adding payload information would mean replacing the selection
+rule outright, which is what our Tier~2 does.
 
+We state the gaps as follows.
 
+\begin{enumerate}
+  \item[\textbf{Gap 1.}] No payload-aware route selection. Existing UAV
+  multi-objective planners apply a fixed geometric criterion that ignores the payload,
+  a hand-tuned weighted sum, or no selection mechanism at all.
+  \item[\textbf{Gap 2.}] No reuse of one front across mission types. Existing
+  planners re-run the full multi-objective search whenever the mission changes. Nothing
+  separates building the front, which depends on the region and the weather, from
+  choosing a route, which depends on the payload.
+  \item[\textbf{Gap 3.}] No algebraic bridge from payload to trade-off. No
+  explicit, reproducible mapping exists from a payload description to the routing
+  trade-off it implies (fragility to low risk, urgency to short distance, weight to low
+  energy).
+  \item[\textbf{Gap 4.}] Wind direction is not resolved per segment. Where
+  weather appears at all, it is a speed-only factor applied uniformly~\cite{r1}. A
+  headwind and a tailwind on the same leg cost the same, and a stored front carries no
+  record of the weather it was built for, so there is no rule for when it goes stale.
+\end{enumerate}
+
+\section{RESEARCH OBJECTIVES}\label{sec:objectives}
+
+The objectives of this project follow from these gaps.
+
+\begin{enumerate}
+  \item To formulate multi-objective UAV route planning as a Pareto front precomputation
+  task over a delivery airspace graph, and to justify an exact, deterministic graph
+  search over stochastic population methods for this task.
+  \item To build a three-dimensional airspace lattice from terrain, buildings,
+  restricted zones, water and land use, with wind-aware, direction-dependent energy and
+  risk on every edge, and a rule for when a stored front must be rebuilt.
+  \item To design a payload metadata schema and an explicit formula that turns mission
+  context (fragility class, payload weight class, delivery urgency, priority) into
+  Pareto-point selection weights with no expert tuning.
+  \item To benchmark Tier~1 front quality against single-objective A* and MOPSO on the
+  same scenarios, using hypervolume, inverted generational distance and spread.
+  \item To gather evidence that Tier~2 picks routes that match the payload, including
+  non-extreme routes for mixed payloads, and does so within one second.
+  \item To export the selected route as an autopilot mission and verify it in a Gazebo
+  and ArduPilot SITL simulation before hardware flights in Phase~II.
+\end{enumerate}
+
+Table~\ref{tab:gap-objective} links each gap to its objectives.
+
+\begin{table}[!htbp]
+\centering
+\caption{Gaps identified and the research objectives that address them}\label{tab:gap-objective}
+\small
+\begin{tabular}{|P{3.6cm}|P{2.2cm}|P{8.4cm}|}
+\hline
+\textbf{Gap} & \textbf{Objectives} & \textbf{How the system addresses it}\\
+\hline
+Gap 1: no payload-aware selection & 3, 5 & Tier~2 derives weights from four payload tags and scores every route on the front; argmax gives the mission route\\
+\hline
+Gap 2: no front reuse & 1, 4 & Tier~1 builds an exact NAMOA* front once per region and weather window; a front store reuses it for every mission until it expires or the weather drifts\\
+\hline
+Gap 3: no algebraic bridge & 3, 5 & Weight formula $w_\mathrm{risk} \propto 2F$, $w_\mathrm{dist} \propto 3U$, $w_\mathrm{energy} \propto 2W$, with priority amplification; deterministic and checked for monotonicity over all 225 tag combinations\\
+\hline
+Gap 4: wind direction not resolved & 2, 6 & Headwind and crosswind computed per edge from its bearing; gust, turbulence and a go/no-go gate; front stored with its weather snapshot and refreshed on drift\\
+\hline
 \end{tabular}
-
 \end{table}
-
-The second aim is to provide practical guidance that can be used in the real world deployment, by doing a profound comparative analysis between two different
-Neural architectures for security practitioners.
-Implement and test ELM, which represents deep supervised learning.
-\begin{itemize}
-    \item Implement and test Extreme Learning Machine (ELM) representing fast analytical learning.
-    \item Measure and report training time, inference latency, memory usage, and detection accuracy
-    \item Clearly indicate to practitioners which architecture applies or choose based on their needs.
-    \item Help organizations select classifiers based on available computational resources and performance requirements.
-\end{itemize}
-The tertiary objective the  extends detection capability beyond binary classification to achieve fine-grained attack categorization and system transparency improvement and resiliance. 
-\begin{itemize}
-    \item Develop a five-class detection system distinguishing phishing, whaling, Pretexting, baiting, and legitimate datas. 
-    \item Measure performance metrics separately for each attack type to identify system strengths and weaknesses.
-\end{itemize}
-
-%directed acyclic graph (DAG) where each node is labeled by
-%a proposition letter from root, except for nodes that are
-%labeled by $0$ and $1$. From every node labeled by a proposition
-%letter, there are two outgoing edges, labeled 'left' and 'right',
-%to nodes labeled by $0$ or $1$, or a proposition letter strictly
-%higher in the ordering $>$ . The nodes labeled by $0$ and $1$ do not have outgoing edges as in figure \ref{fig:BDD}. The OBDDs of figure \ref{fig:BDD} have the ordering $[x, y, z]$ and so does any list having $x$, $y$ and $z$  it in order.
-
-%Ordered Binary Decision Diagrams (OBDDs in short) have been shown as a powerful paradigm in handling Boolean functions and have been applied to many fields such as VLSI, CSD, AI, combinatorics, ect. This is because OBDDs can represent many Boolean functions in very compact manner by an appropriate ordering of logical variables for the functions. Where each variable is evaluated at most once on each path (read-once property), the ordered in which the variable are evaluated does not depend on the input and the size of OBDDs depends on the order of the input. By applying reduction algorithm, OBDDs can be transformed into a canonical form called reduced OBDDs.
-
-%BDDs with multiple occurrences of a boolean variable along a path seem rather inefficient. Moreover, there seems no easy way to test for equivalence of BDDs.
-%So it can improve matters by imposing an ordering on the variables occurring
-%along any path and then adhere to that same ordering for all the BDDs.
-%
-
-
-%The advantage of an ROBDD is that it is canonical (unique) for a particular functionality. This property makes it useful in functional equivalence checking and other operations like functional technology mapping. A path from the root node to the $1$-terminal represents a (possibly partial) variable assignment for which the represented Boolean function is true otherwise false.
-%
-
-%

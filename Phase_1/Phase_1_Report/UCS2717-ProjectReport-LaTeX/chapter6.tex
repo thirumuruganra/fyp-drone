@@ -1,8 +1,45 @@
-\chapter{CONCLUSION AND FUTURE WORK}
+% Chapter 6
 
+\chapter{CONCLUSION AND FUTURE WORK}\label{cha:conclusion}
 
-In conclusion, the proposed incremental learning approach provides an adaptive and scalable method for detecting social engineering attacks. The system integrates stacked autoencoder-based deep feature extraction with PGFDG fuzzy modeling to capture structural patterns, uncertainty, and anomalies. Additionally, the combination of normalized manual features with fuzzy features results in a robust hybrid feature representation that enhances class separability, particularly in scenarios involving overlapping attack classes.
+\section{CONCLUSION}
 
-To overcome catastrophic forgetting, where a model loses previously learned information when trained on new data, the supervised DAIL data augmentation process helps reinforce previously learned class knowledge. The proposed system evolves over four stages, increasing from three to five attack classes. The consistency of the feature space is ensured by frozen encoders, which are neural network components that do not update during training. The Extreme Learning Machine (ELM), a type of single-layer feedforward neural network known for rapid training and efficient computation, makes the system suitable for near real-time applications. The proposed system effectively integrates deep learning, fuzzy modeling, data augmentation, and incremental classification.
+This project set out to let the payload decide the route. Existing multi-objective UAV
+planners build good Pareto fronts and then choose from them with a rule that knows
+nothing about the cargo, or with weights an expert re-tunes for every mission. We
+separated the two problems. Tier~1 builds an exact NAMOA* front over a
+three-dimensional, wind-aware airspace lattice once per region and weather window, and
+stores it with what is needed to tell when it has gone stale. Tier~2 turns four payload
+tags into objective weights with an explicit formula, scores every route on the front
+and returns the best one, or a HOLD when the weather or the battery rules the mission
+out. The chosen route is exported as an ArduPilot mission and has been flown in SITL and
+in a Gazebo city world.
 
-As future work, adding more new attack types, such as spear phishing and AI scams, can enhance the accuracy. Furthermore, adopting more advanced hybrid genetic approaches for data augmentation can improve learning for the minority class. 
+The first results are encouraging, with clear caveats. The Tier~1 front was exact in
+every benchmark scenario, while MOPSO found 38 of 115 routes on the largest. On that
+front the four reference payloads received four different routes, three of them
+non-extreme, in about 0.14\,ms each. Wind direction alone moved the energy of the
+cheapest route by 27.5\% at a fixed speed, and in SITL the flown track stayed within
+0.13\,m RMS of the plan. On the other hand, under a steady wind the front shrank and the
+presets collapsed onto two routes, MOPSO ran at reduced settings, the ablation used
+fixture data, and the risk weights and battery constants are still placeholders.
+
+\section{FUTURE WORK}
+
+The rest of Phase~I is a set of passes through the evaluation cycle. We will run the
+full benchmark (four graphs, nine wind cases, MOPSO at 100 particles, 200 iterations and
+30 repetitions) with per-repetition statistics and a significance test; fix the density
+labels and the monotonicity grouping; study why the front collapses under steady wind,
+testing other normalisations and weight multipliers; repeat the ablation and Tier~2
+studies on live map data; compare Tier~2 with crowding distance, knee point, shortest
+route and fixed weights over all 225 tag combinations; close the two dashboard defects;
+and reduce the Tier~1 runtime on large graphs. On the simulation side, wind will be added
+to the Gazebo world, the battery model will be calibrated per payload weight class, and
+each preset will be flown under several wind cases with all flight metrics logged.
+
+Phase~II moves the system onto a Pixhawk-equipped F450 quadcopter with a Raspberry
+Pi~5 companion computer and a servo payload release. Tier~2 will run on board, and
+outdoor flights will measure route adherence and the time from tag entry to mission
+start. Further out, the two-tier idea could extend to several drones sharing one front,
+to multi-drop routes and to in-flight replanning when the weather changes faster than
+the refresh window.

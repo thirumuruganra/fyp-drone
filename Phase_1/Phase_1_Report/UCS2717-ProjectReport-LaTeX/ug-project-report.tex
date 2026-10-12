@@ -1,9 +1,10 @@
+\PassOptionsToPackage{nohyperlinks}{acronym}
 \documentclass[a4paper, 14pt, oneside]{Thesis}
 \usepackage{ulem}
 \usepackage[square, numbers, comma, sort&compress]{natbib}  % Use the "Natbib" style for the references in the Bibliography
-\usepackage{verbatim} 
+\usepackage{verbatim}
 \usepackage{pslatex} %To set the font as Times New Roman
-\usepackage{amsbsy} 
+\usepackage{amsbsy}
 \usepackage{amsfonts}
 \usepackage{graphicx}
 \usepackage{dcolumn}
@@ -11,7 +12,6 @@
 \usepackage{latexsym}
 \usepackage{amssymb}
 \usepackage{epsfig}
-\usepackage{verbatim} 
 \usepackage{epsfig,graphics}
 \usepackage{subfigure}
 \usepackage{tikz}
@@ -20,9 +20,29 @@
 \usepackage{algpseudocode}
 \usepackage{subcaption}
 \usepackage{placeins}  % For FloatBarrier
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{array}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}} % ragged-right table cells
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{xurl}      % break long URLs in the references
 
-%\usepackage{fancyhdr}
-%\usepackage{lipsum}
+\lstset{basicstyle=\ttfamily\footnotesize, keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{gray}, stringstyle=\color{teal}, frame=single, breaklines=true,
+  showstringspaces=false, columns=fullflexible, captionpos=b}
+\renewcommand{\lstlistingname}{Listing}
+\renewcommand{\appendixname}{APPENDIX}
+% let floats share pages with text instead of sitting alone on float pages
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\hypersetup{hidelinks}
+\newlength{\beforechapskip}\newlength{\topfiddle} % lengths used by \listofacronyms in Thesis.cls
 
 %To have 1. instead of [1] in the bibliographic entry
 \makeatletter
@@ -34,32 +54,25 @@
 \emergencystretch=\maxdimen
 \hyphenpenalty=10000
 \hbadness=10000
-%
+
 %----To make sure the page numbers are in the top middle of each page.
 \fancypagestyle{Thesis}{
 \fancyhf{}
 \fancyhead[C]{\thepage}
-\%lfoot{\thepage}
 \pagestyle{fancy}
 }
-%redefine the plain pagestyle
-%\fancypagestyle{plain}{
-%\fancyhf{}
-%\fancyhead[C]{\thepage}
-%}
 %----------------------------------------------------------------------
-%% ------------------------s----------------------------------------
 \input{bmacros}
 \begin{document}
 
 \frontmatter	  % Begin Roman style (i, ii, iii, iv...) page numbering
 
-
 %  Title Page
 
-\title{ATTACK DETECTION IN SOCIAL PLATFORMS USING FUZZY AND INCREMENTAL NEURAL NETWORK}
-\authors  {{ HARINISHREE K \hspace{0.4in} 3122225001035\\ \vspace{0.1in}}
-{ MUTHUSELVI K  \hspace{0.4in} 3122225001074\\\vspace{0.1in}}
+\title{PAYLOAD-AWARE TWO-TIER UAV ROUTE PLANNING FOR LAST-MILE DELIVERY}
+\authors  {{ THIRUMURUGAN RA \hspace{0.4in} 3122235001149\\ \vspace{0.1in}}
+{ MEGHNA MANIMARAN \hspace{0.4in} 3122235001079\\ \vspace{0.1in}}
+{ SHRIKA SP THOTA \hspace{0.4in} 3122235001125\\ \vspace{0.1in}}
 }
 \addresses  {\\\Computer Science \& Engineering\\}
 \date       {\large {October 2026}}
@@ -72,18 +85,13 @@
 \rhead{\thepage}  % Sets the right side header to show the page number
 \lhead{}  % Clears the left side page header
 
-\pagestyle{fancy}  % Finally, use the "fancy" page style to implement the FancyHdr headers
+\pagestyle{fancy}
 
-
-\Declaration{ 
+\Declaration{
 %
-\quad Certified that this project report titled \textbf{``ATTACK DETECTION IN SOCIAL PLATFORMS USING FUZZY AND INCREMENTAL NEURAL NETWORKS''} is the \textit{bonafide} work of \textbf{HARINISHREE. K (312225001035)}, \textbf{MUTHUSELVI. K (312225001074)} who carried out the project work under my supervision.
+\quad Certified that this project report titled \textbf{``PAYLOAD-AWARE TWO-TIER UAV ROUTE PLANNING FOR LAST-MILE DELIVERY''} is the \textit{bonafide} work of \textbf{THIRUMURUGAN RA (3122235001149)}, \textbf{MEGHNA MANIMARAN (3122235001079)} and \textbf{SHRIKA SP THOTA (3122235001125)} who carried out the project work under my supervision.
 \\
 Certified further that to the best of my knowledge the work reported herein does not form part of any other thesis or dissertation on the basis of which a degree or award was conferred on an earlier occasion on this or any other candidate. \\
-  \newlength{\aulength} 
-  \settowidth{\aulength}{SSN College of Engineering,}
-  \newlength{\auclength} 
-  \settowidth{\auclength}{(HEAD OF THE DEPARTMENT)}
 
 \begin{flushleft}
 \begin{minipage}[t]{0.45\linewidth}
@@ -94,17 +102,16 @@ Certified further that to the best of my knowledge the work reported herein does
     SSN College of Engineering\\[6pt]
     Kalavakkam - 603 110
 \end{minipage}
-\hfill 
+\hfill
 \begin{minipage}[t]{0.45\linewidth}
-    \textbf{Dr. SURESH JAGANATHAN}\\
+    \textbf{Dr. N. SUJAUDEEN}\\
     \textbf{SUPERVISOR}\\
-    Associate Professor\\
+    Assistant Professor\\
     Department of CSE\\
     SSN College of Engineering\\[6pt]
     Kalavakkam - 603 110
 \end{minipage}
 \end{flushleft}
-
 
 \medskip
 Submitted for project viva-voce examination held on\ldots\ldots\ldots\ldots
@@ -115,167 +122,176 @@ Submitted for project viva-voce examination held on\ldots\ldots\ldots\ldots
 {\bf INTERNAL EXAMINER}
 }
 \clearpage
-%% Abstract in Tamil
 
-% Acknowledgement
-%\setstretch{1.3}
-
-\clearpage
 %% ----------------------------------------------------------------
+% Acknowledgements
 
-% The Abstract Page
+\begin{acknowledgements}
+We thank God almighty for giving us the strength and the patience to carry this work through.
 
-\acknowledgements{
-We thank GOD, the almighty for giving our strength and knowledge to do this project.
+We are deeply grateful to our guide, \textbf{Dr. N. SUJAUDEEN}, Assistant Professor, Department of Computer Science and Engineering, for his advice, his patience with our many drafts and his steady push to back every claim with a number. This work took its shape in our discussions with him.
 
-We would like to thank and deep sense of gratitude to my guide \textbf{Dr.SURESH JAGANATHAN}, Associate Professor, Department of Computer Science and Engineering, for his valuable advice and suggestions as well as his continued guidance, patience and support that helped our to shape and refine our work.
+Our sincere thanks to \textbf{Dr. T.T. MIRNALINEE}, Professor and Head of the Department of Computer Science and Engineering, for her encouragement and support. We thank \textbf{Dr. B. BHARATHI}, Project Coordinator, and the members of our review panel, whose questions at each review made the system better than it would otherwise have been.
 
-Our sincere thanks to  \textbf{Dr. T.T. MIRNALINEE}, Professor and Head of the Department of Computer Science and Engineering, for her words of advice and encouragement. We would like to thank \textbf{Dr.B.Bharathi} project Coordinator, our Project panel members for their valuable suggestions throughout this project.
+We also thank \textbf{Dr. S. RADHA}, Principal, for the facilities and support she has provided during our course of study.
 
- We also express our appreciation to \textbf{Dr. S. RADHA}, Principal, for all the help she has rendered during this course of study.
-
- We would like to extend our sincere thanks to all the teaching and non-teaching staffs of our department who have contributed directly and indirectly during the course of my project work.
-Finally, We would like to thank our parents and friends for their patience, cooperation and moral support throughout our life. 
+We thank the teaching and non-teaching staff of our department who helped us, directly or indirectly, during the project. Finally, we thank our parents and friends for their patience and support throughout.
 \newline
 \newline
 \newline
 \newline
-{\bf HARINISHREE K}\hfill 
-{\bf MUTHUSELVI K}
-\clearpage  % Abstract ended, start a new page
+{\bf THIRUMURUGAN RA}\hfill
+{\bf MEGHNA MANIMARAN}\hfill
+{\bf SHRIKA SP THOTA}
+\end{acknowledgements}
+\clearpage
 
-\addtotoc{ABSTRACT} % Add the "Abstract" page entry to the Contents
-\abstract{ \begin{spacing}{1.8}
-Social Platform attacks like Phishing, baiting, pretexting, whaling, and malicious URL spreading attacks are challenging due to unstructured text, diverse URL patterns, and ever-changing attack patterns. This paper presents a memory-efficient incremental learning approach for social engineering attack detection using email text and URL feature data from dynamically streaming data.The proposed system uses a dual-pipeline feature extraction architecture. The first pipeline uses TF-IDF and Truncated SVD with a Stacked Autoencoder (SAE) to extract 100-dimensional latent features that represent semantic and structural patterns. The second pipeline adds a Fuzzy Probability-Guided Feature Descriptor Generator (Fuzzy-PGFDG) that extracts five fuzzy membership descriptors: Typicality, Density, Homogeneity, Outlier Score, and Fuzzy Entropy, to represent uncertainty and class membership. The results are combined into a single 124-dimensional hybrid feature vector.To handle concept drift and catastrophic forgetting, a Data Augmented Incremental Learning (DAIL) approach is used to synthesize new data from previous batches using a column-alternating interleaving scheme, without requiring storage of raw historical data. An Extreme Learning Machine (ELM) classifier is incrementally updated with dynamically scaled hidden neurons to ensure scalability and efficiency.
+%% ----------------------------------------------------------------
+% The Abstract Page (Review II abstract)
+
+\addtotoc{ABSTRACT}
+\begin{abstract}
+\begin{spacing}{1.6}
+In UAV systems for medical and emergency last-mile delivery, conflicting objectives
+must be balanced: higher flight risk is carried by shorter routes, more battery is
+drained by low-risk corridors, and the fastest paths are rarely achieved by
+energy-efficient routing. No single fixed trade-off serves all payload types, yet the
+same objective weights are applied by existing planners to every mission regardless of
+the payload. In existing multi-objective planners, including entropy-based,
+diversity-driven, and crowding-distance Pareto selection methods, objective weights are
+encoded as a fixed scalar before path search begins. No influence is exerted by payload
+properties such as fragility class, payload weight class, and delivery urgency over
+which Pareto-optimal route is chosen. When payloads change, weights must be manually
+re-tuned and planners re-run by operators, which is unworkable under field conditions.
+The proposed work is a Payload-Aware Two-Tier UAV Route Planning system, wherein Pareto
+front construction is separated from route selection and an explicit algebraic bridge
+is added between Tier 1 routing objectives and Tier 2 payload metadata. In Tier 1, the
+NAMOA* multi-objective search is executed over a three-dimensional airspace lattice
+built from terrain elevation, OpenStreetMap buildings and restricted zones, with
+wind-dependent, direction-aware edge costs, producing a Pareto-optimal route set across
+distance, energy consumption, and flight risk. In Tier 2, four operator-assigned payload
+tags are read and objective weights derived: $w_\mathrm{risk}$ is scaled by fragility
+class, $w_\mathrm{distance}$ by delivery urgency, and $w_\mathrm{energy}$ by payload
+weight class. Every Pareto point is scored by these weights via a utility function, and
+the argmax is selected as the mission route. The principal contribution is a
+formula-driven mapping from metadata to routing weights, linking mission context
+directly to Pareto selection without expert intervention. Route choice is set by payload
+properties rather than context-blind diversity criteria. The Pareto front is stored and
+rebuilt only when the graph changes, its validity window expires or the weather drifts,
+serving all missions between updates.
+
+\medskip
+\noindent\textbf{Keywords:} UAV route planning; multi-objective optimisation; NAMOA*;
+Pareto front; payload-aware selection; wind-aware risk; last-mile delivery
 \end{spacing}
-}
+\end{abstract}
 \clearpage
-%%% DUMMY PAGE FOR TAMIL ABSTRACT WHICH WILL BE PRINTED SEPARATELY
-%%% Since LaTeX can't print tamil characters, you've to type tamil 
-%%% abstract in some other editors and print it separately. When
-%%% binding the thesis place the tamil abstract in place of this blank page
-%%% I'm adding this blank page for Table of Contents to point to the right page
 
-%\pagestyle{empty}
-%\newpage
-%\mbox{}
-%\clearpage
-
-\pagestyle{plain}  %The page style headers have been "empty" all this time, now use the "fancy" headers as defined before to bring them back
+\pagestyle{plain}
 
 %% ----------------------------------------------------------------
-\lhead{\emph{Contents}}  % Set the left side page header to "Contents"
-
-\tableofcontents % Write out the Table of Contents
-
+\lhead{\emph{Contents}}
+\tableofcontents
 
 %% ----------------------------------------------------------------
-\lhead{\emph{List of Tables}}  % Set the left side page header to "List of Tables"
-%\begin{spacing}{4}
-%\hspace{2.5in} \textbf{List of Tables} \par 
+\lhead{\emph{List of Tables}}
 \listoftables
-%\end{spacing}
 
 %% ----------------------------------------------------------------
-\lhead{\emph{List of Figures}}  % Set the left side page header to "List if Figures"
-\listoffigures  % Write out the List of Figures
+\lhead{\emph{List of Figures}}
+\listoffigures
 
-
-%2.1 LITERATURE SURVEY OF METAMORPHIC TESTING. . . . . . . . . . . .  13
-
-
- % Write out the List of Tables
-
+%% ----------------------------------------------------------------
+\listofacronyms{MOPSO-XXX}
 
 \mainmatter	  % Begin normal, numeric (1,2,3...) page numbering
-\pagestyle{myheadings}  % Return the page headers back to the "fancy" style
+\pagestyle{myheadings}
 
 \begin{spacing}{1.5}
 \input{chapter1} % INTRODUCTION
 \input{chapter2} % LITERATURE SURVEY
-\input{chapter3} % DESIGN
-\input{chapter4} % IMPLEMENTATION
-\input{chapter5} % CONCLUSION AND FUTURE WORK
-\input{chapter6}
+\input{chapter3} % PROPOSED METHODOLOGY
+\input{chapter4} % EXPERIMENTAL RESULTS AND PERFORMANCE ANALYSIS
+\input{chapter5} % SOCIAL IMPACT AND SUSTAINABILITY
+\input{chapter6} % CONCLUSION AND FUTURE WORK
 
+\clearpage
 \addtotoc{REFERENCES}
+% APA style, alphabetical by first author; numbers follow this order.
+\begin{spacing}{1.15}
 \begin{thebibliography}{99}
 
-\bibitem{ref6}
-N.~Altwaijry \textit{et al.}, ``Advancing phishing email detection: A comparative study of deep learning techniques,'' \textit{PLoS One}, vol.~19, no.~3, p.~e0299216, Mar.~2024.
+\bibitem{r23}
+ArduPilot Development Team. (2026). \textit{ArduPilot software in the loop (SITL) simulator}. \url{https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html}
 
-\bibitem{ref17}
-N.~Alsufyani and A.~Alzahrani, ``Social engineering attack detection using machine learning,'' \textit{International Journal of Advanced Computer Science and Applications}, vol.~13, no.~2,2022.
+\bibitem{r12}
+Avionics International. (2019, August 8). \textit{Drone delivery crash in Switzerland raises safety concerns as UPS forms subsidiary}. \url{https://www.aviationtoday.com/2019/08/08/drone-delivery-crash-in-switzerland-raises-safety-concerns/}
 
-\bibitem{ref4}
-S.~Ariyadasa, S.~Fernando, and S.~Fernando, ``Detecting phishing attacks using a combined model of LSTM and CNN,'' \textit{Int. J. of Advanced and Applied Sciences}, vol.~7, no.~7, pp.~56--67, 2020.
+\bibitem{r4}
+Boeing, G. (2017). OSMnx: New methods for acquiring, constructing, analyzing, and visualizing complex street networks. \textit{Computers, Environment and Urban Systems}, \textit{65}, 126--139. \url{https://doi.org/10.1016/j.compenvurbsys.2017.05.004}
 
-\bibitem{ref19}
-S.~Bagui, D.~Nandi, S.~Bagui, and R.~J.~White, 
-``Machine learning and deep learning for phishing email classification using one-hot encoding,'' 
-\textit{Journal of Computer Science}, vol.~17, pp.~610--623, 2021, doi:\url{https://doi.org/~10.3844/jcssp.2021.610.623}
+\bibitem{r1}
+Chokkalingam, K., \& Ganesan, R. (2026). Dynamic parameter adaptation in Pareto-optimal particle swarm optimization for efficient UAV path planning. \textit{RAIRO -- Operations Research}, \textit{60}(1), 281--305. \url{https://doi.org/10.1051/ro/2025159}
 
-\bibitem{ref13}
-S.~Bahadoripour, H.~Karimipour, A.~N.~Jahromi, and A.~Islam, ``An explainable multi-modal model for advanced cyber-attack detection in industrial control systems,'' \textit{Internet of Things}, vol.~26, p.~101213, 2024.
+\bibitem{r6}
+Coello Coello, C. A., Toscano Pulido, G., \& Salazar Lechuga, M. (2004). Handling multiple objectives with particle swarm optimization. \textit{IEEE Transactions on Evolutionary Computation}, \textit{8}(3), 256--279. \url{https://doi.org/10.1109/TEVC.2004.826067}
 
-\bibitem{ref18}
-S.~Gupta, S.~Jain, V.~Awasthi, A.~Sabharwal, M.~Kumar, A.~Gaur, and W.~M.~Khan, 
-``Detection of phishing URL based on text feature extraction,'' 
-\textit{International Journal of Food and Nutritional Sciences (IJFANS)}, 
-vol.~11, Special Issue~6, pp.~465, 2022.
+\bibitem{r8}
+Deb, K., Pratap, A., Agarwal, S., \& Meyarivan, T. (2002). A fast and elitist multiobjective genetic algorithm: NSGA-II. \textit{IEEE Transactions on Evolutionary Computation}, \textit{6}(2), 182--197. \url{https://doi.org/10.1109/4235.996017}
 
-\bibitem{ref10}
-``Multi-modal fusion for anomaly detection in cybersecurity: Integrating NLP with network traffic data and system logs,'' \textit{EasyChair Preprint}, 2024.
+\bibitem{r11}
+Deng, J., Zhang, H., Feng, D., Yu, Z., \& Liu, Z. (2026). Multi-objective UAV trajectory planning algorithm based on the hybrid MS-INSGA2 strategy. \textit{Journal of King Saud University -- Computer and Information Sciences}, \textit{38}, Article 562. \url{https://doi.org/10.1007/s44443-026-00930-0}
 
-\bibitem{ref11}
-``Multi-modal data fusion techniques for improved cybersecurity threat detection and prediction,'' \textit{Baltic Journal of Modern Learning}, Dec.~2024.
+\bibitem{r5}
+Hagberg, A. A., Schult, D. A., \& Swart, P. J. (2008). Exploring network structure, dynamics, and function using NetworkX. In \textit{Proceedings of the 7th Python in Science Conference (SciPy 2008)} (pp. 11--15). \url{https://doi.org/10.25080/TCWV9851}
 
-\bibitem{ref7}
-S.~Jesmithaa and A.~P.~Eliyas, ``Detecting phishing attacks using convolutional neural network and LSTM,'' in \textit{Proc. 3rd Int. Conf. on Advance Computing and Innovative Technologies in Engineering (ICACITE)}, Greater Noida, India, 2023, pp.~802--807.
+\bibitem{r16}
+IEEE Spectrum. (2019). \textit{In the air with Zipline's medical delivery drones}. \url{https://spectrum.ieee.org/in-the-air-with-ziplines-medical-delivery-drones}
 
-\bibitem{ref2}
-M.~Lansley, S.~Kapetanakis, and N.~Polatidis, ``SEADer++ v2: Detecting social engineering attacks using natural language processing and machine learning,'' in \textit{Proc. 2020 Int. Conf. on Innovations in Intelligent Systems and Applications (INISTA)}, 2020, pp.~1--6.
+\bibitem{r22}
+Joint Authorities for Rulemaking of Unmanned Systems. (2019). \textit{JARUS guidelines on specific operations risk assessment (SORA)} (JAR-DEL-WG6-D.04, Edition 2.0).
 
-\bibitem{ref5}
-S.~Madhusudhanan and S.~Jaganathan, ``Data augmented incremental learning (DAIL) for unsupervised data,'' \textit{IEICE Transactions on Information and Systems}, vol.~105, no.~6, pp.~1185--1197, 2022.
+\bibitem{r17}
+Mandow, L., \& P\'{e}rez de la Cruz, J. L. (2010). Multiobjective A* search with consistent heuristics. \textit{Journal of the ACM}, \textit{57}(5), Article 27. \url{https://doi.org/10.1145/1754399.1754400}
 
-\bibitem{ref20}
-A.~Mahdieh Zabihimayvan, B.~Derek Doran, 
-``Fuzzy rough set feature selection to enhance phishing detection,'' 
-\textit{arXiv preprint arXiv:1903.05675}, 2019.
+\bibitem{r7}
+Meier, L., et al. (2013). \textit{MAVLink: Micro air vehicle communication protocol}. \url{https://mavlink.io}
 
-\bibitem{ref16}
-A.~Namavar~Jahromi \textit{et al.}, ``A deep multi-modal cyber-attack detection model,'' \textit{arXiv preprint arXiv:2304.01440}, 2023.
+\bibitem{r21}
+Ministry of Civil Aviation, Government of India. (2021). \textit{The Drone Rules, 2021} (G.S.R. 589(E)). Gazette of India.
 
-\bibitem{ref8}
-M.~K.~Prabakaran, P.~M.~Sundaram, and A.~D.~Chandrasekar, ``An enhanced deep learning-based phishing detection mechanism to effectively identify malicious URLs using variational autoencoders,'' \textit{IET Information Security}, vol.~17, pp.~423--440, 2023.
+\bibitem{r13}
+Oakey, A., Waters, T., Zhu, W., Royall, P. G., Cherrett, T., Courtney, P., Majoe, D., \& Jelev, N. (2021). Quantifying the effects of vibration on medicines in transit caused by fixed-wing and multi-copter drones. \textit{Drones}, \textit{5}(1), 22. \url{https://doi.org/10.3390/drones5010022}
 
-\bibitem{ref3}
-A.~Prasad and S.~Chandra, ``PhiUSIIL: A diverse security profile empowered phishing URL detection framework based on similarity index and incremental learning,'' \textit{Computers \& Security}, vol.~136, p.~103539, 2024.
+\bibitem{r20}
+Open-Meteo. (2026). \textit{Free weather API and elevation API}. \url{https://open-meteo.com}
 
-\bibitem{ref9}
-O.~K.~Sahingoz, E.~Buber, and O.~Kugu, ``A dual-phase deep learning framework for advanced phishing detection using multiple algorithms,'' \textit{Scientific Reports}, vol.~15, p.~21986, Jul.~2025.
+\bibitem{r24}
+Open Robotics. (2023). \textit{Gazebo Harmonic}. \url{https://gazebosim.org}
 
-\bibitem{ref21}
-B.~Senthilnayaki, K.~Venkatalakshmi, and A.~Kannan, 
-``Intrusion detection system using fuzzy rough set feature selection and modified KNN classifier,'' 
-\textit{The International Arab Journal of Information Technology}, 
-vol.~16, no.~4, Jul.~2019.
+\bibitem{r19}
+Peterson, E. W., \& Hennessey, J. P. (1978). On the use of power laws for estimates of wind power potential. \textit{Journal of Applied Meteorology}, \textit{17}(3), 390--394. \url{https://doi.org/10.1175/1520-0450(1978)017<0390:OTUOPL>2.0.CO;2}
 
-\bibitem{ref15}
-M.~S.~V.~Tyagadurgam \textit{et al.}, ``Preventing phishing attacks using advanced deep learning techniques for cyber threat mitigation,'' \textit{Journal of Data Analysis and Information Processing}, vol.~13, pp.~314--330, 2025.
+\bibitem{r3}
+Ren, Q., Yao, Y., Yang, G., \& Zhou, X. (2019). Multi-objective path planning for UAV in the urban environment based on CDNSGA-II. In \textit{Proceedings of the IEEE International Conference on Service-Oriented System Engineering (SOSE)}. \url{https://doi.org/10.1109/SOSE.2019.00059}
 
-\bibitem{ref12}
-C.~Xu, Y.~Zhan, Z.~Wang, and J.~Yang, ``Multimodal fusion based few-shot network intrusion detection system,'' \textit{Scientific Reports}, vol.~15, p.~21986, Jul.~2025.
+\bibitem{r15}
+Stierlin, N., Loertscher, F., Renz, H., Risch, L., \& Risch, M. (2024). Preanalytic integrity of blood samples in uncrewed aerial vehicle (UAV) medical transport: A comparative study. \textit{Drones}, \textit{8}(9), 517. \url{https://doi.org/10.3390/drones8090517}
 
-\bibitem{ref14}
-Y.~Zhang \textit{et al.}, ``Detection and classification of phishing websites using machine learning,'' \textit{Cybersecurity}, vol.~8, no.~1, pp.~1--18, May~2025.
+\bibitem{r14}
+Theobald, K., Zhu, W., Waters, T., Cherrett, T., Oakey, A., \& Royall, P. G. (2023). Stability of medicines transported by cargo drones: Investigating the effects of vibration from multi-stage flight. \textit{Drones}, \textit{7}(11), 658. \url{https://doi.org/10.3390/drones7110658}
 
-\bibitem{ref1}
-P.~Vidyasri and S.~Suresh, ``FDN-SA: Fuzzy deep neural-stacked autoencoder-based phishing attack detection in social engineering,'' \textit{Computers \& Security}, vol.~148, p.~104188, 2025.
+\bibitem{r10}
+Tsoutsouras, V., Story, J., \& Stanley-Marbell, P. (2020). \textit{Payload-mass-aware trajectory planning on multi-user autonomous unmanned aerial vehicles} (arXiv:2001.02531). arXiv. \url{https://doi.org/10.48550/arXiv.2001.02531}
+
+\bibitem{r18}
+Zitzler, E., \& Thiele, L. (1999). Multiobjective evolutionary algorithms: A comparative case study and the strength Pareto approach. \textit{IEEE Transactions on Evolutionary Computation}, \textit{3}(4), 257--271. \url{https://doi.org/10.1109/4235.797969}
 
 \end{thebibliography}
+\end{spacing}
+
+\input{appendix}
+\input{appendix_code}
 
 \end{spacing}
 \end{document}
-`

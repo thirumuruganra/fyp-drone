@@ -1,0 +1,114 @@
+% Appendices
+
+\appendix
+
+\chapter{CONFIGURATION PARAMETERS}\label{app:params}
+
+All tunable constants live in \texttt{config.py}. Table~\ref{tab:params} lists the main
+parameters of the airspace graph and cost model, and Table~\ref{tab:params2} those of the
+front store and Tier~2. Values marked provisional are placeholders that will be replaced
+by calibrated values.
+
+\begin{table}[!htbp]
+\centering
+\caption{Main airspace graph and cost model parameters}\label{tab:params}
+\small
+\begin{tabular}{|P{5.0cm}|P{2.6cm}|P{6.6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Meaning}\\
+\hline
+\texttt{BOX\_M}, \texttt{LATTICE\_SPACING\_M} & 6000\,m, 200\,m & Lattice extent and spacing\\
+\hline
+\texttt{H\_CRUISE\_AGL}, \texttt{CLEARANCE} & 60\,m, 15\,m & Cruise height, margin above roofs\\
+\hline
+\texttt{H\_MAX\_AGL} & 120\,m & Legal ceiling above ground\\
+\hline
+\texttt{V\_CRUISE\_KMH} & 36\,km/h & Airspeed used in the wind terms\\
+\hline
+\texttt{BETA\_HEAD}, \texttt{BETA\_CROSS} & 0.40, 0.15 & Headwind and crosswind energy coefficients\\
+\hline
+\texttt{V\_MAX\_SAFE\_KMH}, \texttt{K\_GUST} & 40\,km/h, 0.5 & Wind risk saturation speed, gust weight\\
+\hline
+\texttt{ALPHA\_SHEAR} & 0.25 & Power-law wind shear exponent\\
+\hline
+\texttt{EDGE\_SAMPLE\_STEP\_M} & 25\,m & Sampling step along each edge\\
+\hline
+\texttt{NFZ\_SOFT\_LAMBDA\_M} & 150\,m & Decay length of the no-fly buffer\\
+\hline
+\texttt{NO\_GO\_GUST\_KMH} & 45\,km/h & Gust limit of the weather gate (provisional)\\
+\hline
+\texttt{RISK\_WEIGHTS} & Table~\ref{tab:risk} & Weights of the eleven risk components (uncalibrated)\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Front store and Tier~2 parameters}\label{tab:params2}
+\small
+\begin{tabular}{|P{5.0cm}|P{3.4cm}|P{5.8cm}|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Meaning}\\
+\hline
+Front validity window & 3\,h & Front expires after this time\\
+\hline
+Wind speed drift & 10\,km/h & Rebuild when wind speed moves more than this\\
+\hline
+Wind direction drift & 45$^\circ$ (wind $>$ 10\,km/h) & Rebuild when wind turns more than this\\
+\hline
+Gust drift & 15\,km/h & Rebuild when gust moves more than this\\
+\hline
+Tier~1 expansion cap & 200,000 (S1/S2/S3: 80k, 180k, 260k) & Guards against runaway search\\
+\hline
+Payload masses $m_W$ & 0.25, 0.5, 1.0\,kg & Nominal mass of weight classes 1, 2, 3\\
+\hline
+$m_\mathrm{uav}$, battery, reserve & 1.5\,kg, 74\,Wh, 20\% & Airframe mass and battery (provisional)\\
+\hline
+$k_\mathrm{cal}$ & 6\,Wh per unit & Energy proxy to watt-hours (provisional)\\
+\hline
+Priority threshold & $P_\mathrm{lvl} \geq 4$ & Dominant weight amplified by 10\%\\
+\hline
+\end{tabular}
+\end{table}
+
+\chapter{AUTOMATED TEST SUITES}\label{app:tests}
+
+Both code bases have offline unit-test suites that need no network and no API key.
+The planner suite has about 220 tests and the simulation suite 45.
+Table~\ref{tab:tests} lists what they check.
+
+\begin{small}
+\begin{longtable}{|P{5.6cm}|P{8.6cm}|}
+\caption{Test suites and what they verify}\label{tab:tests}\\
+\hline
+\textbf{Test file} & \textbf{What it checks}\\
+\hline
+\endfirsthead
+\hline
+\textbf{Test file} & \textbf{What it checks}\\
+\hline
+\endhead
+\texttt{test\_wind.py} & Headwind sign (wind from 90$^\circ$ is a headwind for an east-bound edge), crosswind, power-law shear, hourly row selection\\
+\hline
+\texttt{test\_lattice.py} & Lattice size, 8-neighbour edges, east-bound edges cost more than west-bound edges under an east wind\\
+\hline
+\texttt{test\_terrain.py} & DEM provider chain and cache, node altitude rule, every node within 120\,m above ground\\
+\hline
+\texttt{test\_risk.py} & Risk components in $[0,1]$, restricted-zone node and edge removal, soft buffer, weather gate\\
+\hline
+\texttt{test\_tier1\_front.py} & NAMOA* front equals a brute-force front over all simple paths on a small graph; no route dominates another; every path valid\\
+\hline
+\texttt{test\_store.py} & Reuse, expiry, graph-hash change, each drift threshold, identity check\\
+\hline
+\texttt{test\_tier2\_payload.py}, \texttt{test\_tier2\_hardening.py} & Weight formula, amplification, non-extreme pick for mixed cargo on a stored lattice front, monotonicity, validation errors, latency under 1\,s, battery HOLD\\
+\hline
+\texttt{test\_evaluation\_metrics.py} & HV, IGD and spread on hand-computed cases; alignment score; competing pickers\\
+\hline
+\texttt{test\_mission\_export.py} & QGC WPL~110 round trip, collinear merge, frame~3 altitude relative to home\\
+\hline
+\texttt{test\_ablation.py}, \texttt{test\_overpass.py}, \texttt{test\_dotenv.py}, \texttt{test\_dashboard\_helpers.py} & Ablation smoke run, Overpass retry and parsing, key loading, dashboard helpers\\
+\hline
+\texttt{Simulation/tests/*} & Bundle loading and frames, clearance checker, mission export (take-off, route, land), world builder geometry\\
+\hline
+\end{longtable}
+\end{small}
