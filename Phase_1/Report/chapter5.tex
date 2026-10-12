@@ -1,0 +1,49 @@
+% Chapter 5
+
+\chapter{SOCIAL IMPACT AND SUSTAINABILITY}\label{cha:social}
+
+\section{SOCIAL IMPACT}
+
+The people who gain most from drone delivery are those far from a hospital or cut off
+by an emergency: patients in rural clinics waiting for blood or antivenom, towns
+isolated by a flood, and hospitals that send samples to a central laboratory every day.
+Zipline's network in Rwanda~\cite{r16} and the hospital sample flights in
+Switzerland~\cite{r12} show that such services already exist. What our work adds is a
+way for each flight to suit its cargo. Urgent antivenom can take the shortest corridor
+and a fragile sample a calmer one, without the operator knowing how the planner works.
+
+This matters most where trained staff are scarce. The person launching a drone at a
+district hospital or a relief camp is likely to be a nurse, a volunteer or a logistics
+worker, not a route-planning expert. Our system asks four simple questions about the
+payload (how fragile, how heavy, how urgent, how important) and handles the rest.
+
+A delivery drone also flies over people who never agreed to it. Population exposure,
+restricted zones, water and building proximity are part of every edge's cost, nodes
+above the legal ceiling are removed, and a weather gate stops flights in storms, heavy
+rain, poor visibility or strong gusts. It keeps the planner from routing over a crowded market to
+save a few seconds.
+
+Every Tier~2 decision is recorded with its tags, weights, route and any HOLD reason, so
+it can be reproduced later. The benefit depends on honest limits, though. The fragility tag is a precaution, not a proven protection~\cite{r13,r14,r15},
+and until the risk weights are calibrated, the risk numbers should be read as rankings
+between routes, not as probabilities of harm. Outdoor flights in Phase~II will follow
+the Drone Rules, 2021~\cite{r21}.
+
+\section{SUSTAINABILITY}
+
+For short, light deliveries, a small electric drone replaces a road trip by van or
+motorcycle and produces no exhaust where it flies. The planner adds to this in two
+ways. Its energy objective sees wind direction, which alone changed the energy of the
+cheapest route by 27.5\% in our study, so it can avoid strong headwinds. And the payload
+weight tag gives energy more weight when the load is heavy, which is when battery use
+matters most. The feasibility filter refuses routes that would eat into the 20\%
+battery reserve, which protects both the mission and the battery's life.
+
+The system is also light on computing. Tier~1 runs on an ordinary laptop CPU with no
+GPU or cloud service, once per region and weather window, and its front is reused by
+every mission until it expires. Tier~2 takes a fraction of a millisecond and can run on
+a Raspberry Pi on board.
+
+Everything the system depends on is open data or open-source software, so there are no
+licence fees and the method can be set up for any region. With all constants in one file
+and about 265 offline tests, it can be recalibrated as real flight data comes in.

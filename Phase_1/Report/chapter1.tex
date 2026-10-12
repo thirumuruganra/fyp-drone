@@ -1,0 +1,224 @@
+% Chapter 1
+
+\chapter{INTRODUCTION}\label{cha:intro}
+
+Unmanned aerial vehicles (UAVs) are a practical option for last-mile delivery where
+ground transport is slow or impossible: medical supplies for remote clinics, emergency
+drug drops after a disaster, and diagnostic samples that should not spend an hour
+shaking in the back of a van. In each case the UAV flies from a dispatch hub to a
+delivery point through airspace that has buildings, terrain, restricted zones and wind
+in it. A good route has to balance three things that pull against each other: how far
+the drone flies, how much battery it uses, and how much of the flight is spent in risky
+air.
+
+Multi-objective path planning was built for this kind of conflict. A multi-objective
+planner keeps distance, energy and risk separate during the search and returns a
+Pareto-optimal front, which is a set of routes where none can be improved on one
+objective without getting worse on another~\cite{r11}. The front tells the operator
+which trade-offs exist. It does not say which route to fly.
+
+The usual shortcut is to fold the three objectives into one weighted sum and run an
+ordinary planner such as A* on the resulting scalar cost. The operator picks the
+weights before each flight to express what the mission cares about. For one fixed
+mission type this works. It stops working once the payload changes, because emergency
+medicine needs a very different weight profile from a fragile blood sample or a box of
+relief supplies~\cite{r1}. Re-tuning the weights and running the search again between
+missions is slow, needs someone who understands the planner, and is hard to justify in
+the middle of an emergency.
+
+This project proposes a Payload-Aware Two-Tier UAV Route Planning system that removes
+that step. Tier~1 builds the Pareto front for a delivery region once, with an exact
+multi-objective graph search over a three-dimensional airspace lattice whose edge costs
+depend on terrain, buildings, restricted zones and the direction of the wind. The front
+is stored and reused until the graph changes, the front expires or the weather drifts.
+Tier~2 runs per mission. It reads four payload tags entered by the operator, turns them
+into objective weights with a fixed formula, scores every route on the stored front and
+returns the best one in well under a millisecond. The chosen route is exported as an
+ArduPilot mission and flown in a Gazebo and ArduPilot software-in-the-loop (SITL)
+simulation.
+
+This report covers Phase~I: the software system, its benchmarks against
+single-objective A* and MOPSO, and the first simulated flights. Phase~II moves the same
+software onto a physical quadcopter.
+
+\section{MOTIVATION}
+
+Three delivery scenarios that come up again and again in medical and emergency drone
+work motivate this project, and their routing needs do not agree with each other.
+
+Fragile medical samples such as tissue biopsies and blood specimens must arrive intact,
+and an operator will want them kept out of rough air when a smoother corridor exists.
+The priority is low flight risk: little time in turbulent or crosswind-exposed corridors
+and few sudden altitude changes. A somewhat longer but much calmer route is better.
+
+Emergency medicine such as insulin or antivenom has a strict time window. The priority
+is the shortest route, so that transit time is as low as possible, and risk and energy
+come second. If the delivery window is fifteen minutes, the shortest path wins.
+
+Disaster-relief supplies such as water purification tablets and ration packs are
+heavier than medical payloads, and they are neither fragile nor urgent. Here the
+priority is low battery drain, so that one charge covers as many drops as possible.
+
+A real delivery service sees all three, sometimes within the same hour. A planner with
+fixed weights treats them identically, and one that lets the operator change the weights
+pushes an optimisation task onto someone dispatching a drone in a hurry. We could not
+find a UAV delivery planner that
+switches between these routing strategies from a description of the payload, without
+an expert in the loop and without running the search again. That is what motivated the
+two-tier design.
+
+A second motivation is wind. None of the planners we reviewed resolve wind direction
+per edge, yet for a quadcopter cruising at 36\,km/h a 25\,km/h wind is not a detail:
+flying into it costs far more energy than flying with it, and crosswind makes the ride
+rough.
+Section~\ref{sec:res-wind} shows that at a fixed wind speed, the direction alone changes
+the energy of the cheapest available route by 27.5\%. A planner blind to direction gets this
+wrong on any windy day, and so does any payload-aware choice built on top of it.
+
+\section{BACKGROUND}\label{sec:background}
+
+\subsection{Building a front versus choosing from it}
+
+Pareto fronts for routing are built either by exact graph search, such as
+NAMOA*~\cite{r17}, which keeps every non-dominated partial path at each node, or by
+population methods such as NSGA-II~\cite{r8} and MOPSO~\cite{r6}, which are faster on
+large spaces but stochastic. Building the front is well studied. Picking one route from
+it gets far less attention: the usual options are a crowding-distance rule~\cite{r8,r3},
+an entropy criterion followed by a hand-set weighted sum~\cite{r1}, or a person. None of
+them looks at what the drone is carrying. Payload does appear in the literature as
+continuous mass inside the energy model~\cite{r10}, which changes the costs, not the
+choice between trade-offs. What is missing is any use of payload metadata to
+\emph{select} a point on a precomputed front.
+
+\subsection{Evidence from real deployments}
+
+Real deployments show where payload matters, and also how thin the public evidence
+still is. Swiss Post flew laboratory samples between hospitals on Matternet quadrotors
+until two incidents in 2019 led it to suspend the service. In January a short circuit
+cut power to the GPS and the drone made an emergency landing on Lake Z\"{u}rich. In May
+a parachute tether snagged on the airframe and the 22-pound drone fell into woods near a
+group of kindergarten children~\cite{r12}. Both were equipment failures, so they say
+nothing about route choice. They do show that laboratory samples are routinely flown
+over water and populated ground, where the choice of corridor has consequences.
+
+Laboratory studies of medicines and blood samples flown by drone found no damage on
+ordinary flights~\cite{r13,r14,r15}, but none of them varied the route
+(Section~\ref{sec:lit-papers}), so in this work the fragility tag is a precaution the
+operator sets, not a measured degradation effect.
+
+Zipline's blood-delivery network in Rwanda serves hospitals up to about 80\,km from its
+distribution centre, and each aircraft follows a predetermined flight plan~\cite{r16}.
+Its engineers treat payload weight as a limit on range. That is the energy side of the
+problem Tier~2 addresses: a heavier load shortens how far the drone can go, so the best
+route depends on what is on board.
+
+\subsection{Regulation}
+
+In India, small civil drones fly under the Drone Rules, 2021~\cite{r21}, which treat
+120\,m above ground as the ceiling for flight without special permission. Ground risk is
+commonly ranked with the SORA framework~\cite{r22}. Our airspace model uses both.
+
+\section{PROBLEM DEFINITION}\label{sec:problem}
+
+Existing UAV route planners either apply a fixed geometric selection rule over the
+Pareto front that ignores the payload, or fold the objectives into one hand-tuned
+weighted sum before the search begins, which fixes the trade-off regardless of what is
+being carried. When the payload changes, an expert has to re-tune the weights and run the search again,
+because no explicit mapping exists from a payload description to the trade-off it
+implies. In the field, that expert is not available.
+
+\subsection{Formal statement}
+
+We are given:
+\begin{enumerate}
+  \item an airspace graph $G = (V, E)$ in which every edge carries a three-objective cost
+  vector $\mathbf{c}(e) = [d(e),\, \varepsilon(e),\, \rho(e)]$ for flight distance,
+  estimated energy and flight risk;
+  \item a Pareto front $\mathcal{P}$ of non-dominated routes computed in advance over
+  $G$; and
+  \item a payload metadata tuple $(F, W, U, P_\mathrm{lvl})$ holding fragility class
+  $F \in \{1,\ldots,5\}$, payload weight class $W \in \{1,2,3\}$, delivery urgency
+  $U \in \{1,2,3\}$ and priority level $P_\mathrm{lvl} \in \{1,\ldots,5\}$.
+\end{enumerate}
+The problem is to select the route $p^* \in \mathcal{P}$ that best meets the
+requirements implied by the payload metadata, without expert re-tuning and without
+running the multi-objective search again.
+
+The inputs are values an operator can assign from domain knowledge (``this vial is
+fragile, $F = 5$; the delivery is not urgent, $U = 1$''). Selection must be
+deterministic and reproducible, and it must finish within one second of the tags being
+entered. Three further conditions follow from the gaps identified in
+Chapter~\ref{cha:lit}. The selected route must depend on $(F, W, U, P_\mathrm{lvl})$ and
+not on the geometry of the front alone. The front must be reused across missions
+between refreshes instead of being rebuilt each time. The map from
+$(F, W, U, P_\mathrm{lvl})$ to $p^*$ must be an explicit formula, not a set of rules
+written by an expert and not a lookup table.
+
+\subsection{Weather dependence}
+
+The edge costs depend on the weather. Writing $\omega$ for a weather snapshot (wind
+speed, wind direction, gust, rain and visibility), the cost of an edge is
+$\mathbf{c}(e;\omega) = [d(e),\, \varepsilon(e;\omega),\, \rho(e;\omega)]$ and the
+front becomes $\mathcal{P}(\omega)$. Distance stays the same, but energy and risk
+change with how the wind meets each edge. The selection problem itself does not change.
+What changes is that a stored front is only valid while $\omega$ stays close to the
+snapshot it was built for. That is why the front is refreshed on a schedule and on
+weather drift. When $\omega$ crosses the go/no-go limits, no route is selected at all
+and the mission is held.
+
+\subsection{Inputs, outputs and success criteria}
+
+Table~\ref{tab:ps-io} lists what the system takes in, what it returns and how each part
+is judged.
+
+\begin{table}[!htbp]
+\centering
+\caption{Inputs, outputs, constraints and success criteria}\label{tab:ps-io}
+\small
+\begin{tabular}{|P{3.3cm}|P{11.2cm}|}
+\hline
+\textbf{Item} & \textbf{Definition}\\
+\hline
+Region input & Centre point and box size; terrain (DEM), OpenStreetMap buildings, restricted zones, water and land use for that box\\
+\hline
+Weather input & Snapshot $\omega$ from Open-Meteo: wind at 80\,m, gust, rain, visibility, WMO weather code\\
+\hline
+Mission input & Depot, destination and payload tuple $(F, W, U, P_\mathrm{lvl})$\\
+\hline
+Tier~1 output & Stored Pareto front $\mathcal{P}(\omega)$ with graph hash, weather snapshot and expiry time\\
+\hline
+Tier~2 output & Selected route $p^*$ with waypoints (latitude, longitude, altitude), weights, ranks and point type, or a HOLD advisory\\
+\hline
+Mission output & QGC WPL~110 \texttt{.waypoints} and QGroundControl \texttt{.plan} files\\
+\hline
+Hard constraints & Cruise at least 60\,m above ground and 15\,m above roofs; at most 120\,m above ground; no entry into restricted zones; route energy within 80\% of battery capacity\\
+\hline
+Tier~1 criteria & Hypervolume and IGD at least as good as every baseline on each scenario; no dominated or duplicate routes in the front\\
+\hline
+Tier~2 criteria & Selection under 1\,s; zero monotonicity violations over all 225 tag combinations; non-extreme picks for mixed payloads\\
+\hline
+Simulation criteria & Cross-track error, clearance margin and landing offset of the flown route in SITL and Gazebo\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Scope}
+
+Phase~I, covered by this report, delivers the full software system and its simulation.
+Phase~II moves the system onto a Pixhawk-equipped
+F450 quadcopter with a Raspberry Pi~5 companion computer and validates it with outdoor
+flights. The Tier~1 front is treated as valid for a bounded window. It is rebuilt when
+the window expires or when the weather drifts past set thresholds, and every mission
+inside the window is served by Tier~2 alone. The project does not cover multi-UAV
+coordination, avoidance of moving obstacles during flight, or real-time replanning.
+
+\section{ORGANIZATION OF THE REPORT}
+
+The report has six chapters, followed by the references and three appendices. Chapter~\ref{cha:intro} sets out the motivation, background and
+problem. Chapter~\ref{cha:lit} reviews the closest papers, the gaps in them and our
+research objectives. Chapter~\ref{cha:method} describes the architecture and its seven
+modules with the algorithms behind them. Chapter~\ref{cha:results} covers the datasets,
+the hardware and software, the experiments and what the results show. Chapter~\ref{cha:social} discusses the social impact and sustainability
+of the work. Chapter~\ref{cha:conclusion} concludes and lists the work planned for the
+rest of Phase~I and for Phase~II. The references follow, and the appendices give the
+main configuration parameters, the automated test suites and the code organisation.
