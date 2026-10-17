@@ -328,7 +328,7 @@
 \addcontentsline{toc}{chapter}{#1}}
 \renewcommand\tableofcontents{
 \btypeout{Table of Contents}
-\begin{spacing}{1.5}
+\begin{spacing}{1.35}
 %{\bf CHAPTER NO.}\hfill{\bf TITLE}\hfill{\bf PAGE NO.}
     \setlength{\parskip}{1pt}
     \if@twocolumn
