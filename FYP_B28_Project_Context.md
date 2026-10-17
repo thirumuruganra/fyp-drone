@@ -14,8 +14,9 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 **Guide:** Dr. Sujaudeen N, Asst. Professor, CSE
 
-## Status (2026-10-12)
+## Status (2026-10-17)
 
+- Phase 1 report (`Phase_1/Report/ug-project-report.tex`, UCS2717 template) draft done. Ch1 → end App C ≈ 66 pp (user target). TOC fits 3 pp (vi–viii); TOC spacing `1.35` in `Thesis.cls` `\tableofcontents` (was 1.5) so App B + C entries stay on page viii, no spill page. Algorithms = full-page `[p]` floats.
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
 - Review 2 report done → `Review_2/Report/BID_REPORT_28.tex` (70 pp). PR thirumuruganra/fyp-drone#12 merged to `main`. Details: § Review 2 Report.
 - Review 2 PPT done → `Review_2/PPT/BID_PPT_28.tex` + `.pdf` (BID PPT 28 deck, ~26 slides, Beamer; figs in `Review_2/PPT/figures/`). Replaced blank UG template. Slide order: R1 Q&A → problem → objectives → arch/modules → methodology → algorithms → status → results (front vs baselines, wind dir, ablation, Tier 2, SITL) → comparison → next steps → team → refs. Numbers = same as report § Key numbers.
