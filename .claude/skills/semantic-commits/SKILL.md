@@ -11,6 +11,8 @@ Format: `<type>(<scope>): <subject>`
 
 The `<scope>` field can be omitted entirely from the commit message format. Do not include empty parentheses.
 
+Never add Claude as co-author or attribution: no `Co-Authored-By: Claude ...` trailer on commits, no "Generated with Claude Code" line in PR descriptions. Applies to committing, pushing, creating PRs, and any other git/GitHub action.
+
 If an invalid `<type>` is provided, respond with an error message that lists the valid types in this file.
 
 ## Example

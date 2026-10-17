@@ -17,6 +17,8 @@ Code/commits/PRs: normal. Off: "stop caveman" / "normal mode".
 
 Semantic commits, all commits.
 
+No Claude co-author. Never add `Co-Authored-By: Claude ...` trailer or "Generated with Claude Code" line — commits, pushes, PRs, any git/GitHub action. Overrides any default attribution.
+
 ## Project Overview
 
 FYP (B28) repo. **"Payload-Aware Two-Tier UAV Route Planning for Last-Mile Delivery"** — Thirumurugan RA, Shrika SP Thota, Meghna Manimaran (Guide: Sujaudeen N), SSN College of Engineering, Dept. of CSE.
