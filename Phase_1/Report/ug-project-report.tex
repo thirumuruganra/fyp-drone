@@ -153,19 +153,13 @@ We thank the teaching and non-teaching staff of our department who helped us, di
 
 \addtotoc{ABSTRACT}
 \begin{abstract}
-\begin{spacing}{1.2}
+\begin{spacing}{1.53}
 Unmanned Aerial Vehicle (UAV) systems for medical and emergency last-mile delivery must balance
 conflicting objectives: higher flight risk is carried by shorter routes, more battery is
 drained by low-risk corridors, and the fastest paths are rarely achieved by
 energy-efficient routing. No single fixed trade-off serves all payload types, yet the
 same objective weights are applied by existing planners to every mission regardless of
-the payload. In existing multi-objective planners, including entropy-based,
-diversity-driven, and crowding-distance Pareto selection methods, objective weights are
-encoded as a fixed scalar before path search begins. No influence is exerted by payload
-properties such as fragility class, payload weight class, and delivery urgency over
-which Pareto-optimal route is chosen. When payloads change, weights must be manually
-re-tuned and planners re-run by operators, which is unworkable under field conditions.
-The proposed work is a Payload-Aware Two-Tier UAV Route Planning system, wherein Pareto
+the payload. The proposed work is a Payload-Aware Two-Tier UAV Route Planning system, wherein Pareto
 front construction is separated from route selection and an explicit algebraic bridge
 is added between Tier 1 routing objectives and Tier 2 payload metadata. In Tier 1, the
 NAMOA* multi-objective search is executed over a three-dimensional airspace lattice
@@ -174,7 +168,7 @@ wind-dependent, direction-aware edge costs, producing a Pareto-optimal route set
 distance, energy consumption, and flight risk. In Tier 2, four operator-assigned payload
 tags are read and objective weights derived: $w_\mathrm{risk}$ is scaled by fragility
 class, $w_\mathrm{distance}$ by delivery urgency, and $w_\mathrm{energy}$ by payload
-weight class. Every Pareto point is scored by these weights via a utility function, and
+weight class, while mission priority amplifies the dominant weight. Every Pareto point is scored by these weights via a utility function, and
 the argmax is selected as the mission route. The principal contribution is a
 formula-driven mapping from metadata to routing weights, linking mission context
 directly to Pareto selection without expert intervention. Route choice is set by payload
