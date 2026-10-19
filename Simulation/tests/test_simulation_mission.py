@@ -20,6 +20,7 @@ import numpy as np  # noqa: E402
 import _paths  # noqa: E402
 import evaluate_gazebo_run  # noqa: E402
 import run_sim_mission  # noqa: E402
+import sitl_mission_runner  # noqa: E402
 from sim_mission_export import load_mission  # noqa: E402
 from sim_region import RegionBundle  # noqa: E402
 from simulation_logger import parse_pose_message  # noqa: E402
@@ -66,6 +67,37 @@ class EndToEndTests(unittest.TestCase):
         for d in self.missions:
             for f in ("mission.plan", "mission.waypoints", "mission.json", "route_markers.sdf"):
                 self.assertTrue((d / f).exists(), f)
+
+    def test_recording_gate_keeps_vehicle_disarmed_while_processing_telemetry(self):
+        meta, _ = load_mission(self.missions[0])
+        depot = meta["pads"]["depot"]
+        start = Path(self.tmp.name) / "start-flight"
+        link = mock.MagicMock()
+        link.wait_home.return_value = (depot["lat"], depot["lon"], meta["h_home_amsl_m"])
+        link.position = (depot["lat"], depot["lon"], 0.0)
+        link.fetch_params.return_value = {**sitl_mission_runner.SIM_PARAMS, "WP_SPD": 5.0}
+        received = []
+
+        def receive(**kwargs):
+            link.arm.assert_not_called()
+            link.set_mode.assert_not_called()
+            received.append(kwargs)
+            if len(received) == 3:
+                start.touch()
+
+        link.recv.side_effect = receive
+        # Stop immediately after release rather than running a synthetic mission.
+        link.set_mode.side_effect = PreflightError("test stops after gate release")
+        with mock.patch.object(sitl_mission_runner, "SitlLink", return_value=link), \
+                mock.patch.object(sitl_mission_runner, "verify_readback", return_value=[]), \
+                redirect_stdout(io.StringIO()):
+            rc = sitl_mission_runner.main([str(self.missions[0]), "--no-gz-log",
+                                           "--start-file", str(start)])
+        self.assertEqual(rc, 2)
+        self.assertEqual(len(received), 3)
+        self.assertFalse(start.exists())
+        link.set_mode.assert_called_once_with("GUIDED")
+        link.arm.assert_not_called()
 
     def test_mission_identity_and_altitudes(self):
         meta, items = load_mission(self.missions[0])

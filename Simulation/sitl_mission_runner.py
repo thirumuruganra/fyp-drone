@@ -266,6 +266,8 @@ def main(argv=None) -> int:
     p.add_argument("--vehicle-model", default=scfg.SIM_VEHICLE_MODEL)
     p.add_argument("--timeout", type=float, default=scfg.SIM_MISSION_TIMEOUT_S)
     p.add_argument("--allow-fixture", action="store_true")
+    p.add_argument("--start-file", type=Path,
+                   help="wait disarmed after mission upload until this file exists")
     a = p.parse_args(argv)
 
     mdir = Path(a.mission_dir).resolve()
@@ -340,6 +342,13 @@ def main(argv=None) -> int:
         if not a.no_gz_log:
             gz = GazeboPoseLogger(meta["world_name"], a.vehicle_model, run_dir)
             gz.start()
+        if a.start_file is not None:
+            save_manifest(status="waiting_for_start", start_file=str(a.start_file))
+            print(f"[SITL] READY ON GROUND. Start recording, then create: {a.start_file}", flush=True)
+            while not a.start_file.exists():
+                link.recv(timeout=0.5)
+            a.start_file.unlink()
+            logger.event("recording_start_released")
         link.set_mode("GUIDED")
         link.arm()
         link.set_mode("AUTO")

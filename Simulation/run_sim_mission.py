@@ -178,6 +178,8 @@ def main(argv=None) -> int:
     g.add_argument("--baseline", choices=sorted(BASELINES))
     p.add_argument("--dest-index", type=int, default=0, help="destination pad of the bundle (0-based)")
     p.add_argument("--spacing-m", type=float, default=scfg.SIM_SPACING_M)
+    p.add_argument("--recording-turns", action="store_true",
+                   help="ten ordered recording checkpoints; constrained corridor, not free route search")
     p.add_argument("--wind-override", nargs=2, type=float, metavar=("SPEED_KMH", "DIR_FROM_DEG"),
                    help="plan for this wind (the Gazebo world is calm unless wind is added to it)")
     p.add_argument("--no-risk-layers", action="store_true")
@@ -195,8 +197,16 @@ def main(argv=None) -> int:
         weather = weather.with_wind(*a.wind_override)
         print("[Sim] WARNING: planning with wind; add matching wind to the Gazebo world before comparing")
 
-    G, checker, key = build_graph(bundle, a.spacing_m, weather, risk_layers=not a.no_risk_layers,
-                                  refresh=a.refresh)
+    if a.recording_turns:
+        if a.dest_index != 0:
+            raise SystemExit("recording corridor uses destination 0")
+        from recording_route import build_recording_graph
+        G, checker, key = build_recording_graph(bundle, a.spacing_m, weather,
+                                               risk_layers=not a.no_risk_layers)
+        print("[Sim] Recording corridor: ten required checkpoints, eight turns; constrained route")
+    else:
+        G, checker, key = build_graph(bundle, a.spacing_m, weather, risk_layers=not a.no_risk_layers,
+                                      refresh=a.refresh)
     if not 0 <= a.dest_index < len(bundle.pads["destinations"]):
         raise SystemExit(f"--dest-index must be 0..{len(bundle.pads['destinations']) - 1}")
     depot_pad = bundle.pads["depot"]
@@ -217,7 +227,7 @@ def main(argv=None) -> int:
     identity = {"bundle_hash": bundle.bundle_hash, "graph_key": key, "hard_clearance": True}
     t0 = time.perf_counter()
     record, rebuilt, reasons = store.get_or_build(
-        G, dep.node, dst.node, location=f"sim-{bundle.region_id}", weather=weather, refresh=a.refresh,
+        G, dep.node, dst.node, location=G.graph.get("location", f"sim-{bundle.region_id}"), weather=weather, refresh=a.refresh,
         max_explored=a.max_explored, extra_identity=identity, valid_hours=scfg.SIM_FRONT_VALID_HOURS)
     tier1_s = time.perf_counter() - t0
     if record["truncated"] and not a.allow_truncated:
@@ -241,6 +251,8 @@ def main(argv=None) -> int:
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     extra = {"tier1_rebuilt": rebuilt, "tier1_reasons": reasons, "tier1_wall_s": round(tier1_s, 3),
+             "route_mode": G.graph.get("route_mode", "planner"),
+             "required_checkpoints": list(range(10)) if a.recording_turns else [],
              "weather": weather.to_dict(), "graph_build_info": {k: G.graph.get(k) for k in (
                  "elevation_provider", "n_buildings", "blocked_nodes", "nfz_nodes", "nfz_edges",
                  "filtered_edges", "clearance_rejected_edges", "clearance_checked_edges")}}

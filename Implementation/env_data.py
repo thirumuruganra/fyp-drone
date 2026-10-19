@@ -839,19 +839,15 @@ class ZoneIndex:
 def sea_polygons(coastline, offset_m: float = cfg.SEA_OFFSET_M) -> list:
     """
     Sea polygons from OSM coastline lines (local metres).  OSM keeps land on the left of
-    a coastline way, so the sea lies on its right: each line is offset to the right by
-    offset_m and closed into a polygon.  (The ocean itself is not a polygon in OSM.)
+    a coastline way, so the sea lies on its right. A right-sided buffer constructs
+    the strip directly, including bends whose offset curve splits into parts.
+    (The ocean itself is not a polygon in OSM.)
     """
-    from shapely.geometry import Polygon
     out = []
     for line in getattr(coastline, "geoms", [coastline]):
         if line.length <= 0:
             continue
-        right = line.offset_curve(-offset_m)
-        if right.is_empty:
-            continue
-        ring = list(line.coords) + list(reversed(list(right.coords)))
-        poly = Polygon(ring).buffer(0)
+        poly = line.buffer(-offset_m, single_sided=True, cap_style="flat", join_style="round")
         if not poly.is_empty:
             out.append(poly)
     return out

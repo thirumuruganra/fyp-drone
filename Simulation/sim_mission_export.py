@@ -73,8 +73,11 @@ def build_sim_mission(path: Sequence[dict], depot_pad: dict, dest_pad: dict, h_h
     for p in pts:
         items.append(_item(len(items), MAV_FRAME_GLOBAL_RELATIVE_ALT, MAV_CMD_NAV_WAYPOINT,
                            p["lat"], p["lon"], rel(p["alt_amsl_m"])))
-    items.append(_item(len(items), MAV_FRAME_GLOBAL_RELATIVE_ALT, MAV_CMD_NAV_WAYPOINT,
-                       dest_pad["lat"], dest_pad["lon"], rel(pts[-1]["alt_amsl_m"])))
+    # A route ending exactly over its pad already contains the approach waypoint.
+    if (abs(pts[-1]["lat"] - dest_pad["lat"]) > 1e-9 or
+            abs(pts[-1]["lon"] - dest_pad["lon"]) > 1e-9):
+        items.append(_item(len(items), MAV_FRAME_GLOBAL_RELATIVE_ALT, MAV_CMD_NAV_WAYPOINT,
+                           dest_pad["lat"], dest_pad["lon"], rel(pts[-1]["alt_amsl_m"])))
     items.append(_item(len(items), MAV_FRAME_GLOBAL_RELATIVE_ALT, MAV_CMD_NAV_LAND,
                        dest_pad["lat"], dest_pad["lon"], 0.0))
     for it in items[1:]:

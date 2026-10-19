@@ -7,3 +7,4 @@ mapbox_earcut>=1.0    # polygon triangulation used by trimesh.extrude_polygon
 scipy>=1.10           # trimesh vertex normals
 jinja2>=3.1           # world SDF template
 pymavlink>=2.4.40     # SITL mission upload / telemetry
+pillow>=10.0         # decode public Terrarium elevation tiles (keyless DEM)

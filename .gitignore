@@ -23,4 +23,7 @@ Simulation/regions/
 Simulation/worlds/
 Simulation/missions/
 Simulation/runs/
+Simulation/.venv/
+Simulation/.gazebo-env/
+Simulation/.local/
 

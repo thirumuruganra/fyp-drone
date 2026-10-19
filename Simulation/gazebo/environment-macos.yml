@@ -1,0 +1,15 @@
+# Native Apple Silicon binaries. Install separately from existing planner venv.
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - gz-sim8=8.10
+  - gz-launch7
+  - cmake
+  - ninja
+  - rapidjson
+  - libopencv
+  - gstreamer
+  - pkg-config
+  - pip

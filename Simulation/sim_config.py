@@ -25,6 +25,28 @@ SIM_DESTINATIONS = [
     (12.987676, 80.255431),     # north-west
 ]
 
+# Desktop profile: real Thiruvanmiyur/Adyar scene, short local delivery for recording.
+# Pads are virtual simulation points, checked against downloaded OSM geometry.
+DESKTOP_REGION_ID = "thiruvanmiyur_adyar"
+DESKTOP_CENTER = (12.9955, 80.2580)
+DESKTOP_BOX_M = 3200.0
+DESKTOP_OSM_RADIUS_M = 1900.0
+DESKTOP_SPACING_M = 150.0
+DESKTOP_TERRAIN_RES_M = 30.0      # lighter city mesh; same frozen DEM and clearance checks
+DESKTOP_DEPOT = (12.9860000, 80.2605000)
+DESKTOP_DESTINATION = (12.9861799, 80.2625304)  # nearby virtual pad (~221 m east/north of depot)
+DESKTOP_QGC_APP = "/Applications/QGroundControl.app"
+# Tight drone framing for recording; wide city view remains an explicit option.
+DESKTOP_CAMERA_OFFSETS = {"takeoff": (-4.0, -6.0, 3.0),
+                          "follow": (-6.0, -8.0, 8.0),
+                          "wide": (-120.0, -90.0, 35.0), "close": (-6.0, -8.0, 8.0)}
+DESKTOP_OVERVIEW_ALT_M = 6.0    # visible ground liftoff → close follow through landing
+# Ordered recording checkpoints: fraction along source→destination, lateral metres.
+# Intentional corridor with eight corners; not an unconstrained shortest-path claim.
+DESKTOP_TURN_CHECKPOINTS = ((0.0, 0.0), (0.12, 0.0), (0.12, 35.0),
+    (0.34, 35.0), (0.34, 0.0), (0.57, 0.0), (0.57, 40.0),
+    (0.79, 40.0), (0.79, 0.0), (1.0, 0.0))
+
 # ── Terrain ──────────────────────────────────────────────────────────────────
 SIM_DEM_FETCH_M = 90.0          # DEM sampling step (Copernicus 90 m via Open-Meteo); finer adds nothing
 SIM_TERRAIN_RES_M = 10.0        # Gazebo terrain mesh resolution (bilinear from the DEM grid)

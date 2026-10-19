@@ -1,7 +1,7 @@
 # Gazebo + ArduPilot SITL simulation: Two-Tier planner over an OSM city
 
 This folder flies the route chosen by the two-tier planner through a 3-D Gazebo copy of
-Thiruvanmiyur. The pipeline:
+Thiruvanmiyur / Adyar, Chennai. The pipeline:
 
 1. OSM building footprints are extruded to their heights and placed on the DEM terrain.
 2. Tier 1 (NAMOA*) builds the Pareto front once.
@@ -32,8 +32,9 @@ OSM + DEM ──► prepare_sim_region.py ──► regions/<id>/  (ONE frozen d
 
 | File | What it does |
 |---|---|
-| `sim_config.py` | Region (1.5 km box, 100 m lattice), depot/destination pads, clearance, world and SITL settings |
+| `sim_config.py` | CLI region (1.5 km / 100 m); desktop Thiruvanmiyur–Adyar profile (3.2 km / 150 m); pads, clearance, world and SITL settings |
 | `prepare_sim_region.py` | Builds the frozen bundle: DEM grid, OSM buildings with heights, roads, pads, `manifest.json` |
+| `terrain_tiles.py` | Keyless AWS Terrarium elevation tiles; decoded metres, bilinear sampling, local cache and provenance |
 | `sim_region.py` | `RegionBundle` loader; frame helpers (planner frame = box centre, world frame = depot) |
 | `route_clearance.py` | Hard checks on every lattice edge and pad connector (roof +15 m with a 5 m buffer, terrain +15 m, 120 m AGL) |
 | `gazebo_world_builder.py` | Writes the SDF world, terrain mesh, building tiles, roads and pads, plus `route_markers_sdf()` |
@@ -56,6 +57,124 @@ mission   = frame 3 (GLOBAL_RELATIVE_ALT): rel_alt = alt_amsl_m − H_home      
 ```
 
 With `--model JSON`, ArduPilot derives GPS from its own home position plus the Gazebo pose. The world origin and the SITL home must therefore be the same point. `gazebo_world_builder.py` writes the matching command to `worlds/<id>/sitl_command.txt`, and the runner refuses to fly if the SITL home is more than 2 m horizontally or 1 m vertically from the depot pad.
+
+## Apple Silicon Mac: visible simulation
+
+Native setup uses Conda-forge Harmonic binaries in `Simulation/.gazebo-env`,
+ArduPilot/plugin checkouts under `Simulation/.local`, and a native Gazebo GUI
+app bundle. Generated environments, builds, worlds and logs stay git-ignored.
+Homebrew's current macOS 14 formulas require extensive source builds, so this
+Mac setup uses the existing Conda installation instead.
+
+One-time setup (Conda/Miniforge and Xcode Command Line Tools required):
+
+```bash
+bash Simulation/gazebo/setup_macos.sh
+```
+
+Double-click `Simulation/Launch Simulation.command` in Finder, or run:
+
+```bash
+bash "Simulation/Launch Simulation.command"
+```
+
+Default region is **real Thiruvanmiyur / Adyar**, `thiruvanmiyur_adyar`:
+3.2 km square centred at 12.9955°N, 80.2580°E, with a virtual Thiruvanmiyur
+depot and a nearby virtual delivery pad about 221 m away for short recordings.
+The wider Adyar city scenery remains visible. Profile coordinates live in `sim_config.py`.
+First launch prepares strict real-data bundle using keyless public OSM and
+AWS terrain tiles; later launches reuse the frozen local data. It generates
+a battery-feasible Tier 2 mission, opens Gazebo, starts ArduCopter SITL,
+uploads/read-backs the mission, and flies it. The default desktop drone is `iris_with_ardupilot` (no
+gimbal/video plugins). Existing world-builder default stays `iris_with_gimbal`.
+Reference-video presentation uses cloudy sky and starts with a close launch-pad
+camera at (-4, -6, 3 m), about 8 m from drone. Camera position stays fixed while
+tracking initial climb, making liftoff visible. At 6 m world altitude, native
+Mac GUI changes to tight drone follow (-6, -8, +8 m), about 13 m away, through
+flight and landing. Controller stays active and restores tracking if it is
+released or changed. `--view follow` / `--view close` follow immediately;
+`--view wide` explicitly selects the distant city view.
+Installed macOS QGroundControl opens automatically and connects on UDP 14550;
+its satellite map shows the uploaded route, aircraft and live telemetry. Select
+Satellite/Hybrid in its map controls if another map type was previously saved.
+Arrange Gazebo left and QGroundControl right for the paired view in the video.
+Thin blue routes show the Pareto front; thick red route is selected.
+Desktop recording route now uses **10 navigation waypoints and 8 turns** in a
+short zigzag corridor, about 371 m / 74 seconds cruising. Takeoff, speed command
+and landing are additional mission commands. All ten required points and their
+legs are checked against the same terrain, building and restricted-zone data.
+Checkpoints are operator constraints for filming: Tier 1 / Tier 2 run on this
+ordered corridor, with one feasible route, rather than claiming an unconstrained
+region-wide optimum. Standard planner remains available with `--route-style planner`.
+Close the Gazebo window or press Ctrl+C in its Terminal to stop the session.
+Restart the shortcut for a fresh flight from the depot.
+
+```bash
+# View city and routes without flight:
+bash "Simulation/Launch Simulation.command" --scene-only
+# Recording: hold drone disarmed on pad until ready:
+bash "Simulation/Launch Simulation.command" --view takeoff --wait-for-start
+# Once READY ON GROUND appears, start recording, then in a second Terminal:
+touch /Users/meghna/Desktop/fyp-drone/Simulation/.local/start-flight
+# Different payload preset (same stored Tier 1 front):
+bash "Simulation/Launch Simulation.command" --preset fragile_medical
+# Original direct planner route (~223 m), without mandatory recording turns:
+bash "Simulation/Launch Simulation.command" --route-style planner
+# Close drone view; optional lighter rendering / Gazebo-only presentation:
+bash "Simulation/Launch Simulation.command" --view close --no-sky --no-ground-station
+# Existing live-data region, prepared separately:
+bash "Simulation/Launch Simulation.command" --region-id thiru_1500
+# Original synthetic setup demonstration:
+bash "Simulation/Launch Simulation.command" --region-id smoke_offline --spacing-m 100
+```
+
+Real crop contains 7,006 OSM building footprints and 1,834 road segments
+(downloaded 2026-10-16). Heights: 2 tagged, 129 from levels, 6,875 type defaults.
+Footprints are real; most heights are estimates. Pads are virtual simulation
+locations, checked against these geometries. Direct planner route is about
+223 m horizontally including pad connectors (150 m between lattice nodes).
+Default ten-point recording corridor adds turns: about 371 m / 74 seconds
+cruising at 5 m/s, plus takeoff and landing time. Previous
+~2.2 km mission's region bundle is retained under
+`.local/region-backups/thiruvanmiyur_adyar_4dc43585516d9189/` on this laptop;
+short bundle hash `c34ef7a32459cb82` invalidates the previous graph/front identity.
+Calm weather is simulated. OSM is not a complete aeronautical restriction source.
+
+Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
+Terrain Tiles / Mapzen, Tilezen; global SRTM/GMTED2010 data courtesy of USGS;
+[terrain source attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md).
+AWS tiles use Terrarium encoding at zoom 12 (~38 m pixel spacing near Chennai).
+The 90 m sampled grid is filtered approximate ground; desktop uses a 30 m
+terrain mesh for playback performance. Mesh resampling adds no source detail.
+`manifest.json` records terrain provider and attribution.
+
+`--keyless` skips `.env` and OpenTopography credentials, trying AWS terrain
+tiles then Open-Meteo. Strict mode rejects flat fallback and empty building
+data. To prepare another live region manually, use `--keyless --strict` and
+specify its centre, box and pads. Fixture buildings remain hand-made,
+**not real OSM evidence**.
+
+For manual commands, source the local environment in bash or macOS zsh:
+
+```bash
+source Simulation/gazebo/env.sh
+python Simulation/prepare_sim_region.py --strict
+```
+
+`gazebo/launch_region.sh` separates server and GUI on macOS, recognizes `.dylib`
+plugins, and uses the generated camera configuration. The native GUI binary is
+`Simulation/.local/macos/FYP Gazebo.app`. It is a GUI client only; use the
+`.command` shortcut to start the complete simulation. Launcher rejects a second
+desktop session or an occupied SITL TCP port 5762. Logs appear in
+`Simulation/runs/desktop_<timestamp>/` and the mission runner's normal run folder.
+
+The setup script sets Apple's `nm`/`size` explicitly: GNU tools from an existing
+Anaconda base environment cannot inspect the Mach-O SITL binary correctly.
+Conda's Ogre resource paths must be exported; missing paths can crash the GUI.
+Some relocated Conda libraries still log failed padded resource paths before
+successfully using the exported paths. Optional video streaming is not required.
+ROS and WSL are not required. QGroundControl is optional; Gazebo flight runs
+without it. Closing Gazebo stops SITL; QGroundControl remains available.
 
 ## Phase 0: one-time setup in WSL2 (Ubuntu 24.04)
 
@@ -199,7 +318,34 @@ python -m unittest discover -s Implementation/tests   # planner suite (edge_filt
 
 `python prepare_sim_region.py --offline --region-id smoke_offline` builds a bundle from the hand-made fixtures in `Implementation/tests/fixtures`. These fixtures are **not real data** and are for smoke tests only; `--strict` rejects them.
 
-## Verified so far (2026-10-06, cloud sandbox without Gazebo)
+## Verified on Apple Silicon Mac (2026-10-16)
+
+- Real Thiruvanmiyur/Adyar bundle prepared in strict/keyless mode; 7,006 buildings,
+  1,834 road segments. 436-node clearance-checked graph, complete seven-route
+  front, mixed-cargo route 2.199 km. Real city visibility confirmed by user.
+  Optimized desktop mesh uses 27,378 terrain triangles; cruise real-time factor
+  0.81–0.95 across five samples. ArduPilot accepted/read-back 19 items, took off
+  and flew initial route waypoints. Full real-city landing/evaluation pending.
+- Current regression suite: 224 planner + 50 simulation tests pass. Keyless DEM
+  and split-offset real-coastline regressions included.
+
+- macOS 14.4.1 / Apple M2; Conda-forge Gazebo Sim 8.10.0, ArduCopter 4.8.0-dev
+  (`8ab6afd`), official plugin `082a0fe`. Native GUI built; user confirmed scene visible.
+- `smoke_offline`: 31 fixture buildings, terrain, seven complete Pareto routes;
+  mixed-cargo selection #2, non-extreme, planner distance 1.473 km.
+- Full Gazebo JSON-backend flight: 17 mission items accepted/read back, AUTO,
+  destination LAND/disarm, 409 s wall time. Ground-truth track RMSE 0.40 m,
+  p95 1.10 m, max 1.60 m; landing offset 1.57 m; roof violations 0;
+  restricted incursions 0. Route did not cross building roofs, so no measured
+  over-roof clearance value. Fixture evidence only.
+- Run: `runs/20261016_210201_smoke_offline_dest0_mixed_cargo__210204/`;
+  `metrics.json`, map overlay and altitude plots generated by evaluator.
+- Five real-time-factor samples: 0.94–1.06. Sustained performance on live city
+  and collision drop-tests remain unverified.
+- All 223 planner tests and 45 simulation tests passed. First gimbal-model
+  attempt stalled after world reset; desktop default uses camera-free Iris.
+
+## Earlier verification (2026-10-06, cloud sandbox without Gazebo)
 
 - All of `Simulation/tests` passes offline, and so does `Implementation/tests` except for the existing Tkinter import in `test_dashboard_helpers` (no Tk in the sandbox).
 - `sitl_mission_runner.py` was flown against a **real ArduCopter SITL** (4.8.0-dev, built-in `quad` physics, `--speedup 5`), with home at the depot pad, using fixture-bundle missions:
@@ -213,7 +359,7 @@ python -m unittest discover -s Implementation/tests   # planner suite (edge_filt
 
 ## Known limits
 
-- The terrain is Copernicus 90 m (a DSM) with a 10th-percentile filter. It is approximate ground, and Thiruvanmiyur is nearly flat (about 0–15 m).
+- Terrain is filtered approximate ground. Desktop uses AWS Terrain Tiles z12 sampled at 90 m with p10 filter; standard CLI provider chain may use Copernicus/Open-Meteo instead. Grid/mesh resampling does not add source accuracy.
 - Building heights fall back to `levels × 3 m`, then to a type default. The counts are in `manifest.json`.
 - The Gazebo world has no wind. Plan calm, or add wind to the world and verify it reaches the iris before comparing wind cases.
 - Battery and energy figures in Gazebo are not calibrated. Planner energy is reported as a proxy.

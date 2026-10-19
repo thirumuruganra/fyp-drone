@@ -188,7 +188,7 @@ def sitl_command(bundle: RegionBundle) -> str:
     lat, lon = bundle.depot
     # ArduPilot >= 4.6 dev: the SITL binary picks per-frame defaults from --model, and --model JSON
     # matches none, so FRAME_CLASS stays 0 ("Arm: Motors: Check frame class and type"). Layer them back.
-    pdir = "$HOME/ardupilot/Tools/autotest/default_params"
+    pdir = "${FYP_ARDUPILOT_DIR:-$HOME/ardupilot}/Tools/autotest/default_params"
     return (f"sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console "
             f"--add-param-file={pdir}/copter.parm --add-param-file={pdir}/gazebo-iris.parm "
             f"--custom-location={lat:.7f},{lon:.7f},{bundle.h_home:.3f},0")
@@ -197,8 +197,11 @@ def sitl_command(bundle: RegionBundle) -> str:
 def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_root: Optional[Path] = None,
                 terrain_res_m: float = scfg.SIM_TERRAIN_RES_M, tile_m: float = scfg.SIM_TILE_M,
                 vehicle_model: str = scfg.SIM_VEHICLE_MODEL, roads: bool = True, sky: bool = True,
-                contact_system: bool = False) -> Path:
+                contact_system: bool = False, gui_view: str = "takeoff") -> Path:
     import jinja2
+    offset = scfg.DESKTOP_CAMERA_OFFSETS[gui_view]
+    camera_pose = (*offset, 0.0, math.atan2(offset[2], math.hypot(*offset[:2])),
+                   math.atan2(-offset[1], -offset[0]))
     bundle = RegionBundle.load(region_id, regions_root)
     out = Path(worlds_root or _paths.WORLDS_DIR) / region_id
     if out.exists():
@@ -250,12 +253,21 @@ def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_r
         spawn_z=scfg.SIM_VEHICLE_SPAWN_Z, sky=sky, contact_system=contact_system)
     world_path = out / f"{wname}.sdf"
     world_path.write_text(sdf, encoding="utf-8")
+    (out / "gui.config").write_text(
+        env.get_template("gui.config.j2").render(vehicle_model=vehicle_model,
+            camera_pose=" ".join(map(str, camera_pose)),
+            camera_offset=" ".join(map(str, offset)),
+            camera_mode="track" if gui_view == "takeoff" else "follow"), encoding="utf-8")
     (out / "sitl_command.txt").write_text(cmd + "\n", encoding="utf-8")
 
     xmin, xmax, ymin, ymax = world_extent(bundle)
     wm = {
         "region_id": region_id, "bundle_hash": bundle.bundle_hash, "world_name": wname,
         "world_sdf": world_path.name, "vehicle_model": vehicle_model, "sitl_command": cmd,
+        "gui": {"view": gui_view, "camera_offset": list(offset), "sky": sky,
+                "mode": "track" if gui_view == "takeoff" else "follow",
+                "overview_offset": list(scfg.DESKTOP_CAMERA_OFFSETS["follow"]),
+                "overview_alt_m": scfg.DESKTOP_OVERVIEW_ALT_M},
         "extent_m": {"xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax},
         "terrain": {"res_m": terrain_res_m, "vertices": int(len(terr.vertices)), "faces": int(len(terr.faces)),
                     "z_min": float(terr.vertices[:, 2].min()), "z_max": float(terr.vertices[:, 2].max())},

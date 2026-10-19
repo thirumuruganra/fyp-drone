@@ -29,10 +29,11 @@ import numpy as np
 import _paths
 import config as cfg
 import sim_config as scfg
-from env_data import (ElevationGrid, LocalFrame, LocalRasterProvider, _first_number,
+from env_data import (ElevationGrid, LocalFrame, LocalRasterProvider, OpenMeteoElevationProvider, _first_number,
                       building_height_m, default_elevation_providers, fetch_elevations,
                       fetch_osm_layers, fetch_osm_roads, load_dotenv, FIXTURE_DEM)
 from sim_region import BundleError, region_dir, sample_grid
+from terrain_tiles import TerrariumElevationProvider
 
 BUNDLE_VERSION = 1
 
@@ -299,12 +300,17 @@ def build_bundle(region_id: str, center: Sequence[float], box_m: float, depot: S
         "terrain": {"provider": provider, "source_step_m": dem_step_m, "filter": dsm_filter_mode,
                     "shape": list(values.shape), "min_m": float(values.min()),
                     "max_m": float(values.max()), "raw_max_m": float(raw.max()),
-                    "surface_note": "Copernicus/Open-Meteo DEM is a DSM; filtered, approximate ground"},
+                    "surface_note": "Public DEM surface; filtered, approximate ground, not surveyed DTM",
+                    "source": next((getattr(p, "provenance", {}) for p in elevation_providers
+                                    if p.name == provider), {})},
         "buildings": {"count": int(len(buildings)), "height_source_counts": counts, **bstats},
         "layers": {name: int(len(_clip(layers.get(name), bbox)) if layers.get(name) is not None else 0)
                    for name in ("restricted", "water", "landuse")},
         "roads": int(len(road_gdf)) if road_gdf is not None else 0,
         "data_mode": {"offline": bool(offline), "fixture": bool(fixture), "strict": bool(strict)},
+        "map_source": {"attribution": "© OpenStreetMap contributors",
+                       "url": "https://www.openstreetmap.org/copyright",
+                       "height_note": "OSM height tag, else building:levels × configured level height, else type default"},
         "files": files,
     }
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -318,7 +324,6 @@ def build_bundle(region_id: str, center: Sequence[float], box_m: float, depot: S
 
 
 def main(argv=None):
-    load_dotenv()                                   # OPENTOPO_API_KEY etc. from <repo>/.env
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--region-id", default=scfg.SIM_REGION_ID)
     p.add_argument("--center", nargs=2, type=float, metavar=("LAT", "LON"), default=scfg.SIM_CENTER)
@@ -329,16 +334,26 @@ def main(argv=None):
                    help="delivery pad (repeat); default: sim_config.SIM_DESTINATIONS")
     p.add_argument("--dem", default=None, help="local DEM (GeoTIFF or ElevationGrid JSON)")
     p.add_argument("--dem-step-m", type=float, default=scfg.SIM_DEM_FETCH_M)
+    p.add_argument("--osm-radius-m", type=float, default=cfg.OSM_FETCH_RADIUS_M)
     p.add_argument("--dsm-filter", choices=["p10", "none"], default=scfg.SIM_DSM_FILTER)
     p.add_argument("--offline", action="store_true", help="hand-made fixtures (smoke tests only)")
+    p.add_argument("--keyless", action="store_true",
+                   help="use public AWS terrain tiles / Open-Meteo only; do not load .env credentials/endpoints")
     p.add_argument("--strict", action="store_true",
                    help="refuse fixtures, flat-ground fallback and empty building layers")
     args = p.parse_args(argv)
+    if args.keyless and (args.offline or args.dem):
+        p.error("--keyless cannot be combined with --offline or --dem")
+    if not args.keyless:
+        load_dotenv()                               # OPENTOPO_API_KEY etc. from <repo>/.env
     try:
         build_bundle(args.region_id, args.center, args.box_m, args.depot,
                      args.dest or scfg.SIM_DESTINATIONS, margin_m=args.margin_m,
                      dem_step_m=args.dem_step_m, dsm_filter_mode=args.dsm_filter,
-                     offline=args.offline, strict=args.strict, dem_path=args.dem)
+                     offline=args.offline, strict=args.strict, dem_path=args.dem,
+                     osm_radius_m=args.osm_radius_m,
+                     elevation_providers=[TerrariumElevationProvider(), OpenMeteoElevationProvider()]
+                     if args.keyless else None)
     except BundleError as exc:
         raise SystemExit(f"[Region] ERROR: {exc}")
 
