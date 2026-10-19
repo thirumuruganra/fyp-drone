@@ -23,3 +23,6 @@ Simulation/regions/
 Simulation/worlds/
 Simulation/missions/
 Simulation/runs/
+# Phase 1 submission bundle: poster, video (LFS) and Readme tracked; duplicated source/report not
+Phase_1/Submission/Batch_28/SourceCode/
+Phase_1/Submission/Batch_28/Report/
