@@ -32,11 +32,13 @@ OSM + DEM ──► prepare_sim_region.py ──► regions/<id>/  (ONE frozen d
 
 | File | What it does |
 |---|---|
-| `sim_config.py` | Region (1.5 km box, 100 m lattice), depot/destination pads, clearance, world and SITL settings |
+| `sim_config.py` | Region (`thiru_demo`: 1.5 km box, 100 m lattice), depot/destination pads, clearance, camera views, world and SITL settings |
+| `launch_simulation.py` | One command: prepare (if missing) → world → mission → Gazebo + bare SITL → fly → evaluate |
+| `gazebo/env.sh` | Sets `FYP_ARDUPILOT_DIR`, `FYP_ARDUPILOT_GAZEBO_DIR` (default `~/ardupilot`, `~/ardupilot_gazebo`) and Gazebo plugin/resource paths |
 | `prepare_sim_region.py` | Builds the frozen bundle: DEM grid, OSM buildings with heights, roads, pads, `manifest.json` |
 | `sim_region.py` | `RegionBundle` loader; frame helpers (planner frame = box centre, world frame = depot) |
 | `route_clearance.py` | Hard checks on every lattice edge and pad connector (roof +15 m with a 5 m buffer, terrain +15 m, 120 m AGL) |
-| `gazebo_world_builder.py` | Writes the SDF world, terrain mesh, building tiles, roads and pads, plus `route_markers_sdf()` |
+| `gazebo_world_builder.py` | Writes the SDF world, terrain mesh, building tiles, roads and pads, `gui.config` (follow camera), plus `route_markers_sdf()` |
 | `run_sim_mission.py` | Runs bundle → graph → Tier 1 (cached) → Tier 2 → ArduCopter mission + markers |
 | `sim_mission_export.py` | Writes QGC `.plan`, `QGC WPL 110` and `mission.json` (TAKEOFF → route → LAND, no RTL) |
 | `sitl_mission_runner.py` | pymavlink: preflight identity checks, upload + read-back, GUIDED → arm → AUTO, logging |
@@ -137,11 +139,41 @@ ArduPilot's MAVProxy sends to **UDP 14550**. The PX4 link you made earlier used 
 
 - Update the Windows GPU driver.
 - Install a newer Mesa: `sudo add-apt-repository ppa:kisak/kisak-mesa && sudo apt upgrade`.
-- Launch with `gazebo/launch_region.sh <id> "" --render-engine ogre`.
-- Build the world without the sky: `python gazebo_world_builder.py <id> --no-sky`.
+- Launch with `gazebo/launch_region.sh <id> "" --render-engine ogre` (or `launch_simulation.py --render-engine ogre`).
+- Build the world without the sky: `python gazebo_world_builder.py <id> --no-sky` (or `launch_simulation.py --no-sky`).
+- Use a coarser terrain mesh: `--terrain-res-m 30` (the launcher's default). The planner and clearance checks still use the bundle DEM.
 - As a last resort, run the server headless (`gz sim -s -r <world>.sdf`) and the GUI separately (`gz sim -g`).
 
-## Running a simulated delivery
+## Running a simulated delivery: one command
+
+```bash
+cd ~/fyp-drone/Simulation
+source gazebo/env.sh                          # once per shell
+python launch_simulation.py                   # thiru_demo, mixed_cargo: prepare → world → plan → fly → evaluate
+python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, different Tier 2 pick
+python launch_simulation.py --scene-only      # world + route markers only
+python launch_simulation.py --gcs-host nat    # WSL NAT networking (not mirrored): QGC at the Windows host IP
+```
+
+What it does:
+
+- Prepares the region if `regions/<id>/` is missing. `thiru_demo` uses live data with `--strict`, and `smoke_offline` uses the fixtures.
+- Rebuilds the world with a 30 m display terrain mesh and the follow camera.
+- Runs `run_sim_mission.py`, which reuses the cached graph and Tier 1 front.
+- Starts Gazebo through `launch_region.sh`.
+- Starts the bare ArduCopter SITL binary. It uses the same `--model JSON`, Iris parameter files and depot home as `sitl_command.txt`, with a wiped EEPROM and no MAVProxy.
+- Waits for TCP 5762, then flies the mission with `sitl_mission_runner.py` and runs `evaluate_gazebo_run.py` after landing.
+
+Notes:
+
+- Every launch starts a fresh Gazebo and SITL, so no manual restart is needed between flights.
+- It refuses to start a second session, or to start when TCP 5762 is in use (for example by PX4 SITL).
+- Logs go to `runs/launch_<time>/` (`gazebo.log`, `ardupilot.log`), plus the runner's usual `runs/<run_id>__<time>/`.
+- Telemetry for QGroundControl goes to `--gcs-host`:14550. The default, 127.0.0.1, reaches Windows QGC only under mirrored networking.
+
+The steps below are the same pipeline, run by hand.
+
+## Running a simulated delivery: step by step
 
 ```bash
 cd ~/fyp-drone/Simulation
@@ -149,11 +181,11 @@ cd ~/fyp-drone/Simulation
 # Phase 1: freeze the region (live OSM + DEM, cached in Implementation/cache)
 #   OPENTOPO_API_KEY is read automatically from <repo>/.env → Copernicus 30 m DEM;
 #   without a key the Open-Meteo 90 m DEM is used.
-python prepare_sim_region.py --strict                 # default: thiru_1500 (sim_config.py)
+python prepare_sim_region.py --strict                 # default: thiru_demo (sim_config.py)
 #   other area:  --region-id my_area --center LAT LON --box-m 1500 --depot LAT LON --dest LAT LON --dest LAT LON
 
 # Phase 2: build the Gazebo world
-python gazebo_world_builder.py thiru_1500
+python gazebo_world_builder.py thiru_demo                # --view wide, --terrain-res-m 30, --no-sky
 
 # Phase 3: plan (Tier 1 once, Tier 2 per payload)
 python run_sim_mission.py --preset fragile_medical    # or --payload F W U P, --dest-index 1
@@ -161,7 +193,7 @@ python run_sim_mission.py --all-presets               # four picks from ONE cach
 python run_sim_mission.py --baseline min-distance     # single-objective baseline
 
 # Phase 4: fly
-gazebo/launch_region.sh thiru_1500 missions/<run_id>                  # terminal 1: world + markers
+gazebo/launch_region.sh thiru_demo missions/<run_id>                  # terminal 1: world + markers + follow camera
 sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console -w \
     --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/copter.parm \
     --add-param-file=$HOME/ardupilot/Tools/autotest/default_params/gazebo-iris.parm \
@@ -174,14 +206,11 @@ python sitl_mission_runner.py missions/<run_id>                       # terminal
 python evaluate_gazebo_run.py runs/<run_id>__<time>
 ```
 
-**Short demo region (`thiru_demo`, for video).** Depot and one pad about 450 m apart, so the route has 5 lattice nodes (6 navigation waypoints, about 2 minutes at 5 m/s). Both pads were picked at least 12 m clear of any footprint. The default depot in `sim_config.py` sits inside a footprint buffer with live OSM data, so `run_sim_mission.py` reports NO FEASIBLE MISSION for `thiru_1500`.
+**Default region (`thiru_demo`).** The depot and one pad are about 450 m apart, so the route has 5 lattice nodes (6 navigation waypoints, about 2 minutes at 5 m/s). Both pads were picked at least 12 m clear of any footprint.
 
-```bash
-python prepare_sim_region.py --region-id thiru_demo --box-m 1500 --depot 12.978683 80.254140 --dest 12.982188 80.256170 --strict
-python gazebo_world_builder.py thiru_demo
-python run_sim_mission.py --region-id thiru_demo --preset fragile_medical    # or --all-presets
-gazebo/launch_region.sh thiru_demo missions/<run_id>                         # then sim_vehicle.py + sitl_mission_runner.py as above
-```
+The former default, `thiru_1500`, had its depot (12.978683, 80.254601) inside a footprint buffer with live OSM data, so `run_sim_mission.py` reported NO FEASIBLE MISSION. Its three corner pads are listed in `sim_config.py` but have not been checked. To try them, use `prepare_sim_region.py --region-id <id> --dest LAT LON …`.
+
+**Gazebo camera.** `gazebo_world_builder.py` writes `worlds/<id>/gui.config`. The camera starts behind the depot and follows the vehicle: `follow` = (−6, −8, +8) m, `wide` = (−120, −90, +35) m. `launch_region.sh` passes it with `--gui-config`, then re-sends the follow request on `/gui/track` for about 10 s in case the GUI started late. After that, the camera is free to move.
 
 In Gazebo, the thin blue lines are the Tier 1 Pareto front and the thick red line is the Tier 2 pick. The pads are blue (depot) and orange (destination). Building colours show where each height came from: grey means an OSM `height` tag, beige means `building:levels × 3 m`, and light red means the type default.
 
@@ -202,7 +231,7 @@ In Gazebo, the thin blue lines are the Tier 1 Pareto front and the thick red lin
 ## Tests (offline, synthetic data)
 
 ```bash
-python -m unittest discover -s Simulation/tests       # 45 tests
+python -m unittest discover -s Simulation/tests       # needs trimesh
 python -m unittest discover -s Implementation/tests   # planner suite (edge_filter / identity / altitude-frame tests added)
 ```
 
