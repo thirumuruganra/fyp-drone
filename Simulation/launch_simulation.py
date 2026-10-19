@@ -263,7 +263,8 @@ def main(argv=None) -> int:
             runner_args = [sys.executable, "-u", str(sim / "sitl_mission_runner.py"), str(mission),
                            "--vehicle-model", args.vehicle_model]
             if args.wait_for_start:
-                start_file.unlink(missing_ok=True)
+                for stale in (start_file, start_file.with_name(start_file.name + ".ready")):
+                    stale.unlink(missing_ok=True)
                 runner_args += ["--start-file", str(start_file)]
                 threading.Thread(target=wait_for_enter, args=(start_file, stop_prompt), daemon=True).start()
             runner = subprocess.Popen(runner_args, cwd=sim, stdin=subprocess.DEVNULL, start_new_session=True)

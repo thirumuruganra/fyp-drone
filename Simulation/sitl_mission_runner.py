@@ -279,6 +279,12 @@ def main(argv=None) -> int:
                    help="after upload, hold disarmed on the pad until this file exists (writes <file>.ready first)")
     a = p.parse_args(argv)
 
+    ready = None
+    if a.start_file is not None:                # stale signals from an earlier (crashed) run
+        ready = a.start_file.with_name(a.start_file.name + ".ready")
+        a.start_file.unlink(missing_ok=True)
+        ready.unlink(missing_ok=True)
+
     mdir = Path(a.mission_dir).resolve()
     meta, items = load_mission(mdir)
     try:
@@ -349,8 +355,6 @@ def main(argv=None) -> int:
             return 0
 
         if a.start_file is not None:            # recording: hold on the pad until released
-            ready = a.start_file.with_name(a.start_file.name + ".ready")
-            a.start_file.unlink(missing_ok=True)
             save_manifest(status="waiting_for_start", start_file=str(a.start_file))
             logger.event("waiting_for_start")
             ready.touch()
