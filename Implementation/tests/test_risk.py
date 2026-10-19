@@ -241,6 +241,16 @@ class WaterTests(unittest.TestCase):
         self.assertTrue(z.contains([0], [0])[0])                                # the pond
         self.assertTrue(z.contains([500], [FRAME.to_local(cfg.CENTER_LAT + 0.01, 0)[1] + 5])[0])  # canal
 
+    def test_wavy_coastline_handles_a_split_offset_curve(self):
+        # Real Chennai coastline triggered a MultiLineString at the 10 km offset.
+        line = LineString([(i % 2, i * 100) for i in range(10)])
+        self.assertEqual(line.offset_curve(-10000).geom_type, "MultiLineString")
+        sea = sea_polygons(line, offset_m=10000)
+        point = __import__("shapely").geometry.Point
+        self.assertTrue(sea[0].is_valid)
+        self.assertTrue(sea[0].contains(point(500, 450)))
+        self.assertFalse(sea[0].contains(point(-500, 450)))
+
 
 class PopulationTests(unittest.TestCase):
     def test_class_lookup_order(self):
