@@ -190,8 +190,10 @@ def sitl_command(bundle: RegionBundle) -> str:
     # ArduPilot >= 4.6 dev: the SITL binary picks per-frame defaults from --model, and --model JSON
     # matches none, so FRAME_CLASS stays 0 ("Arm: Motors: Check frame class and type"). Layer them back.
     pdir = "${FYP_ARDUPILOT_DIR:-$HOME/ardupilot}/Tools/autotest/default_params"
+    # Project overrides last (precision landing off: no IR-LOCK beacon in the city world).
     return (f"sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console "
             f"--add-param-file={pdir}/copter.parm --add-param-file={pdir}/gazebo-iris.parm "
+            f"--add-param-file={_paths.SITL_OVERRIDES} "
             f"--custom-location={lat:.7f},{lon:.7f},{bundle.h_home:.3f},0")
 
 

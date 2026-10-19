@@ -1,0 +1,5 @@
+# Project overrides, layered after copter.parm + gazebo-iris.parm (sitl_command.txt, launch_simulation.py).
+# gazebo-iris.parm enables precision landing (PLND_ENABLED 1, PLND_TYPE 3, PLND_STRICT 1) for an IR-LOCK
+# beacon the city world does not have: below PLND_ALT_MAX the vehicle reports "PrecLand: Failsafe Measures",
+# never completes LAND and never disarms. Plain GPS landing on the destination pad instead.
+PLND_ENABLED 0

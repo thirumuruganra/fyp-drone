@@ -165,9 +165,10 @@ def main(argv=None) -> int:
             defaults = ap / "Tools/autotest/default_params"
             home = f"{bundle.depot[0]:.7f},{bundle.depot[1]:.7f},{bundle.h_home:.3f},0"
             gcs = gcs_host(args.gcs_host)
-            # Same JSON backend, Iris defaults and home as sitl_command.txt, minus MAVProxy windows.
+            # Same JSON backend, Iris defaults + project overrides and home as sitl_command.txt, no MAVProxy.
             sitl = subprocess.Popen([str(binary), "-w", "--model", "JSON", "--speedup", "1",
-                                     "--defaults", f"{defaults / 'copter.parm'},{defaults / 'gazebo-iris.parm'}",
+                                     "--defaults", f"{defaults / 'copter.parm'},{defaults / 'gazebo-iris.parm'},"
+                                                   f"{_paths.SITL_OVERRIDES}",
                                      "--home", home, "--serial0", f"udpclient:{gcs}:{GCS_UDP_PORT}",
                                      "--serial1", f"tcp:{SITL_TCP_PORT}"],
                                     cwd=session, stdout=ap_log, stderr=subprocess.STDOUT, start_new_session=True)

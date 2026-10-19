@@ -97,6 +97,8 @@ pip install -r requirements-simulation.txt
 
 ### Smoke test (must pass before the city)
 
+**Precision landing is switched off.** `gazebo-iris.parm` enables precision landing (`PLND_ENABLED 1`, strict mode) for an IR-LOCK beacon that the city world does not have. Below 8 m the vehicle reports `PrecLand: Failsafe Measures`, sits on the pad without finishing LAND, and never disarms, so the runner never completes. `gazebo/sitl_overrides.parm` (`PLND_ENABLED 0`) is layered last, both in `sitl_command.txt` and in the launcher.
+
 `--model JSON` hides the `gazebo-iris` frame from newer ArduPilot SITL binaries (defaults are looked up by model name), so `FRAME_CLASS` stays 0 and arming fails with `Motors: Check frame class and type`. The two `--add-param-file` options restore the defaults; `-w` wipes a stale `eeprom.bin` once.
 
 ```bash
@@ -136,6 +138,15 @@ ArduPilot's MAVProxy sends to **UDP 14550**. The PX4 link you made earlier used 
   3. If QGC needs a manual link, add a UDP link on port 14550.
 
 ### Gazebo GUI under WSLg is slow or black
+
+- **Blank window, and the log repeats "GUI requesting list of world names"** (even with `empty.sdf`): the GUI cannot reach the server over gz-transport. Pin transport to loopback in `~/.bashrc`, then open a new terminal:
+
+  ```bash
+  export GZ_IP=127.0.0.1
+  export GZ_RELAY=127.0.0.1
+  ```
+
+  The server alone (`gz sim -s -r empty.sdf`) still loads in this state, which is how to tell this case apart from a rendering problem.
 
 - Update the Windows GPU driver.
 - Install a newer Mesa: `sudo add-apt-repository ppa:kisak/kisak-mesa && sudo apt upgrade`.

@@ -52,7 +52,10 @@ class WorldBuilderTests(unittest.TestCase):
             self.assertTrue((self.out / "models" / u[len("model://"):] / "model.sdf").exists(), u)
         for f in (self.out / "models").rglob("model.sdf"):
             ET.parse(f)
-        self.assertIn("--custom-location=", (self.out / "sitl_command.txt").read_text())
+        cmd = (self.out / "sitl_command.txt").read_text()
+        self.assertIn("--custom-location=", cmd)
+        self.assertIn("sitl_overrides.parm", cmd)        # after the Iris defaults: precision landing off
+        self.assertLess(cmd.index("gazebo-iris.parm"), cmd.index("sitl_overrides.parm"))
 
     def test_gui_config_follows_the_vehicle(self):
         text = (self.out / "gui.config").read_text().split("?>", 1)[1]     # several top-level elements
