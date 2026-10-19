@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<!-- Gazebo Harmonic default GUI (~/.gz/sim/8/gui.config) plus a camera that starts behind the
-     depot and follows the vehicle. Written by gazebo_world_builder.py to worlds/<id>/gui.config. -->
+<!-- Gazebo Harmonic default GUI (~/.gz/sim/8/gui.config) plus a camera that starts near the depot
+     and (follow / wide views) follows the vehicle. Written by gazebo_world_builder.py. -->
 
 <!-- Quick start dialog -->
 <dialog name="quick_start" show_again="true"/>
@@ -81,9 +81,11 @@
     <property key="state" type="string">floating</property>
     <property key="showTitleBar" type="bool">false</property>
   </gz-gui>
+{%- if follow %}
   <follow_target>{{ vehicle_model }}</follow_target>
   <follow_offset>{{ camera_offset }}</follow_offset>
   <follow_pgain>0.05</follow_pgain>
+{%- endif %}
 </plugin>
 <plugin filename="MarkerManager" name="Marker manager">
   <gz-gui>

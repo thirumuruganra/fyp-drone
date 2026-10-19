@@ -275,6 +275,8 @@ def main(argv=None) -> int:
                    help="Gazebo model for ground-truth pose; default: the world manifest's, else sim_config")
     p.add_argument("--timeout", type=float, default=scfg.SIM_MISSION_TIMEOUT_S)
     p.add_argument("--allow-fixture", action="store_true")
+    p.add_argument("--start-file", type=Path,
+                   help="after upload, hold disarmed on the pad until this file exists (writes <file>.ready first)")
     a = p.parse_args(argv)
 
     mdir = Path(a.mission_dir).resolve()
@@ -345,6 +347,21 @@ def main(argv=None) -> int:
         save_manifest(status="uploaded", sitl_home=home, home_offset_m=[dh, dv], upload_s=upload_s)
         if a.no_fly:
             return 0
+
+        if a.start_file is not None:            # recording: hold on the pad until released
+            ready = a.start_file.with_name(a.start_file.name + ".ready")
+            a.start_file.unlink(missing_ok=True)
+            save_manifest(status="waiting_for_start", start_file=str(a.start_file))
+            logger.event("waiting_for_start")
+            ready.touch()
+            print(f"[SITL] READY ON GROUND, disarmed. Waiting for the start signal ({a.start_file.name}).",
+                  flush=True)
+            while not a.start_file.exists():
+                link.recv(timeout=0.5)
+            a.start_file.unlink(missing_ok=True)
+            ready.unlink(missing_ok=True)
+            logger.event("start_released")
+            print("[SITL] Start signal received.", flush=True)
 
         if not a.no_gz_log:
             gz = GazeboPoseLogger(meta["world_name"], a.vehicle_model or world_vehicle_model(meta), run_dir)

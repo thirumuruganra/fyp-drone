@@ -6,11 +6,15 @@ One-command simulated delivery (WSL2 / Linux): region → world → mission → 
     python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, new Tier 2 pick
     python launch_simulation.py --scene-only               # world + route markers, no flight
     python launch_simulation.py --gcs-host 127.0.0.1       # QGC address (default: Windows host on WSL2)
+    python launch_simulation.py --wait-for-start           # recording: hold on the pad until Enter
 
 Replaces the three terminals of README Phase 4. Each launch starts a fresh Gazebo and a fresh
 ArduCopter SITL (wiped EEPROM, home = depot pad), so no manual restart is needed between flights.
 SITL runs as the bare binary with the same --model JSON and Iris parameter files as
 sitl_command.txt; telemetry goes to QGroundControl on UDP 14550 and to the mission runner on TCP 5762.
+On WSL2 the Windows QGroundControl is opened if it is not already running (--no-ground-station skips it).
+Camera (--view): takeoff (default) films the lift-off from beside the depot pad and switches to a close
+follow camera at 6 m (gazebo/camera_director.py, system python3); follow / wide follow from the start.
 Close the Gazebo window or press Ctrl+C to stop everything.
 """
 from __future__ import annotations
@@ -22,7 +26,9 @@ import os
 import signal
 import socket
 import subprocess
+import shutil
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -79,6 +85,61 @@ def gcs_host(choice: str) -> str:
     return parts[parts.index("via") + 1]
 
 
+def windows_exe(name: str) -> str:
+    return shutil.which(name) or f"/mnt/c/Windows/System32/{name}"
+
+
+def open_ground_station(exe: str) -> str:
+    """Start Windows QGroundControl from WSL2 unless one is already running; returns what happened."""
+    if not under_wsl2():
+        return "not started (only on WSL2)"
+    listing = subprocess.run([windows_exe("tasklist.exe"), "/FI", "IMAGENAME eq QGroundControl*", "/NH"],
+                             capture_output=True, text=True, cwd="/mnt/c", check=False).stdout
+    if "QGroundControl" in listing:
+        return "already running"
+    unix = subprocess.run(["wslpath", "-u", exe], capture_output=True, text=True, check=False).stdout.strip()
+    if not unix or not Path(unix).is_file():
+        return f"not found at {exe} (set FYP_QGC_EXE or --qgc-exe)"
+    subprocess.Popen([windows_exe("powershell.exe"), "-NoProfile", "-Command",
+                      f"Start-Process -FilePath '{exe}'"], cwd="/mnt/c", stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return f"opened {exe}"
+
+
+def camera_director(sim: Path, world: str, model: str, view: str) -> subprocess.Popen | None:
+    """Start gazebo/camera_director.py under the system python3 (Gazebo's Python bindings live there)."""
+    python = "/usr/bin/python3"
+    probe = subprocess.run([python, "-c", "import gz.transport13, gz.msgs10"], capture_output=True, check=False)
+    if probe.returncode:
+        print("Camera: python3-gz-transport13 / python3-gz-msgs10 missing; gui.config camera only.", flush=True)
+        return None
+    if view == "takeoff":
+        place = ["--takeoff-pos", *map(str, scfg.SIM_CAMERA_VIEWS["takeoff"]),
+                 "--follow-offset", *map(str, scfg.SIM_CAMERA_VIEWS["follow"])]
+    else:
+        place = ["--follow-offset", *map(str, scfg.SIM_CAMERA_VIEWS[view])]
+    return subprocess.Popen([python, "-u", str(sim / "gazebo/camera_director.py"), "--world", world,
+                             "--model", model, "--view", view, "--switch-alt", str(scfg.SIM_CAMERA_SWITCH_ALT_M),
+                             "--parent-pid", str(os.getpid()), *place],
+                            cwd=sim, stdin=subprocess.DEVNULL, start_new_session=True)
+
+
+def wait_for_enter(start_file: Path, stop: threading.Event) -> None:
+    """Release the runner's pad hold (--start-file) when the user presses Enter."""
+    ready = start_file.with_name(start_file.name + ".ready")
+    while not ready.exists():
+        if stop.is_set():
+            return
+        time.sleep(0.5)
+    print("\n>>> READY ON GROUND (disarmed). Start recording, then press Enter to take off.", flush=True)
+    try:
+        sys.stdin.readline()        # EOF (no terminal attached) releases immediately
+    except (OSError, ValueError):
+        pass
+    if not stop.is_set():
+        start_file.touch()
+
+
 def prepare_args(region_id: str) -> list:
     if region_id == "smoke_offline":
         return ["--offline", "--region-id", region_id]
@@ -110,7 +171,13 @@ def main(argv=None) -> int:
     parser.add_argument("--preset", default="mixed_cargo")
     parser.add_argument("--dest-index", type=int, default=0)
     parser.add_argument("--scene-only", action="store_true", help="show world and route markers without flying")
-    parser.add_argument("--view", choices=sorted(scfg.SIM_CAMERA_VIEWS), default="follow")
+    parser.add_argument("--view", choices=sorted(scfg.SIM_CAMERA_VIEWS), default="takeoff",
+                        help="takeoff: pad shot, then follow at 6 m; follow: close chase; wide: distant chase")
+    parser.add_argument("--wait-for-start", action="store_true",
+                        help="hold disarmed on the depot pad after upload until Enter is pressed")
+    parser.add_argument("--no-ground-station", action="store_true", help="do not open Windows QGroundControl")
+    parser.add_argument("--qgc-exe", default=os.environ.get("FYP_QGC_EXE", scfg.SIM_QGC_EXE),
+                        help="Windows path of QGroundControl.exe (env FYP_QGC_EXE)")
     parser.add_argument("--terrain-res-m", type=float, default=scfg.SIM_DISPLAY_TERRAIN_RES_M,
                         help="Gazebo terrain mesh step; display only, planner uses the bundle DEM")
     parser.add_argument("--no-sky", action="store_true", help="lighter rendering (WSLg / software GL)")
@@ -159,13 +226,22 @@ def main(argv=None) -> int:
     session.mkdir(parents=True)
     print(f"Mission: {mission}\nSession logs: {session}\nClose Gazebo or press Ctrl+C to stop.", flush=True)
     gz_extra = ["--render-engine", args.render_engine] if args.render_engine else []
+    world = json.loads((_paths.WORLDS_DIR / args.region_id / "world_manifest.json").read_text())["world_name"]
+    start_file = sim / ".local/start-flight"
+    stop_prompt = threading.Event()
     children = []
     try:
         with (session / "gazebo.log").open("w") as gz_log, (session / "ardupilot.log").open("w") as ap_log:
             gazebo = subprocess.Popen(["bash", str(sim / "gazebo/launch_region.sh"), args.region_id,
                                        str(mission), *gz_extra], cwd=sim, stdout=gz_log,
-                                      stderr=subprocess.STDOUT, start_new_session=True)
+                                      stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                      start_new_session=True)
             children.append(gazebo)
+            director = camera_director(sim, world, args.vehicle_model, args.view)
+            if director is not None:
+                children.append(director)
+            if not args.no_ground_station:
+                print(f"QGroundControl: {open_ground_station(args.qgc_exe)}", flush=True)
             if args.scene_only:
                 return gazebo.wait()
 
@@ -178,13 +254,19 @@ def main(argv=None) -> int:
                                                    f"{_paths.SITL_OVERRIDES}",
                                      "--home", home, "--serial0", f"udpclient:{gcs}:{GCS_UDP_PORT}",
                                      "--serial1", f"tcp:{SITL_TCP_PORT}"],
-                                    cwd=session, stdout=ap_log, stderr=subprocess.STDOUT, start_new_session=True)
+                                    cwd=session, stdout=ap_log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                    start_new_session=True)
             children.append(sitl)
             wait_tcp(SITL_TCP_PORT, sitl)
             print(f"QGroundControl: telemetry → {gcs}:{GCS_UDP_PORT} (UDP; QGC auto-connects).", flush=True)
 
-            runner = subprocess.Popen([sys.executable, "-u", str(sim / "sitl_mission_runner.py"), str(mission),
-                                       "--vehicle-model", args.vehicle_model], cwd=sim, start_new_session=True)
+            runner_args = [sys.executable, "-u", str(sim / "sitl_mission_runner.py"), str(mission),
+                           "--vehicle-model", args.vehicle_model]
+            if args.wait_for_start:
+                start_file.unlink(missing_ok=True)
+                runner_args += ["--start-file", str(start_file)]
+                threading.Thread(target=wait_for_enter, args=(start_file, stop_prompt), daemon=True).start()
+            runner = subprocess.Popen(runner_args, cwd=sim, stdin=subprocess.DEVNULL, start_new_session=True)
             children.append(runner)
             while runner.poll() is None:
                 if gazebo.poll() is not None:
@@ -206,6 +288,7 @@ def main(argv=None) -> int:
     except KeyboardInterrupt:
         return 130
     finally:
+        stop_prompt.set()
         for process in reversed(children):
             stop(process)
 

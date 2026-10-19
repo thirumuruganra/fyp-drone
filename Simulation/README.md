@@ -167,6 +167,8 @@ python launch_simulation.py                   # thiru_demo, mixed_cargo: prepare
 python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, different Tier 2 pick
 python launch_simulation.py --scene-only      # world + route markers only
 python launch_simulation.py --gcs-host 127.0.0.1   # WSL mirrored networking (default auto = Windows host under NAT)
+python launch_simulation.py --wait-for-start      # recording: hold disarmed on the pad until you press Enter
+python launch_simulation.py --view follow         # chase camera from the start (default: takeoff shot)
 ```
 
 What it does:
@@ -181,6 +183,9 @@ What it does:
 Notes:
 
 - Every launch starts a fresh Gazebo and SITL, so no manual restart is needed between flights.
+- **Recording.** With `--wait-for-start`, the runner uploads and verifies the mission, then holds the drone disarmed on the depot pad and prints `READY ON GROUND`. Start your screen recorder, then press Enter in the launcher terminal to arm and take off.
+- **Camera.** The default `--view takeoff` places the camera beside the depot pad, (−4, −6, +3) m, about 8 m from the drone, and turns it to watch the lift-off. At 6 m altitude it switches to the close follow camera, (−6, −8, +8) m, for the rest of the flight. `gazebo/camera_director.py` does this; it runs under the system `python3`, because the `python3-gz-transport13` and `python3-gz-msgs10` bindings are Debian packages, not part of the venv. It also restores tracking if Gazebo drops it (Escape, or selecting another model). `--view follow` and `--view wide` follow from the start.
+- **QGroundControl.** On WSL2 the launcher opens Windows QGroundControl if it is not already running. The default path is `C:\Program Files\QGroundControl\bin\QGroundControl.exe`; override it with `--qgc-exe` or `FYP_QGC_EXE`, or skip it with `--no-ground-station`.
 - It refuses to start a second session, or to start when TCP 5762 is in use (for example by PX4 SITL).
 - Logs go to `runs/launch_<time>/` (`gazebo.log`, `ardupilot.log`), plus the runner's usual `runs/<run_id>__<time>/`.
 - Telemetry for QGroundControl goes to `--gcs-host`:14550. The default is `auto`. On WSL2 it sends to the default gateway, which is the Windows host under NAT networking (`sim_vehicle.py` does the same); elsewhere it sends to 127.0.0.1. With mirrored networking, pass `--gcs-host 127.0.0.1`.
@@ -224,7 +229,7 @@ python evaluate_gazebo_run.py runs/<run_id>__<time>
 
 The former default, `thiru_1500`, had its depot (12.978683, 80.254601) inside a footprint buffer with live OSM data, so `run_sim_mission.py` reported NO FEASIBLE MISSION. Its three corner pads are listed in `sim_config.py` but have not been checked. To try them, use `prepare_sim_region.py --region-id <id> --dest LAT LON …`.
 
-**Gazebo camera.** `gazebo_world_builder.py` writes `worlds/<id>/gui.config`. The camera starts behind the depot and follows the vehicle: `follow` = (−6, −8, +8) m, `wide` = (−120, −90, +35) m. `launch_region.sh` passes it with `--gui-config`, then re-sends the follow request on `/gui/track` for about 10 s in case the GUI started late. After that, the camera is free to move.
+**Gazebo camera.** `gazebo_world_builder.py` writes `worlds/<id>/gui.config`. With `follow` (−6, −8, +8) m or `wide` (−120, −90, +35) m, the camera starts near the depot and follows the vehicle. `takeoff` (−4, −6, +3) m is a fixed shot of the pad; the launcher's `gazebo/camera_director.py` then switches it to follow at 6 m. `launch_region.sh` passes it with `--gui-config`, then re-sends the follow request on `/gui/track` for about 10 s in case the GUI started late. After that, the camera is free to move.
 
 In Gazebo, the thin blue lines are the Tier 1 Pareto front and the thick red line is the Tier 2 pick. The pads are blue (depot) and orange (destination). Building colours show where each height came from: grey means an OSM `height` tag, beige means `building:levels × 3 m`, and light red means the type default.
 

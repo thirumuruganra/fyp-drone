@@ -48,8 +48,12 @@ SIM_VEHICLE_MODEL = "iris_with_ardupilot"   # from ardupilot_gazebo/models; no g
 SIM_VEHICLE_SPAWN_Z = 0.195              # as in ardupilot_gazebo iris_runway.sdf
 SIM_MAX_FRONT_MARKERS = 20      # Tier 1 front routes drawn as thin lines
 # GUI camera follow offsets (x, y, z metres from the vehicle) written to worlds/<id>/gui.config.
-SIM_CAMERA_VIEWS = {"follow": (-6.0, -8.0, 8.0),       # tight chase view through the flight
+SIM_CAMERA_VIEWS = {"takeoff": (-4.0, -6.0, 3.0),      # beside the depot pad (~8 m), then "follow" from
+                    "follow": (-6.0, -8.0, 8.0),       # tight chase view through the flight
                     "wide": (-120.0, -90.0, 35.0)}     # distant city view
+SIM_CAMERA_SWITCH_ALT_M = 6.0   # takeoff view: hold the pad shot until the vehicle is this high (world z)
+# Windows QGroundControl, opened by launch_simulation.py on WSL2 (override: FYP_QGC_EXE or --qgc-exe).
+SIM_QGC_EXE = r"C:\Program Files\QGroundControl\bin\QGroundControl.exe"
 ROAD_WIDTH_M = {"motorway": 14.0, "trunk": 12.0, "primary": 10.0, "secondary": 8.0,
                 "tertiary": 7.0, "residential": 5.0}
 ROAD_WIDTH_DEFAULT_M = 4.0

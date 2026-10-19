@@ -203,6 +203,7 @@ def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_r
                 contact_system: bool = False, gui_view: str = "follow") -> Path:
     import jinja2
     offset = scfg.SIM_CAMERA_VIEWS[gui_view]
+    follow = gui_view != "takeoff"      # takeoff: fixed pad shot; camera_director.py switches to follow
     # Start the GUI camera at the follow offset from the depot (world origin), looking at it.
     camera_pose = (*offset, 0.0, math.atan2(offset[2], math.hypot(*offset[:2])),
                    math.atan2(-offset[1], -offset[0]))
@@ -259,14 +260,15 @@ def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_r
     world_path.write_text(sdf, encoding="utf-8")
     (out / "gui.config").write_text(env.get_template("gui.config.j2").render(
         vehicle_model=vehicle_model, camera_pose=" ".join(f"{v:.4f}" for v in camera_pose),
-        camera_offset=" ".join(f"{v:.1f}" for v in offset)), encoding="utf-8")
+        camera_offset=" ".join(f"{v:.1f}" for v in offset), follow=follow), encoding="utf-8")
     (out / "sitl_command.txt").write_text(cmd + "\n", encoding="utf-8")
 
     xmin, xmax, ymin, ymax = world_extent(bundle)
     wm = {
         "region_id": region_id, "bundle_hash": bundle.bundle_hash, "world_name": wname,
         "world_sdf": world_path.name, "vehicle_model": vehicle_model, "sitl_command": cmd,
-        "gui": {"config": "gui.config", "view": gui_view, "camera_offset": list(offset)},
+        "gui": {"config": "gui.config", "view": gui_view, "camera_offset": list(offset),
+                "mode": "follow" if follow else "fixed"},
         "extent_m": {"xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax},
         "terrain": {"res_m": terrain_res_m, "vertices": int(len(terr.vertices)), "faces": int(len(terr.faces)),
                     "z_min": float(terr.vertices[:, 2].min()), "z_max": float(terr.vertices[:, 2].max())},
@@ -325,7 +327,7 @@ def main(argv=None):
     p.add_argument("--no-sky", action="store_true", help="lighter rendering (WSLg / software GL)")
     p.add_argument("--contact-system", action="store_true", help="add gz Contact system (collision evidence)")
     p.add_argument("--view", choices=sorted(scfg.SIM_CAMERA_VIEWS), default="follow",
-                   help="GUI camera written to gui.config (follows the vehicle)")
+                   help="GUI camera in gui.config: follow / wide track the vehicle, takeoff is a fixed pad shot")
     a = p.parse_args(argv)
     build_world(a.region_id, terrain_res_m=a.terrain_res_m, tile_m=a.tile_m, vehicle_model=a.vehicle_model,
                 roads=not a.no_roads, sky=not a.no_sky, contact_system=a.contact_system, gui_view=a.view)

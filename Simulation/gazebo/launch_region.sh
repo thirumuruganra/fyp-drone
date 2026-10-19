@@ -78,7 +78,7 @@ fi
 
 # Re-send the follow request on /gui/track in case the GUI ignored gui.config's CameraTracking
 # settings or started late. Stops after ~10 s so the user can move the camera freely afterwards.
-if [[ -n "${GUI_ARGS[*]}" ]] && wait_for_world && read -r VEHICLE OX OY OZ < <(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); print(m["vehicle_model"], *m.get("gui", {}).get("camera_offset", [-6, -8, 8]))' "$WORLD_DIR/world_manifest.json"); then
+if [[ -n "${GUI_ARGS[*]}" ]] && wait_for_world && read -r VEHICLE OX OY OZ < <(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); g=m.get("gui", {}); assert g.get("mode", "follow") == "follow"; print(m["vehicle_model"], *g.get("camera_offset", [-6, -8, 8]))' "$WORLD_DIR/world_manifest.json" 2>/dev/null); then
   ( for _ in 1 2 3 4 5; do
       gz topic -t /gui/track -m gz.msgs.CameraTrack -p "track_mode: FOLLOW, follow_target: {name: \"$VEHICLE\"}, follow_offset: {x: $OX, y: $OY, z: $OZ}, follow_pgain: 0.05" >/dev/null 2>&1 || true
       sleep 2
