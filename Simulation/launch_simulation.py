@@ -5,7 +5,7 @@ One-command simulated delivery (WSL2 / Linux): region → world → mission → 
     python launch_simulation.py                            # thiru_demo, mixed_cargo
     python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, new Tier 2 pick
     python launch_simulation.py --scene-only               # world + route markers, no flight
-    python launch_simulation.py --gcs-host nat             # WSL NAT networking: QGC at the Windows host IP
+    python launch_simulation.py --gcs-host 127.0.0.1       # QGC address (default: Windows host on WSL2)
 
 Replaces the three terminals of README Phase 4. Each launch starts a fresh Gazebo and a fresh
 ArduCopter SITL (wiped EEPROM, home = depot pad), so no manual restart is needed between flights.
@@ -61,9 +61,16 @@ def stop(process: subprocess.Popen) -> None:
         process.wait()
 
 
+def under_wsl2() -> bool:
+    return "microsoft-standard-WSL2" in os.uname().release
+
+
 def gcs_host(choice: str) -> str:
-    """'nat' → Windows host as seen from WSL (default gateway); anything else is used as given."""
-    if choice != "nat":
+    """QGroundControl address. 'auto': the Windows host on WSL2 (default gateway, as sim_vehicle.py
+    does; correct under NAT networking), else 127.0.0.1. 'nat' forces the gateway; an IP is used as given."""
+    if choice == "auto" and not under_wsl2():
+        return "127.0.0.1"
+    if choice not in ("auto", "nat"):
         return choice
     out = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, check=True).stdout
     parts = out.split()
@@ -109,8 +116,8 @@ def main(argv=None) -> int:
     parser.add_argument("--no-sky", action="store_true", help="lighter rendering (WSLg / software GL)")
     parser.add_argument("--render-engine", choices=("ogre", "ogre2"), help="pass ogre if WSLg shows a black window")
     parser.add_argument("--vehicle-model", default=scfg.SIM_VEHICLE_MODEL)
-    parser.add_argument("--gcs-host", default="127.0.0.1",
-                        help="QGroundControl address: 127.0.0.1 with WSL mirrored networking, 'nat' or an IP otherwise")
+    parser.add_argument("--gcs-host", default="auto",
+                        help="QGroundControl address: auto (Windows host on WSL2, else 127.0.0.1), nat, or an IP")
     parser.add_argument("--no-evaluate", action="store_true", help="skip evaluate_gazebo_run.py after landing")
     args = parser.parse_args(argv)
 
@@ -174,7 +181,7 @@ def main(argv=None) -> int:
                                     cwd=session, stdout=ap_log, stderr=subprocess.STDOUT, start_new_session=True)
             children.append(sitl)
             wait_tcp(SITL_TCP_PORT, sitl)
-            print(f"QGroundControl: listening on UDP {GCS_UDP_PORT} receives telemetry from {gcs}.", flush=True)
+            print(f"QGroundControl: telemetry → {gcs}:{GCS_UDP_PORT} (UDP; QGC auto-connects).", flush=True)
 
             runner = subprocess.Popen([sys.executable, "-u", str(sim / "sitl_mission_runner.py"), str(mission),
                                        "--vehicle-model", args.vehicle_model], cwd=sim, start_new_session=True)

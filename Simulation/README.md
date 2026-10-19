@@ -163,7 +163,7 @@ source gazebo/env.sh                          # once per shell
 python launch_simulation.py                   # thiru_demo, mixed_cargo: prepare → world → plan → fly → evaluate
 python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, different Tier 2 pick
 python launch_simulation.py --scene-only      # world + route markers only
-python launch_simulation.py --gcs-host nat    # WSL NAT networking (not mirrored): QGC at the Windows host IP
+python launch_simulation.py --gcs-host 127.0.0.1   # WSL mirrored networking (default auto = Windows host under NAT)
 ```
 
 What it does:
@@ -180,7 +180,7 @@ Notes:
 - Every launch starts a fresh Gazebo and SITL, so no manual restart is needed between flights.
 - It refuses to start a second session, or to start when TCP 5762 is in use (for example by PX4 SITL).
 - Logs go to `runs/launch_<time>/` (`gazebo.log`, `ardupilot.log`), plus the runner's usual `runs/<run_id>__<time>/`.
-- Telemetry for QGroundControl goes to `--gcs-host`:14550. The default, 127.0.0.1, reaches Windows QGC only under mirrored networking.
+- Telemetry for QGroundControl goes to `--gcs-host`:14550. The default is `auto`. On WSL2 it sends to the default gateway, which is the Windows host under NAT networking (`sim_vehicle.py` does the same); elsewhere it sends to 127.0.0.1. With mirrored networking, pass `--gcs-host 127.0.0.1`.
 
 The steps below are the same pipeline, run by hand.
 
