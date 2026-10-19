@@ -133,11 +133,14 @@ SourceCode/Simulation side by side). Simulation imports the planner from ../Impl
 
 --- 2. Simulation (Gazebo + ArduPilot SITL, Ubuntu 24.04 / WSL2) ----
   One-time setup of Gazebo Harmonic, ArduPilot SITL and the ardupilot_gazebo plugin:
-  follow "Phase 0" in Simulation/README.md.
+  follow "One-time setup" in SourceCode/Simulation/README.md.
 
-  cd SourceCode/Simulation
-  python3 -m venv ~/venvs/fyp && . ~/venvs/fyp/bin/activate
-  pip install -r requirements-simulation.txt
+  Copy the extracted Batch_28 folder into the Linux filesystem first (running from
+  /mnt/c is much slower):
+      cp -r /mnt/c/<path to>/Batch_28 ~/Batch_28
+      cd ~/Batch_28/SourceCode/Simulation
+      python3 -m venv ~/venvs/fyp && . ~/venvs/fyp/bin/activate
+      pip install -r requirements-simulation.txt
 
   Plan (no Gazebo needed), using the frozen thiru_demo bundle shipped in regions/:
       python run_sim_mission.py --all-presets
@@ -154,7 +157,7 @@ SourceCode/Simulation side by side). Simulation imports the planner from ../Impl
   Manual alternative (three terminals):
       python gazebo_world_builder.py thiru_demo
       python run_sim_mission.py --preset fragile_medical
-      gazebo/launch_region.sh thiru_demo missions/<run_id>
+      bash gazebo/launch_region.sh thiru_demo missions/<run_id>
       sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console -w ...
           (exact command in worlds/thiru_demo/sitl_command.txt)
       python sitl_mission_runner.py missions/<run_id>
@@ -165,6 +168,9 @@ SourceCode/Simulation side by side). Simulation imports the planner from ../Impl
 
   Unit tests (needs trimesh):
       python -m unittest discover -s tests
+
+  If bash reports "$'\r': command not found" (a script was saved on Windows):
+      sed -i 's/\r$//' gazebo/*.sh gazebo/*.parm
 
   Full step-by-step, frame conventions and WSL notes: SourceCode/Simulation/README.md.
   Planner details (files, options, known limits): SourceCode/Implementation/README.md.
