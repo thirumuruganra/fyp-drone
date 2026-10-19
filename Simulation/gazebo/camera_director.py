@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import threading
 import time
 
@@ -41,6 +42,23 @@ def alive(pid: int) -> bool:
         return False
 
 
+def wait_for_gui(parent_pid: int, settle_s: float = 5.0, timeout_s: float = 300.0) -> bool:
+    """Block until the GUI serves /gui/move_to/pose, then settle. Joining gz-transport (subscribe/advertise)
+    while Gazebo is still starting can crash it: its discovery thread calls getenv() while the GUI is
+    still setting environment variables (segfault in NodeShared::OnSubscribers)."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline and alive(parent_pid):
+        try:
+            out = subprocess.run(["gz", "service", "-l"], capture_output=True, text=True, timeout=15).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            out = ""
+        if "/gui/move_to/pose" in out.split():
+            time.sleep(settle_s)
+            return True
+        time.sleep(2)
+    return False
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--world", required=True)
@@ -51,6 +69,9 @@ def main(argv=None) -> int:
     p.add_argument("--switch-alt", type=float, default=6.0)
     p.add_argument("--parent-pid", type=int, default=0)
     a = p.parse_args(argv)
+    if not wait_for_gui(a.parent_pid):
+        print("[Camera] Gazebo GUI not found; camera director idle.", flush=True)
+        return 1
 
     from gz.msgs10.boolean_pb2 import Boolean
     from gz.msgs10.cameratrack_pb2 import CameraTrack
