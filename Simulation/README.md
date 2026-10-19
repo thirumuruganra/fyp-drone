@@ -97,7 +97,10 @@ pip install -r requirements-simulation.txt
 
 ### Smoke test (must pass before the city)
 
-**Precision landing is switched off.** `gazebo-iris.parm` enables precision landing (`PLND_ENABLED 1`, strict mode) for an IR-LOCK beacon that the city world does not have. Below 8 m the vehicle reports `PrecLand: Failsafe Measures`, sits on the pad without finishing LAND, and never disarms, so the runner never completes. `gazebo/sitl_overrides.parm` (`PLND_ENABLED 0`) is layered last, both in `sitl_command.txt` and in the launcher.
+**SITL overrides: rangefinder and precision landing off.** `gazebo/sitl_overrides.parm` is layered after the Iris defaults, both in `sitl_command.txt` and in the launcher. It sets two parameters:
+
+- `RNGFND1_TYPE 0`. SITL simulates the rangefinder as height above the *home* altitude, because it has no terrain model. On a pad higher than the depot, the reading after touchdown is the height difference (5.95 m on `thiru_demo`). Copter's land detector needs a reading under 2 m, so LAND never completes, the vehicle never disarms, and the runner never finishes. The Iris models have no rangefinder anyway.
+- `PLND_ENABLED 0`. `gazebo-iris.parm` enables strict precision landing for an IR-LOCK beacon that the city world does not have, which causes `PrecLand: Failsafe Measures` during LAND.
 
 `--model JSON` hides the `gazebo-iris` frame from newer ArduPilot SITL binaries (defaults are looked up by model name), so `FRAME_CLASS` stays 0 and arming fails with `Motors: Check frame class and type`. The two `--add-param-file` options restore the defaults; `-w` wipes a stale `eeprom.bin` once.
 
