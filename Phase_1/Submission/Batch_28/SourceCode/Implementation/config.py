@@ -19,7 +19,7 @@ H_CRUISE_AGL = 60.0       # m, nominal cruise height above ground
 CLEARANCE = 15.0          # m, vertical margin above the tallest obstacle
 H_MAX_AGL = 120.0         # m, legal ceiling
 
-# ── Wind / energy model (see wind_integration_plan.md v1.1) ────────────────
+# ── Wind / energy model ────────────────
 V_CRUISE_KMH = 36.0       # UAV airspeed, 10 m/s
 BETA_HEAD = 0.40          # energy penalty per (headwind / V_CRUISE)
 BETA_CROSS = 0.15         # energy penalty per (crosswind / V_CRUISE)

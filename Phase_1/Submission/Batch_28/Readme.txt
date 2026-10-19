@@ -151,7 +151,8 @@ side). Simulation imports the planner from ../Implementation.
   Unit tests (needs trimesh):
       python -m unittest discover -s tests
 
-  Full step-by-step, frame conventions and WSL notes: Simulation/README.md.
+  Full step-by-step, frame conventions and WSL notes: SourceCode/Simulation/README.md.
+  Planner details (files, options, known limits): SourceCode/Implementation/README.md.
 
 --- 3. Report (LaTeX) -------------------------------------------------
   Unzip Report/Batch_28_Report.zip, then in the extracted folder:
