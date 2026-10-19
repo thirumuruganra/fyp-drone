@@ -91,10 +91,9 @@ API KEYS (optional)
 =====================================================================
 c. HOW TO EXECUTE THE SOURCE CODE
 =====================================================================
-The code is shared only through this OneDrive folder (Batch_28); there is no Git
-repository. Download Batch_28, extract it outside OneDrive, and run the commands below
-from the extracted Batch_28 folder. Keep the folder layout (SourceCode/Implementation and
-SourceCode/Simulation side by side). Simulation imports the planner from ../Implementation.
+Download the Batch_28 folder and run the commands below from it. Keep the folder layout
+(SourceCode/Implementation and SourceCode/Simulation side by side). Simulation imports
+the planner from ../Implementation.
 
 --- 1. Planner (Windows / Linux / macOS) ---------------------------
   cd SourceCode/Implementation
@@ -135,7 +134,7 @@ SourceCode/Simulation side by side). Simulation imports the planner from ../Impl
   One-time setup of Gazebo Harmonic, ArduPilot SITL and the ardupilot_gazebo plugin:
   follow "One-time setup" in SourceCode/Simulation/README.md.
 
-  Copy the extracted Batch_28 folder into the Linux filesystem first (running from
+  Copy the Batch_28 folder into the Linux filesystem first (running from
   /mnt/c is much slower):
       cp -r /mnt/c/<path to>/Batch_28 ~/Batch_28
       cd ~/Batch_28/SourceCode/Simulation

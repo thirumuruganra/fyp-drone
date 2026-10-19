@@ -20,12 +20,7 @@ score(p) = w_distance(1 - d~) + w_energy(1 - e~) + w_risk(1 - r~)     (objective
 
 ## Getting the code
 
-The code is shared only through the OneDrive folder `Batch_28`; there is no Git repository to
-clone. Download `Batch_28` from OneDrive (it arrives as a zip), extract it outside OneDrive and run
-from the extracted `Batch_28` folder. The scripts write `cache/`, `outputs/` and
-`pareto_front_storage/` next to themselves, and those should not be synced back into OneDrive.
-
-Keep the layout:
+Download the `Batch_28` folder and run the commands below from it. Keep the layout:
 
 ```
 Batch_28/SourceCode/

@@ -14,17 +14,15 @@ The planner stays in `../Implementation`. This folder imports it through the Pyt
 
 ## Getting the code
 
-The code is shared only through the OneDrive folder `Batch_28`; there is no Git repository to
-clone. Download `Batch_28` from OneDrive (it arrives as a zip), extract it, and copy the extracted
-`Batch_28` folder into the Linux filesystem of Ubuntu / WSL2. Running from `/mnt/c/...` works but
-is much slower, and a folder that OneDrive is still syncing should not be used as the working copy.
+Download the `Batch_28` folder and copy it into the Linux filesystem of Ubuntu / WSL2 (running
+from `/mnt/c/...` works but is much slower).
 
 ```bash
-cp -r /mnt/c/<path to>/Batch_28 ~/Batch_28          # the extracted Batch_28 folder
+cp -r /mnt/c/<path to>/Batch_28 ~/Batch_28
 cd ~/Batch_28/SourceCode/Simulation                  # all commands below run from here
 ```
 
-The layout after extraction must stay:
+Keep the layout:
 
 ```
 Batch_28/SourceCode/
