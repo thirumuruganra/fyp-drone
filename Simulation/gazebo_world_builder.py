@@ -1,7 +1,7 @@
 """
 Phase 2: Gazebo (Harmonic+) city world from a region bundle.
 
-    python gazebo_world_builder.py thiru_1500            # → worlds/thiru_1500/
+    python gazebo_world_builder.py thiru_demo            # → worlds/thiru_demo/
 
 Output (git-ignored):
 
@@ -9,6 +9,7 @@ Output (git-ignored):
     worlds/<id>/models/<id>_terrain/       static terrain mesh (visual = collision)
     worlds/<id>/models/<id>_bldg_<i>_<j>/  building tiles, one link per height source
     worlds/<id>/models/<id>_roads/         flat road ribbons (visual only)
+    worlds/<id>/gui.config                GUI layout + camera following the vehicle
     worlds/<id>/sitl_command.txt          matching sim_vehicle.py line
     worlds/<id>/world_manifest.json       bundle hash, counts, extents
 
@@ -188,7 +189,7 @@ def sitl_command(bundle: RegionBundle) -> str:
     lat, lon = bundle.depot
     # ArduPilot >= 4.6 dev: the SITL binary picks per-frame defaults from --model, and --model JSON
     # matches none, so FRAME_CLASS stays 0 ("Arm: Motors: Check frame class and type"). Layer them back.
-    pdir = "$HOME/ardupilot/Tools/autotest/default_params"
+    pdir = "${FYP_ARDUPILOT_DIR:-$HOME/ardupilot}/Tools/autotest/default_params"
     return (f"sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console "
             f"--add-param-file={pdir}/copter.parm --add-param-file={pdir}/gazebo-iris.parm "
             f"--custom-location={lat:.7f},{lon:.7f},{bundle.h_home:.3f},0")
@@ -197,8 +198,12 @@ def sitl_command(bundle: RegionBundle) -> str:
 def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_root: Optional[Path] = None,
                 terrain_res_m: float = scfg.SIM_TERRAIN_RES_M, tile_m: float = scfg.SIM_TILE_M,
                 vehicle_model: str = scfg.SIM_VEHICLE_MODEL, roads: bool = True, sky: bool = True,
-                contact_system: bool = False) -> Path:
+                contact_system: bool = False, gui_view: str = "follow") -> Path:
     import jinja2
+    offset = scfg.SIM_CAMERA_VIEWS[gui_view]
+    # Start the GUI camera at the follow offset from the depot (world origin), looking at it.
+    camera_pose = (*offset, 0.0, math.atan2(offset[2], math.hypot(*offset[:2])),
+                   math.atan2(-offset[1], -offset[0]))
     bundle = RegionBundle.load(region_id, regions_root)
     out = Path(worlds_root or _paths.WORLDS_DIR) / region_id
     if out.exists():
@@ -250,12 +255,16 @@ def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_r
         spawn_z=scfg.SIM_VEHICLE_SPAWN_Z, sky=sky, contact_system=contact_system)
     world_path = out / f"{wname}.sdf"
     world_path.write_text(sdf, encoding="utf-8")
+    (out / "gui.config").write_text(env.get_template("gui.config.j2").render(
+        vehicle_model=vehicle_model, camera_pose=" ".join(f"{v:.4f}" for v in camera_pose),
+        camera_offset=" ".join(f"{v:.1f}" for v in offset)), encoding="utf-8")
     (out / "sitl_command.txt").write_text(cmd + "\n", encoding="utf-8")
 
     xmin, xmax, ymin, ymax = world_extent(bundle)
     wm = {
         "region_id": region_id, "bundle_hash": bundle.bundle_hash, "world_name": wname,
         "world_sdf": world_path.name, "vehicle_model": vehicle_model, "sitl_command": cmd,
+        "gui": {"config": "gui.config", "view": gui_view, "camera_offset": list(offset)},
         "extent_m": {"xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax},
         "terrain": {"res_m": terrain_res_m, "vertices": int(len(terr.vertices)), "faces": int(len(terr.faces)),
                     "z_min": float(terr.vertices[:, 2].min()), "z_max": float(terr.vertices[:, 2].max())},
@@ -313,9 +322,11 @@ def main(argv=None):
     p.add_argument("--no-roads", action="store_true")
     p.add_argument("--no-sky", action="store_true", help="lighter rendering (WSLg / software GL)")
     p.add_argument("--contact-system", action="store_true", help="add gz Contact system (collision evidence)")
+    p.add_argument("--view", choices=sorted(scfg.SIM_CAMERA_VIEWS), default="follow",
+                   help="GUI camera written to gui.config (follows the vehicle)")
     a = p.parse_args(argv)
     build_world(a.region_id, terrain_res_m=a.terrain_res_m, tile_m=a.tile_m, vehicle_model=a.vehicle_model,
-                roads=not a.no_roads, sky=not a.no_sky, contact_system=a.contact_system)
+                roads=not a.no_roads, sky=not a.no_sky, contact_system=a.contact_system, gui_view=a.view)
 
 
 if __name__ == "__main__":
