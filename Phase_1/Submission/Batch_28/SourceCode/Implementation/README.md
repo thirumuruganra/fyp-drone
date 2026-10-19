@@ -18,9 +18,27 @@ P >= 4: the largest weight gets +10 %, then renormalise to 1
 score(p) = w_distance(1 - d~) + w_energy(1 - e~) + w_risk(1 - r~)     (objectives min-max normalised)
 ```
 
+## Getting the code
+
+The code is shared only through the OneDrive folder `Batch_28`; there is no Git repository to
+clone. Download `Batch_28` from OneDrive (it arrives as a zip), extract it outside OneDrive and run
+from the extracted `Batch_28` folder. The scripts write `cache/`, `outputs/` and
+`pareto_front_storage/` next to themselves, and those should not be synced back into OneDrive.
+
+Keep the layout:
+
+```
+Batch_28/SourceCode/
+  .env.example      copy to .env for the optional OpenTopography key
+  Implementation/   this folder; run every command below from here
+  Simulation/       Gazebo + SITL (imports this folder)
+```
+
 ## Setup
 
 ```bash
+cd Batch_28/SourceCode/Implementation
+python -m venv .venv                # optional; activate: .venv\Scripts\activate (Windows) or . .venv/bin/activate
 pip install -r requirements.txt     # Python 3, tested on 3.12
 ```
 
@@ -28,8 +46,9 @@ Windows: set `PYTHONUTF8=1` before running (PowerShell: `$env:PYTHONUTF8 = "1"`)
 console prints crash on the cp1252 code page. Tkinter (bundled with Python) is needed only for
 `dashboard.py`.
 
-Optional: an OpenTopography key gives the 30 m Copernicus DEM. Copy `../.env.example` to
-`../.env` and fill in `OPENTOPO_API_KEY`. Without a key the 90 m Open-Meteo elevation API is used.
+Optional: an OpenTopography key gives the 30 m Copernicus DEM. Copy `Batch_28/SourceCode/.env.example` to
+`Batch_28/SourceCode/.env` (one level above this folder) and fill in `OPENTOPO_API_KEY`. The entry scripts
+read it from there. Without a key the 90 m Open-Meteo elevation API is used.
 
 ## Run
 

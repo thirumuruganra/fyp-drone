@@ -12,6 +12,34 @@ Flies the route chosen by the two-tier planner through a 3-D Gazebo copy of Thir
 The planner stays in `../Implementation`. This folder imports it through the Python path, so keep
 `Implementation/` and `Simulation/` side by side.
 
+## Getting the code
+
+The code is shared only through the OneDrive folder `Batch_28`; there is no Git repository to
+clone. Download `Batch_28` from OneDrive (it arrives as a zip), extract it, and copy the extracted
+`Batch_28` folder into the Linux filesystem of Ubuntu / WSL2. Running from `/mnt/c/...` works but
+is much slower, and a folder that OneDrive is still syncing should not be used as the working copy.
+
+```bash
+cp -r /mnt/c/<path to>/Batch_28 ~/Batch_28          # the extracted Batch_28 folder
+cd ~/Batch_28/SourceCode/Simulation                  # all commands below run from here
+```
+
+The layout after extraction must stay:
+
+```
+Batch_28/SourceCode/
+  .env.example      copy to .env for the optional OpenTopography key
+  Implementation/   planner (imported by this folder)
+  Simulation/       this folder
+```
+
+The shell scripts and the parameter file are saved with Linux (LF) line endings. If one was opened
+and saved on Windows and bash reports `$'\r': command not found`, convert it back:
+`sed -i 's/\r$//' gazebo/*.sh gazebo/*.parm`.
+
+The output folders `worlds/`, `missions/`, `runs/` and `.local/` are not shipped; they are created on
+the first run. `regions/` ships with the two frozen bundles.
+
 ```
 OSM + DEM -> prepare_sim_region.py -> regions/<id>/   (frozen data bundle, bundle_hash)
                                           |
@@ -85,17 +113,19 @@ git clone https://github.com/ArduPilot/ardupilot_gazebo ~/ardupilot_gazebo
 cd ~/ardupilot_gazebo && mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j4
 
-# Environment: source once per shell (or copy its exports to ~/.bashrc).
-# Override the checkout paths with FYP_ARDUPILOT_DIR / FYP_ARDUPILOT_GAZEBO_DIR.
-source gazebo/env.sh               # run from the Simulation folder
+# Gazebo Python bindings for the recording camera (system python3, not the venv)
+sudo apt install python3-gz-transport13 python3-gz-msgs10
 
-# Python environment, from the SourceCode folder
-cd Simulation
+# Python environment
+cd ~/Batch_28/SourceCode/Simulation
 python3 -m venv ~/venvs/fyp && . ~/venvs/fyp/bin/activate
 pip install -r requirements-simulation.txt
-```
 
-Under WSL2, put the project in the Linux filesystem (not `/mnt/c`) for speed.
+# Environment: source once per shell, from this folder (or copy its exports to ~/.bashrc).
+# It expects ~/ardupilot and ~/ardupilot_gazebo; for other locations set
+# FYP_ARDUPILOT_DIR / FYP_ARDUPILOT_GAZEBO_DIR first.
+source gazebo/env.sh
+```
 
 **Smoke test (run once before the city):**
 
@@ -125,7 +155,8 @@ about 2 minutes at 5 m/s), both at least 12 m clear of any building footprint. I
 already in `regions/`.
 
 ```bash
-cd Simulation
+. ~/venvs/fyp/bin/activate                            # once per shell
+cd ~/Batch_28/SourceCode/Simulation
 source gazebo/env.sh                                   # once per shell
 python launch_simulation.py                            # thiru_demo, mixed_cargo: prepare -> world -> plan -> fly -> evaluate
 python launch_simulation.py --preset fragile_medical   # same stored Tier 1 front, different Tier 2 pick
@@ -171,10 +202,11 @@ Notes:
 The same pipeline, run by hand.
 
 ```bash
-cd Simulation
+cd ~/Batch_28/SourceCode/Simulation
+. ~/venvs/fyp/bin/activate
 
 # Phase 1: frozen region. regions/thiru_demo is already included; rebuild only to refresh the data
-# (needs network; OPENTOPO_API_KEY in ../.env gives the 30 m DEM, otherwise a 90 m DEM is used)
+# (needs network; OPENTOPO_API_KEY in Batch_28/SourceCode/.env gives the 30 m DEM, otherwise a 90 m DEM is used)
 python prepare_sim_region.py --strict                  # default: thiru_demo (sim_config.py)
 #   other area: --region-id my_area --center LAT LON --box-m 1500 --depot LAT LON --dest LAT LON
 
@@ -188,7 +220,7 @@ python run_sim_mission.py --baseline min-distance
 #   also: --payload F W U P, --dest-index N, --wind-override SPEED_KMH DIR_FROM_DEG, --refresh
 
 # Phase 4: fly (three terminals)
-gazebo/launch_region.sh thiru_demo missions/<run_id>
+bash gazebo/launch_region.sh thiru_demo missions/<run_id>
 sim_vehicle.py ...                                     # exact command in worlds/thiru_demo/sitl_command.txt
 python sitl_mission_runner.py missions/<run_id>
 #   or in QGroundControl: Plan -> Open -> mission.plan -> Upload -> Start Mission

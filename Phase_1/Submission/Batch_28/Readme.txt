@@ -91,8 +91,10 @@ API KEYS (optional)
 =====================================================================
 c. HOW TO EXECUTE THE SOURCE CODE
 =====================================================================
-Keep the folder layout (SourceCode/Implementation and SourceCode/Simulation side by
-side). Simulation imports the planner from ../Implementation.
+The code is shared only through this OneDrive folder (Batch_28); there is no Git
+repository. Download Batch_28, extract it outside OneDrive, and run the commands below
+from the extracted Batch_28 folder. Keep the folder layout (SourceCode/Implementation and
+SourceCode/Simulation side by side). Simulation imports the planner from ../Implementation.
 
 --- 1. Planner (Windows / Linux / macOS) ---------------------------
   cd SourceCode/Implementation
