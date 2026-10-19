@@ -1,0 +1,17 @@
+{
+  "depot": {
+    "name": "depot",
+    "lat": 12.978683,
+    "lon": 80.25414,
+    "ground_amsl_m": 3.816286999159508
+  },
+  "destinations": [
+    {
+      "name": "dest0",
+      "lat": 12.982188,
+      "lon": 80.25617,
+      "ground_amsl_m": 9.788750667913606
+    }
+  ],
+  "h_home_amsl_m": 3.816286999159508
+}
