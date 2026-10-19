@@ -113,3 +113,53 @@ Table~\ref{tab:tests} lists what they check.
 \hline
 \end{longtable}
 \end{small}
+
+\chapter{CODE ORGANISATION}\label{app:code}
+
+The planner is written in Python as flat scripts, one file per module, plus a
+configuration file, an environment-data file and entry-point scripts. The simulation
+lives in a separate folder and imports the planner modules through the Python path.
+Every tunable constant (region, flight heights, wind coefficients, risk weights,
+battery and mass values, drift thresholds, Overpass endpoints) lives in one file,
+\texttt{config.py}, so an experiment changes a value in one place. API keys are read
+from a \texttt{.env} file by the entry-point scripts only, so the test suites never need
+a key or a network connection. Table~\ref{tab:files} maps the source files to the
+modules.
+
+\begin{table}[!htbp]
+\centering
+\caption{Source files and the modules they implement}\label{tab:files}
+\small
+\begin{tabular}{|P{5.2cm}|P{1.4cm}|P{7.6cm}|}
+\hline
+\textbf{File} & \textbf{Module} & \textbf{Role}\\
+\hline
+\texttt{config.py} & all & Every tunable constant\\
+\hline
+\texttt{env\_data.py} & 1 & Weather, DEM providers, OSM layers, spatial indexes, key loader\\
+\hline
+\texttt{overpass\_client.py} & 1 & Multi-endpoint Overpass fetch with retry\\
+\hline
+\texttt{module1\_graph\_builder.py} & 1 & Synthetic and lattice builders, cost pipeline\\
+\hline
+\texttt{module2\_tier1\_moastar.py} & 2 & NAMOA* engine, dominance helpers, thinning\\
+\hline
+\texttt{pareto\_store.py} & 2 & Front store, graph hash, drift, region runs\\
+\hline
+\texttt{module3\_baselines.py} & 3 & A* variants, weighted-sum A*, MOPSO\\
+\hline
+\texttt{module4\_tier2\_payload.py} & 4 & Weight bridge, selector, feasibility, export\\
+\hline
+\texttt{module5\_evaluation.py} & 5 & HV, IGD, spread, Tier~2 evidence, sweep\\
+\hline
+\texttt{run\_benchmarks.py}, \texttt{run\_ablation.py} & 5 & Benchmark and ablation runners\\
+\hline
+\texttt{mission\_export.py}, \texttt{dashboard.py} & 6 & QGC WPL~110 export, operator interface\\
+\hline
+\texttt{run\_demo\_syn.py}, \texttt{run\_demo\_osm.py} & 1--4 & End-to-end demonstrations with figures\\
+\hline
+\texttt{Simulation/*.py} & 7 & Bundle, clearance, world, mission, runner, logger, evaluator\\
+\hline
+\end{tabular}
+\end{table}
+
