@@ -29,3 +29,4 @@ WORLDS_DIR = SIM_DIR / "worlds"                # generated Gazebo worlds + meshe
 MISSIONS_DIR = SIM_DIR / "missions"            # planned missions (selection, .plan, .waypoints, markers)
 RUNS_DIR = SIM_DIR / "runs"                    # flown runs (telemetry, metrics, plots)
 TEMPLATES_DIR = SIM_DIR / "gazebo" / "templates"
+SITL_OVERRIDES = SIM_DIR / "gazebo" / "sitl_overrides.parm"   # layered after the ArduPilot Iris defaults

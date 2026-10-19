@@ -3,17 +3,19 @@
 #
 #   gazebo/launch_region.sh <region_id> [mission_dir] [extra gz sim args...]
 #
-#   gazebo/launch_region.sh thiru_1500
-#   gazebo/launch_region.sh thiru_1500 missions/20261006_101500_thiru_1500_dest0_fragile_medical
-#   gazebo/launch_region.sh thiru_1500 "" --render-engine ogre     # WSLg / VM rendering fallback
+#   gazebo/launch_region.sh thiru_demo
+#   gazebo/launch_region.sh thiru_demo missions/20261018_224344_thiru_demo_dest0_fragile_medical
+#   gazebo/launch_region.sh thiru_demo "" --render-engine ogre     # WSLg / VM rendering fallback
 #
-# Needs: Gazebo Harmonic+ (gz), ardupilot_gazebo built and on GZ_SIM_SYSTEM_PLUGIN_PATH /
-# GZ_SIM_RESOURCE_PATH (see Simulation/README.md). Then start SITL in another terminal with the
-# sim_vehicle.py line this script prints (its --custom-location MUST match the world origin).
+# Needs: Gazebo Harmonic+ (gz) and ardupilot_gazebo built (see Simulation/README.md); gazebo/env.sh
+# puts it on GZ_SIM_SYSTEM_PLUGIN_PATH / GZ_SIM_RESOURCE_PATH. Then start SITL in another terminal
+# with the sim_vehicle.py line this script prints (its --custom-location MUST match the world origin),
+# or run launch_simulation.py, which does all of this in one command.
 set -euo pipefail
 
 SIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REGION="${1:-thiru_1500}"
+source "$SIM_DIR/gazebo/env.sh"
+REGION="${1:-thiru_demo}"
 MISSION="${2:-}"
 shift $(( $# > 2 ? 2 : $# ))
 
@@ -49,21 +51,38 @@ echo " QGC   : Windows QGroundControl auto-connects on UDP 14550 (WSL mirrored n
 echo "         else add --out=udp:<windows-ip>:14550 to the sim_vehicle.py line."
 echo "──────────────────────────────────────────────────────────────────────"
 
-gz sim -v3 -r "$@" "$WORLD_SDF" &
+GUI_ARGS=()
+[[ -f "$WORLD_DIR/gui.config" ]] && GUI_ARGS=(--gui-config "$WORLD_DIR/gui.config")   # follow camera
+gz sim -v3 -r "${GUI_ARGS[@]}" "$@" "$WORLD_SDF" &
 GZ_PID=$!
-trap 'kill $GZ_PID 2>/dev/null || true' INT TERM
+trap 'kill $GZ_PID 2>/dev/null || true' EXIT
+trap 'exit 130' INT TERM
+
+wait_for_world() {
+  for _ in $(seq 1 60); do
+    if gz service -l 2>/dev/null | grep -q "^/world/$WORLD_NAME/create$"; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
 
 if [[ -n "$MISSION" ]]; then
   MARKERS="$(cd "$MISSION" && pwd)/route_markers.sdf"
   echo "Waiting for world $WORLD_NAME to spawn route markers …"
-  for _ in $(seq 1 60); do
-    if gz service -l 2>/dev/null | grep -q "^/world/$WORLD_NAME/create$"; then break; fi
-    sleep 1
-  done
+  wait_for_world || true
   gz service -s "/world/$WORLD_NAME/create" --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean \
     --timeout 5000 --req "sdf_filename: \"$MARKERS\", name: \"route_markers\"" \
     && echo "Route markers spawned (thin blue = Tier 1 front, thick red = Tier 2 pick)." \
     || echo "WARNING: could not spawn $MARKERS" >&2
+fi
+
+# Re-send the follow request on /gui/track in case the GUI ignored gui.config's CameraTracking
+# settings or started late. Stops after ~10 s so the user can move the camera freely afterwards.
+if [[ -n "${GUI_ARGS[*]}" ]] && wait_for_world && read -r VEHICLE OX OY OZ < <(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); g=m.get("gui", {}); assert g.get("mode", "follow") == "follow"; print(m["vehicle_model"], *g.get("camera_offset", [-6, -8, 8]))' "$WORLD_DIR/world_manifest.json" 2>/dev/null); then
+  ( for _ in 1 2 3 4 5; do
+      gz topic -t /gui/track -m gz.msgs.CameraTrack -p "track_mode: FOLLOW, follow_target: {name: \"$VEHICLE\"}, follow_offset: {x: $OX, y: $OY, z: $OZ}, follow_pgain: 0.05" >/dev/null 2>&1 || true
+      sleep 2
+    done ) &
 fi
 
 wait $GZ_PID

@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ import trimesh  # noqa: E402
 
 from gazebo_world_builder import build_world, route_markers_sdf, world_ground_z  # noqa: E402
 from sim_region import RegionBundle  # noqa: E402
+import sim_config as scfg  # noqa: E402
 
 
 class WorldBuilderTests(unittest.TestCase):
@@ -43,14 +45,29 @@ class WorldBuilderTests(unittest.TestCase):
         self.assertAlmostEqual(float(sc.find("latitude_deg").text), self.bundle.depot[0], places=6)
         self.assertAlmostEqual(float(sc.find("elevation").text), self.bundle.h_home, places=2)
         uris = [i.find("uri").text for i in w.findall("include")]
-        self.assertIn("model://iris_with_gimbal", uris)
+        self.assertIn(f"model://{scfg.SIM_VEHICLE_MODEL}", uris)
         self.assertIn("model://w_terrain", uris)
         self.assertTrue(any(u.startswith("model://w_bldg_") for u in uris))
         for u in uris[:-1]:
             self.assertTrue((self.out / "models" / u[len("model://"):] / "model.sdf").exists(), u)
         for f in (self.out / "models").rglob("model.sdf"):
             ET.parse(f)
-        self.assertIn("--custom-location=", (self.out / "sitl_command.txt").read_text())
+        cmd = (self.out / "sitl_command.txt").read_text()
+        self.assertIn("--custom-location=", cmd)
+        self.assertIn("sitl_overrides.parm", cmd)        # after the Iris defaults: precision landing off
+        self.assertLess(cmd.index("gazebo-iris.parm"), cmd.index("sitl_overrides.parm"))
+
+    def test_gui_config_follows_the_vehicle(self):
+        text = (self.out / "gui.config").read_text().split("?>", 1)[1]     # several top-level elements
+        root = ET.fromstring(f"<root>{text}</root>")
+        tracking = root.find("plugin[@filename='CameraTracking']")
+        self.assertEqual(tracking.find("follow_target").text, scfg.SIM_VEHICLE_MODEL)
+        offset = [float(v) for v in tracking.find("follow_offset").text.split()]
+        self.assertEqual(offset, list(scfg.SIM_CAMERA_VIEWS["follow"]))
+        pose = [float(v) for v in root.find("plugin[@filename='MinimalScene']/camera_pose").text.split()]
+        self.assertEqual(pose[:3], offset)
+        manifest = json.loads((self.out / "world_manifest.json").read_text())
+        self.assertEqual(manifest["gui"]["view"], "follow")
 
     def test_terrain_mesh_matches_the_bundle_surface(self):
         m = trimesh.load(self.out / "models" / "w_terrain" / "meshes" / "terrain.obj", process=False)

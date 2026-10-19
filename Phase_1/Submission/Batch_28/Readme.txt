@@ -44,9 +44,10 @@ fixed random seed, so they are reproducible without any download.
       Implementation/tests/fixtures/ holds small hand-made fixtures. They are NOT real data,
       only for tests and the --offline flag.
 
-  SourceCode/Simulation/regions/ (thiru_1500 and thiru_demo) holds the frozen OSM + DEM
+  SourceCode/Simulation/regions/ (thiru_demo and thiru_1500) holds the frozen OSM + DEM
   bundles used for the simulation, so the Gazebo world can be rebuilt without
-  re-downloading. thiru_demo is the short demo region used in the video.
+  re-downloading. thiru_demo is the default region and the one used in the video;
+  thiru_1500 is the former default (its depot is infeasible with live OSM data).
 
 
 =====================================================================
@@ -74,7 +75,9 @@ SOFTWARE - SIMULATION (Simulation/requirements-simulation.txt)
   Gazebo Harmonic (gz-sim 8)
   ArduPilot SITL (ArduCopter) with sim_vehicle.py / MAVProxy
   ardupilot_gazebo plugin
-  QGroundControl (optional, for viewing and uploading the mission)
+  python3-gz-transport13, python3-gz-msgs10 (Debian packages, for the recording camera)
+  QGroundControl (optional, for viewing and uploading the mission; on WSL2 the launcher
+  opens the Windows install)
 
 SOFTWARE - REPORT / POSTER
   LaTeX distribution (MiKTeX or TeX Live) with pdflatex; references are inline, so
@@ -123,7 +126,7 @@ side). Simulation imports the planner from ../Implementation.
 
   Results are written to Implementation/outputs/ (figures, CSV, JSON, .waypoints).
 
-  Unit tests (offline, 223 tests):
+  Unit tests (offline, 224 tests):
       python -m unittest discover -s tests
 
 --- 2. Simulation (Gazebo + ArduPilot SITL, Ubuntu 24.04 / WSL2) ----
@@ -135,19 +138,28 @@ side). Simulation imports the planner from ../Implementation.
   pip install -r requirements-simulation.txt
 
   Plan (no Gazebo needed), using the frozen thiru_demo bundle shipped in regions/:
-      python run_sim_mission.py --region-id thiru_demo --all-presets
-  To rebuild the bundle from live data instead (needs network):
-      python prepare_sim_region.py --region-id thiru_demo --box-m 1500 \
-          --depot 12.978683 80.254140 --dest 12.982188 80.256170 --strict
-  Build the world and fly (three terminals):
+      python run_sim_mission.py --all-presets
+
+  One command (world -> plan -> Gazebo + SITL -> fly -> evaluate), default region thiru_demo:
+      source gazebo/env.sh
+      python launch_simulation.py
+      python launch_simulation.py --preset fragile_medical
+      python launch_simulation.py --wait-for-start   (recording: holds on the pad until Enter)
+  Under WSL2, telemetry goes to the Windows host and Windows QGroundControl is opened
+  automatically (--no-ground-station to skip). If the Gazebo window stays blank, set
+  GZ_IP=127.0.0.1 and GZ_RELAY=127.0.0.1 in ~/.bashrc.
+
+  Manual alternative (three terminals):
       python gazebo_world_builder.py thiru_demo
-      python run_sim_mission.py --region-id thiru_demo --preset fragile_medical
+      python run_sim_mission.py --preset fragile_medical
       gazebo/launch_region.sh thiru_demo missions/<run_id>
       sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console -w ...
-          (exact command is printed by launch_region.sh)
+          (exact command in worlds/thiru_demo/sitl_command.txt)
       python sitl_mission_runner.py missions/<run_id>
-  Evaluate the flight:
       python evaluate_gazebo_run.py runs/<run_id>__<time>
+
+  To rebuild the bundle from live data (needs network):
+      python prepare_sim_region.py --strict
 
   Unit tests (needs trimesh):
       python -m unittest discover -s tests

@@ -2,7 +2,7 @@
 Phase 4: upload a planned mission to ArduCopter SITL (Gazebo JSON backend), fly it
 in AUTO, and log MAVLink telemetry + Gazebo ground truth.
 
-    # terminal 1: gazebo/launch_region.sh thiru_1500 missions/<run_id>
+    # terminal 1: gazebo/launch_region.sh thiru_demo missions/<run_id>
     # terminal 2: sim_vehicle.py ... --custom-location=...   (printed by the launcher)
     # terminal 3:
     python sitl_mission_runner.py missions/<run_id>
@@ -77,6 +77,14 @@ def preflight_identity(meta: dict, *, worlds_root: Path = None, allow_fixture: b
     if meta.get("fixture_data") and not allow_fixture:
         warnings.append("mission planned on HAND-MADE FIXTURE data (smoke test only)")
     return warnings
+
+
+def world_vehicle_model(meta: dict, *, worlds_root: Path = None) -> str:
+    """Vehicle the world was built with (worlds from before the model change still carry iris_with_gimbal)."""
+    wm_path = Path(worlds_root or _paths.WORLDS_DIR) / meta["region_id"] / "world_manifest.json"
+    if wm_path.exists():
+        return json.loads(wm_path.read_text(encoding="utf-8")).get("vehicle_model", scfg.SIM_VEHICLE_MODEL)
+    return scfg.SIM_VEHICLE_MODEL
 
 
 def item_tuple(it) -> tuple:
@@ -263,10 +271,19 @@ def main(argv=None) -> int:
     p.add_argument("--url", default=scfg.SIM_MAVLINK_URL, help="pymavlink URL (tcp:127.0.0.1:5762 = SITL SERIAL1)")
     p.add_argument("--no-fly", action="store_true", help="checks + upload + read-back only")
     p.add_argument("--no-gz-log", action="store_true")
-    p.add_argument("--vehicle-model", default=scfg.SIM_VEHICLE_MODEL)
+    p.add_argument("--vehicle-model", default=None,
+                   help="Gazebo model for ground-truth pose; default: the world manifest's, else sim_config")
     p.add_argument("--timeout", type=float, default=scfg.SIM_MISSION_TIMEOUT_S)
     p.add_argument("--allow-fixture", action="store_true")
+    p.add_argument("--start-file", type=Path,
+                   help="after upload, hold disarmed on the pad until this file exists (writes <file>.ready first)")
     a = p.parse_args(argv)
+
+    ready = None
+    if a.start_file is not None:                # stale signals from an earlier (crashed) run
+        ready = a.start_file.with_name(a.start_file.name + ".ready")
+        a.start_file.unlink(missing_ok=True)
+        ready.unlink(missing_ok=True)
 
     mdir = Path(a.mission_dir).resolve()
     meta, items = load_mission(mdir)
@@ -337,8 +354,21 @@ def main(argv=None) -> int:
         if a.no_fly:
             return 0
 
+        if a.start_file is not None:            # recording: hold on the pad until released
+            save_manifest(status="waiting_for_start", start_file=str(a.start_file))
+            logger.event("waiting_for_start")
+            ready.touch()
+            print(f"[SITL] READY ON GROUND, disarmed. Waiting for the start signal ({a.start_file.name}).",
+                  flush=True)
+            while not a.start_file.exists():
+                link.recv(timeout=0.5)
+            a.start_file.unlink(missing_ok=True)
+            ready.unlink(missing_ok=True)
+            logger.event("start_released")
+            print("[SITL] Start signal received.", flush=True)
+
         if not a.no_gz_log:
-            gz = GazeboPoseLogger(meta["world_name"], a.vehicle_model, run_dir)
+            gz = GazeboPoseLogger(meta["world_name"], a.vehicle_model or world_vehicle_model(meta), run_dir)
             gz.start()
         link.set_mode("GUIDED")
         link.arm()

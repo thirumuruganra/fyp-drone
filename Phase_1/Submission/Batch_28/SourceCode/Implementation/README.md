@@ -41,7 +41,7 @@ python run_benchmarks.py --smoke                              # quick benchmark 
 python run_benchmarks.py --scenario S2                        # all, S1, S2 or S3
 python run_ablation.py                                        # risk-layer ablation
 python dashboard.py                                           # operator dashboard (run run_demo_syn.py once first)
-python -m unittest discover -s tests                          # 223 offline tests
+python -m unittest discover -s tests                          # 224 offline tests
 ```
 
 Useful `run_demo_osm.py` options: `--preset NAME` (`fragile_medical`, `emergency_medicine`,

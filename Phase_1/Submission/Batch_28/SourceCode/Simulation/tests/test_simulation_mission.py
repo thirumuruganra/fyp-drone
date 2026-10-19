@@ -23,7 +23,8 @@ import run_sim_mission  # noqa: E402
 from sim_mission_export import load_mission  # noqa: E402
 from sim_region import RegionBundle  # noqa: E402
 from simulation_logger import parse_pose_message  # noqa: E402
-from sitl_mission_runner import PreflightError, preflight_identity, verify_readback  # noqa: E402
+from sitl_mission_runner import (PreflightError, preflight_identity, verify_readback,  # noqa: E402
+                                 world_vehicle_model)
 
 BUILDINGS = [(-60, -70, -40, 70, {"height": "40"}),        # a 40 m block between depot and destination
              (20, -30, 40, -10, {"building:levels": "6"}),
@@ -152,6 +153,15 @@ class EndToEndTests(unittest.TestCase):
 
 
 class LoggerAndRunnerHelperTests(unittest.TestCase):
+    def test_pose_logger_model_comes_from_the_world(self):
+        import sim_config as scfg
+        with tempfile.TemporaryDirectory() as tmp:
+            meta = {"region_id": "r"}
+            self.assertEqual(world_vehicle_model(meta, worlds_root=Path(tmp)), scfg.SIM_VEHICLE_MODEL)
+            (Path(tmp) / "r").mkdir()
+            (Path(tmp) / "r" / "world_manifest.json").write_text(json.dumps({"vehicle_model": "iris_with_gimbal"}))
+            self.assertEqual(world_vehicle_model(meta, worlds_root=Path(tmp)), "iris_with_gimbal")
+
     def test_parse_pose_json(self):
         msg = json.dumps({"header": {"stamp": {"sec": 12, "nsec": 500000000}},
                           "pose": [{"name": "other", "position": {"x": 9}},

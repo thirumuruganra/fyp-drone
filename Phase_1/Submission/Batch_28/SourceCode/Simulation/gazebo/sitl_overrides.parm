@@ -1,0 +1,10 @@
+# Project overrides, layered after copter.parm + gazebo-iris.parm (sitl_command.txt, launch_simulation.py).
+#
+# Rangefinder off. SITL simulates RNGFND1 as height above the HOME altitude (it has no terrain model), so on
+# a destination pad higher than the depot it still reads that difference after touchdown (thiru_demo: 5.95 m).
+# Copter's land detector needs a rangefinder reading under 2 m, so LAND never completes and the vehicle never
+# disarms. The iris models carry no rangefinder sensor; altitude comes from baro/GPS (frame 3, above home).
+RNGFND1_TYPE 0
+# Precision landing off. gazebo-iris.parm enables it (PLND_ENABLED 1, PLND_TYPE 3, PLND_STRICT 1) for an
+# IR-LOCK beacon the city world does not have ("PrecLand: Failsafe Measures" during LAND).
+PLND_ENABLED 0
