@@ -251,7 +251,24 @@ python -m unittest discover -s Implementation/tests   # planner suite (edge_filt
 
 `python prepare_sim_region.py --offline --region-id smoke_offline` builds a bundle from the hand-made fixtures in `Implementation/tests/fixtures`. These fixtures are **not real data** and are for smoke tests only; `--strict` rejects them.
 
-## Verified so far (2026-10-06, cloud sandbox without Gazebo)
+## Verified in WSL2 Gazebo (2026-10-19)
+
+Setup: Ubuntu 24.04 WSL2 (NAT networking), Gazebo Harmonic 8.15, ArduCopter master `9dd2e0f350`, RTX 4060 laptop.
+
+All three runs used `thiru_demo` with real OSM and DEM data and `--preset fragile_medical`. Every run flew the same route: Tier 2 picked the min-risk point (0.524 km) from a front of 2 routes.
+
+| Run | Lands + disarms | Xtrack RMSE / max | Vert RMSE | Landing offset | Min roof clearance | Violations | RTF (10 s median) | Wall time to disarm |
+|---|---|---|---|---|---|---|---|---|
+| Old manual pipeline, stock params | no: stuck on pad (rangefinder 5.95 m) | 0.19 / 1.11 m | 0.19 m | 0.49 m | 49.67 m | 0 | n/a | never |
+| Old manual pipeline + `sitl_overrides.parm` | yes | 0.21 / 1.13 m | 0.19 m | 0.50 m | 49.67 m | 0 | 0.33 | 606 s |
+| `launch_simulation.py` (30 m mesh, `iris_with_ardupilot`) | yes | 0.22 / 1.11 m | 0.19 m | 0.50 m | 49.67 m | 0 | 0.69 | 277 s |
+
+- Flight accuracy is the same across all three runs.
+- The launcher roughly doubles the real-time factor: the lighter terrain mesh and the camera-free vehicle avoid server-side gimbal camera rendering.
+- QGroundControl on Windows connected through the launcher (default `--gcs-host auto` → the Windows host).
+- The GUI confirmed the follow camera (`/gui/currently_tracked`: FOLLOW `iris_with_ardupilot`).
+
+## Earlier verification (2026-10-06, cloud sandbox without Gazebo)
 
 - All of `Simulation/tests` passes offline, and so does `Implementation/tests` except for the existing Tkinter import in `test_dashboard_helpers` (no Tk in the sandbox).
 - `sitl_mission_runner.py` was flown against a **real ArduCopter SITL** (4.8.0-dev, built-in `quad` physics, `--speedup 5`), with home at the depot pad, using fixture-bundle missions:
