@@ -174,6 +174,15 @@ python sitl_mission_runner.py missions/<run_id>                       # terminal
 python evaluate_gazebo_run.py runs/<run_id>__<time>
 ```
 
+**Short demo region (`thiru_demo`, for video).** Depot and one pad about 450 m apart, so the route has 5 lattice nodes (6 navigation waypoints, about 2 minutes at 5 m/s). Both pads were picked at least 12 m clear of any footprint. The default depot in `sim_config.py` sits inside a footprint buffer with live OSM data, so `run_sim_mission.py` reports NO FEASIBLE MISSION for `thiru_1500`.
+
+```bash
+python prepare_sim_region.py --region-id thiru_demo --box-m 1500 --depot 12.978683 80.254140 --dest 12.982188 80.256170 --strict
+python gazebo_world_builder.py thiru_demo
+python run_sim_mission.py --region-id thiru_demo --preset fragile_medical    # or --all-presets
+gazebo/launch_region.sh thiru_demo missions/<run_id>                         # then sim_vehicle.py + sitl_mission_runner.py as above
+```
+
 In Gazebo, the thin blue lines are the Tier 1 Pareto front and the thick red line is the Tier 2 pick. The pads are blue (depot) and orange (destination). Building colours show where each height came from: grey means an OSM `height` tag, beige means `building:levels × 3 m`, and light red means the type default.
 
 ## What is checked and where
