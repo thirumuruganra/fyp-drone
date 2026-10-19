@@ -40,7 +40,7 @@ python run_demo_osm.py --offline --box-km 2 --payload 3 2 2 3 # fixtures, fast, 
 python run_benchmarks.py --smoke                              # quick benchmark check
 python run_benchmarks.py --scenario S2                        # all, S1, S2 or S3
 python run_ablation.py                                        # risk-layer ablation
-python dashboard.py                                           # operator dashboard, exports .waypoints
+python dashboard.py                                           # operator dashboard (run run_demo_syn.py once first)
 python -m unittest discover -s tests                          # 223 offline tests
 ```
 
@@ -53,8 +53,8 @@ Useful `run_demo_osm.py` options: `--preset NAME` (`fragile_medical`, `emergency
 for tests and quick runs only.
 
 Results go to `outputs/` (figures, CSV/JSON selections, `.waypoints` mission files), created on
-first run. Downloaded layers are cached in `cache/`. Stored fronts go to
-`pareto_front_storage/fronts/`.
+first run. Downloaded layers are cached in `cache/`. Stored graphs and fronts go to
+`pareto_front_storage/`. All three folders are created automatically and are not part of this submission.
 
 ## Files
 
@@ -74,7 +74,6 @@ first run. Downloaded layers are cached in `cache/`. Stored fronts go to
 | `run_demo_syn.py`, `run_demo_osm.py` | End-to-end demos (Modules 1, 2, 4) |
 | `run_benchmarks.py`, `run_ablation.py` | Benchmark and ablation entry points |
 | `map_data/` | Historical OSM road snapshot, used only as a display fallback when the live road fetch fails |
-| `pareto_front_storage/` | Sample stored graphs and front used by the dashboard |
 | `tests/` | `unittest` suite and offline fixtures |
 
 ## Known limits

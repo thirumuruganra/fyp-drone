@@ -114,7 +114,8 @@ side). Simulation imports the planner from ../Implementation.
       python run_benchmarks.py --scenario S2           (S1, S2 or S3)
   Ablation of the risk layers:
       python run_ablation.py
-  Operator dashboard (enter payload tags, view route, export mission):
+  Operator dashboard (enter payload tags, view route, export mission; run
+  run_demo_syn.py once first so it has a stored graph and front to load):
       python dashboard.py
 
   Payload tags: F fragility 1-5, W payload weight class 1-3, U urgency 1-3,
