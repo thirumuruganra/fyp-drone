@@ -272,6 +272,11 @@ All three runs used `thiru_demo` with real OSM and DEM data and `--preset fragil
 - The launcher roughly doubles the real-time factor: the lighter terrain mesh and the camera-free vehicle avoid server-side gimbal camera rendering.
 - QGroundControl on Windows connected through the launcher (default `--gcs-host auto` → the Windows host).
 - The GUI confirmed the follow camera (`/gui/currently_tracked`: FOLLOW `iris_with_ardupilot`).
+- Recording mode (`--wait-for-start`, `--view takeoff`):
+  - The drone held disarmed on the pad until Enter (15.8 s), then flew.
+  - The camera director placed the pad shot, switched to FOLLOW at 6 m, and the drone landed and disarmed.
+  - Flight results matched the plain launcher run: xtrack RMSE 0.21 m, landing offset 0.5 m, 0 violations.
+  - An A/B check of the same scene showed no RTF cost from the director (0.184 vs 0.190, 4.6 % CPU). Flight RTF varied between sessions (0.51–0.69).
 
 ## Earlier verification (2026-10-06, cloud sandbox without Gazebo)
 
