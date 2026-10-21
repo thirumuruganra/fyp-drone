@@ -2,59 +2,58 @@
 
 \chapter{LITERATURE SURVEY}\label{cha:lit}
 
-Multi-objective UAV path planning draws on both graph search and evolutionary
-optimisation~\cite{r11}. We read the literature with one question in mind: once a
-planner has a set of good routes, how does it pick the one to fly, and does the payload
-have any say in that choice? This chapter reviews the papers closest to that question,
-the algorithms our system builds on or competes with, and the small body of work on how
-drone transport affects medical payloads. It then states the gaps we found and the
-objectives that follow from them.
+Work on multi-objective UAV path planning comes from both graph search and evolutionary
+optimisation~\cite{r11}. The main thing we asked was that once a planner holds a set of
+good routes, how does it choose the one to fly, and does the payload get a say? Below we
+show the papers which are nearest to that question and the few studies of what drone
+transport does to medical payloads. The chapter ends with gaps we found and the
+objectives we decided from them.
 
 \section{PAPERS RELATED TO THE PROBLEM IDENTIFIED}\label{sec:lit-papers}
 
 \subsection{Pareto-optimal particle swarm optimisation with entropy selection}
 
-Chokkalingam and Ganesan~\cite{r1} propose a Pareto-optimal particle swarm optimisation
-(POPSO) algorithm for UAV path planning in changing environments. Their framework
-combines four ideas. The swarm is initialised with a mix of grid-based and random
-particles to start from a spread of paths. The cost function covers path length, energy,
-an inverse safety term, a moving-obstacle penalty and a weather factor. The inertia
-weight and learning coefficients of the swarm are updated during the run, so the search
-explores more when it stalls and exploits more when it is improving. Finally, a hybrid
-Pareto-entropy mechanism ranks archive members by Pareto rank and by an entropy measure
-computed from distances between solutions, which keeps the archive diverse. On real terrain images with added obstacles it produced well-distributed fronts and
+Chokkalingam and Ganesan~\cite{r1} propose a Pareto-optimal particle swarm optimiser
+(POPSO) for UAV paths in changing surroundings, which has four parts. Grid-based and
+random particles are mixed at the start which ensures that the swarm begins with varied
+paths. Path length, energy, an inverse safety term, a penalty for moving obstacles and a
+weather factor are the factors that determine the cost. Inertia weight and learning
+coefficients shift during the run hence pushing exploration when progress stalls and
+exploitation when it does not. Last, a hybrid Pareto-entropy step orders the archive by
+Pareto rank and by an entropy value built from inter-solution distances, which keeps
+the archive varied. On real terrain images with added obstacles it produced well-distributed fronts and
 better path efficiency and safety than the methods it was compared with.
 
 Two details matter for our work. The weather factor is
 $W = \gamma\,(1 + v_\mathrm{wind}/v_\mathrm{max})$, which depends on wind speed only,
 so a path flown into the wind and the same path flown with it are costed alike. And the
-final route is not chosen by the entropy mechanism. The paper defines an auxiliary
-weighted sum over the normalised objectives, with weights ``typically determined
-empirically based on mission priorities'', and uses it both for particle updates and to
-select the representative solution that is actually deployed. So the last step is still
+final route is not chosen by the entropy mechanism. For that the paper uses a separate
+weighted sum of the normalised objectives, with weights ``typically determined
+empirically based on mission priorities''. The same sum drives particle updates and
+picks the one solution that gets deployed. So the last step is still
 a hand-set weighted sum, and the payload does not enter it.
 
 \subsection{Crowding-distance NSGA-II for urban UAV path planning}
 
 Ren et al.~\cite{r3} plan UAV paths in an urban environment with two objectives,
-distance and safety. The city is stored as an octree, which subdivides 3-D space
-hierarchically and keeps memory low in large open regions, and a safety index map
-scores how close each cell is to obstacles. The population is seeded with A* paths and
-evolved with NSGA-II. The authors point out a case where the standard crowding distance
-prefers a counter-intuitive point, and they redefine crowding as the average distance to
-the $k$ nearest solutions. The resulting CDNSGA-II finds well-spread, collision-free
-Pareto paths efficiently.
+distance and safety. They store the city as an octree, which splits 3-D space level by
+level and uses little memory over large empty areas, and add a safety index map rating
+each cell by its nearness to obstacles. A* paths seed the population and NSGA-II
+evolves it. They show one case where the usual crowding distance favours an odd point,
+and redefine crowding as the mean distance to the $k$ nearest solutions. The resulting
+CDNSGA-II quickly finds well-spread, collision-free Pareto paths.
 
-The authors argue that a weighted sum needs its weights fixed in advance, which is
-hard, so they build a front first and pick from it. The pick, though, is made by
+A weighted sum, they argue, needs its weights fixed beforehand, which is hard, so they
+build the front first and choose from it later. The pick,
+though, is made by
 crowding distance, which measures how isolated a point is on the front and has no notion
 of urgency, fragility or payload weight.
 
 \subsection{Multi-strategy improved NSGA-II for 3-D trajectory planning}
 
-Deng et al.~\cite{r11} address two known weaknesses of evolutionary planners in 3-D:
-getting stuck in local optima, and the tension between converging quickly and keeping
-the population diverse. Their MS-INSGA2 framework seeds the population with linearly
+Deng et al.~\cite{r11} go after two familiar faults of evolutionary planners in 3-D.
+They get trapped in local optima, and fast convergence tends to cost population
+diversity. Their MS-INSGA2 framework seeds the population with linearly
 interpolated trajectories that pass a safety check, couples a dynamic guidance step
 with crossover and mutation rates that adapt to the state of the population, and adds a
 local search that refines the Pareto front and smooths the trajectories. Three
@@ -89,7 +88,7 @@ of A*. Instead of one cost per node, NAMOA* keeps a set of non-dominated cost ve
 the complete set of Pareto-optimal solution costs. The paper proves that, when the heuristic is
 consistent, NAMOA* expands no more labels than any other admissible multi-objective
 search algorithm given the same heuristic, and that a better-informed heuristic never
-makes it expand more. NAMOA* is the basis of our Tier~1 engine. Its
+makes it expand more. NAMOA* is the starting point of our Tier~1 engine. Its
 exactness is the reason we chose it over a population method: the front is the same on
 every run, and interior points that a payload might need are never lost to chance.
 
@@ -121,20 +120,20 @@ our benchmarks.
 Three studies measure what drone flight does to medical cargo. Oakey et al.~\cite{r13}
 recorded vibration on fixed-wing and multi-copter drones and found levels up to three
 times those of road transport, at higher frequencies, but insulin carried on those
-flights showed no aggregation. Theobald et al.~\cite{r14} flew monoclonal antibody
-infusions on sixty flights with vibration between 1.5 and 3\,g and found no change in
-particle size or aggregation. Stierlin et al.~\cite{r15} compared drone and car
+flights showed no aggregation. Theobald et al.~\cite{r14} tried flying monoclonal
+antibody infusions on sixty flights with vibration between 1.5 and 3\,g and found zero
+change in particle size or aggregation. Stierlin et al.~\cite{r15} compared drone and car
 transport of blood samples and found them comparable, with small differences in five
 analytes.
 
-Taken together, these results say the tested payloads survive ordinary flights. They
+So the payloads that were tested come unharmed. The studies
 do not say what happens to a more fragile cargo, or whether a calmer corridor would
-help, because none of the studies changed the route. We read this as a reason to treat
-fragility as an operator's precaution in the planner, not as a proven damage model.
+help, because none of them changed the route. We read this as a reason to treat
+fragility as an operator's precaution and not as a proven damage model.
 
 \subsection{Summary of the reviewed work}
 
-Table~\ref{tab:related-work} summarises the reviewed papers.
+The papers are shown in Table~\ref{tab:related-work}.
 
 \begin{footnotesize}
 \begin{longtable}{|P{0.5cm}|P{2.6cm}|P{4.1cm}|P{3.5cm}|P{3.6cm}|}
@@ -170,9 +169,9 @@ Table~\ref{tab:related-work} summarises the reviewed papers.
 
 \section{GAPS IDENTIFIED}\label{sec:gap}
 
-Two of the planners we reviewed make the diversity of the front their central design
-concern, and only one of those two uses it to \emph{select} a route. The crowding
-distance of Ren et al.~\cite{r3} picks a point directly from the front. Chokkalingam and
+Front diversity acts as the main criteria of design for two planners analyzed, but only
+one of them uses it in choosing a route: Ren et al.~\cite{r3} choose a route using a
+point selected directly from the front on the basis of crowding distance. Chokkalingam and
 Ganesan~\cite{r1} use entropy only to keep the archive diverse during optimisation, and
 fall back on a weighted sum, with weights set per mission, to make the final pick.
 Deng et al.~\cite{r11} improve the front itself and leave the choice open.
@@ -192,36 +191,34 @@ We state the gaps as follows.
   \item[\textbf{Gap 1.}] No payload-aware route selection. Existing UAV
   multi-objective planners apply a fixed geometric criterion that ignores the payload,
   a hand-tuned weighted sum, or no selection mechanism at all.
-  \item[\textbf{Gap 2.}] No reuse of one front across mission types. Existing
-  planners re-run the full multi-objective search whenever the mission changes. Nothing
+  \item[\textbf{Gap 2.}] No reuse of a front between mission types. Every planner
+  we read reruns the whole search when the mission changes. Nothing
   separates building the front, which depends on the region and the weather, from
   choosing a route, which depends on the payload.
-  \item[\textbf{Gap 3.}] No algebraic bridge from payload to trade-off. No
-  explicit, reproducible mapping exists from a payload description to the routing
-  trade-off it implies (fragility to low risk, urgency to short distance, weight to low
-  energy).
-  \item[\textbf{Gap 4.}] Wind direction is not resolved per segment. Where
-  weather appears at all, it is a speed-only factor applied uniformly~\cite{r1}. A
+  \item[\textbf{Gap 3.}] No algebraic bridge from payload to trade-off. We found
+  no written, repeatable rule from a payload description to the trade-off it calls for
+  (fragility to low risk, urgency to short distance, weight to low energy).
+  \item[\textbf{Gap 4.}] Wind direction is not resolved per segment. When
+  weather is modelled at all, it is one speed-only factor applied everywhere~\cite{r1}. A
   headwind and a tailwind on the same leg cost the same, and a stored front carries no
   record of the weather it was built for, so there is no rule for when it goes stale.
 \end{enumerate}
 
 \section{RESEARCH OBJECTIVES}\label{sec:objectives}
 
-The objectives of this project follow from these gaps.
+Each objective below answers one or more of these gaps.
 
 \begin{enumerate}
-  \item To formulate multi-objective UAV route planning as a Pareto front precomputation
-  task over a delivery airspace graph, and to justify an exact, deterministic graph
-  search over stochastic population methods for this task.
-  \item To build a three-dimensional airspace lattice from terrain, buildings,
-  restricted zones, water and land use, with wind-aware, direction-dependent energy and
-  risk on every edge, and a rule for when a stored front must be rebuilt.
-  \item To design a payload metadata schema and an explicit formula that turns mission
+  \item To cast UAV route planning as precomputing a Pareto front over a delivery
+  airspace graph, and to justify exact search over stochastic methods.
+  \item To build a 3-D airspace lattice from terrain, buildings, restricted zones, water
+  and land use, with wind- and heading-dependent energy and risk on each edge, and a rule
+  for when a stored front must be rebuilt.
+  \item To define a payload metadata schema and a written formula turning mission
   context (fragility class, payload weight class, delivery urgency, priority) into
-  Pareto-point selection weights with no expert tuning.
-  \item To benchmark Tier~1 front quality against single-objective A* and MOPSO on the
-  same scenarios, using hypervolume, inverted generational distance and spread.
+  weights for picking a Pareto point, with no expert tuning.
+  \item To score the Tier~1 front against single-objective A* and MOPSO by
+  hypervolume, inverted generational distance and spread.
   \item To gather evidence that Tier~2 picks routes that match the payload, including
   non-extreme routes for mixed payloads, and does so within one second.
   \item To export the selected route as an autopilot mission and verify it in a Gazebo

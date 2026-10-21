@@ -9,37 +9,38 @@ planners build good Pareto fronts and then choose from them with a rule that kno
 nothing about the cargo, or with weights an expert re-tunes for every mission. We
 separated the two problems. Tier~1 builds an exact NAMOA* front over a
 three-dimensional, wind-aware airspace lattice once per region and weather window, and
-stores it with what is needed to tell when it has gone stale. Tier~2 turns four payload
+stores it until it goes stale. Tier~2 turns four payload
 tags into objective weights with an explicit formula, scores every route on the front
 and returns the best one, or a HOLD when the weather or the battery rules the mission
-out. The chosen route is exported as an ArduPilot mission and has been flown in SITL and
-in a Gazebo city world.
+out. The chosen route has been flown in SITL and in a Gazebo city world.
 
-The first results are encouraging, with clear caveats. The Tier~1 front was exact in
-every benchmark scenario, while MOPSO found 38 of 115 routes on the largest. On that
-front the four reference payloads received four different routes, three of them
-non-extreme, in about 0.14\,ms each. Wind direction alone moved the energy of the
-cheapest route by 27.5\% at a fixed speed, and in SITL the flown track stayed within
-0.13\,m RMS of the plan. On the other hand, under a steady wind the front shrank and the
-presets collapsed onto two routes, MOPSO ran at reduced settings, the ablation used
-fixture data, and the risk weights and battery constants are still placeholders.
+The preliminary results have been quite encouraging, but there are still some important
+observations to make. First, the Tier~1 front was exact for each of the benchmarks, while MOPSO managed to discover 38 routes
+out of 115 on the biggest one. On that front the four reference payloads received four
+different routes, three of them non-extreme, in about 0.14\,ms each. Secondly, when only the wind direction was varied at constant speed,
+the energy consumed on the route that had the lowest cost changed by 27.5\%. The results
+of the SITL simulations showed that the drone stayed within 0.13\,m RMS of the planned
+trajectory. However, there were a number of flaws found as well. In a steady wind the front
+shrank and the presets fell onto two routes; MOPSO ran at reduced settings; the ablation
+used fixture data; and the risk weights and battery constants are still placeholders.
 
 \section{FUTURE WORK}
 
-The rest of Phase~I is a set of passes through the evaluation cycle. We will run the
-full benchmark (four graphs, nine wind cases, MOPSO at 100 particles, 200 iterations and
-30 repetitions) with per-repetition statistics and a significance test; fix the density
-labels and the monotonicity grouping; study why the front collapses under steady wind,
-testing other normalisations and weight multipliers; repeat the ablation and Tier~2
-studies on live map data; compare Tier~2 with crowding distance, knee point, shortest
-route and fixed weights over all 225 tag combinations; close the two dashboard defects;
-and reduce the Tier~1 runtime on large graphs. On the simulation side, wind will be added
-to the Gazebo world, the battery model will be calibrated per payload weight class, and
-each preset will be flown under several wind cases with all flight metrics logged.
-
-Phase~II moves the system onto a Pixhawk-equipped F450 quadcopter with a Raspberry
-Pi~5 companion computer and a servo payload release. Tier~2 will run on board, and
-outdoor flights will measure route adherence and the time from tag entry to mission
-start. Further out, the two-tier idea could extend to several drones sharing one front,
-to multi-drop routes and to in-flight replanning when the weather changes faster than
-the refresh window.
+The following experiment conducts the full benchmark (four graphs, nine wind cases,
+MOPSO set to use 100 particles, 200 iterations, and 30 runs) with stats for each run and
+significance test. Density tags and monotonicity classification need fixing, and our
+goal is to find out the reason for Pareto collapse in constant wind case by testing
+other normalization and weight multipliers. Ablation and Tier~2 experiments will be
+performed again but using real map data, and then Tier~2 will be tested against
+crowding distance, knee point, shortest route, and fixed weights for all 225 tag
+combinations. There are two flaws in the dashboard that are not fixed yet, and Tier~1
+needs better performance in large graphs. Simulation involves putting the Gazebo world
+through wind, tuning the battery model according to the class of load it carries, and
+running the pre-defined setup for all different wind conditions with full flight logs
+recorded. For Phase~II, the system switches to using an F450 quadcopter with the Pixhawk and a
+companion computer called Raspberry Pi~5 and a servo for releasing the payload. The
+Tier~2 system runs on the drone, and outdoor testing will involve checking the extent to
+which it stays on course and the time between entering tags and starting the mission.
+Following this, the two-tier system can be further expanded to include multiple drones
+having a common front, performing multi-drop delivery missions, or in-flight
+re-planning of routes based on the changing weather.

@@ -9,9 +9,8 @@ choice of route depends on the payload, so it is made per mission, against whate
 front is current. A mission that arrives between refreshes runs only Tier~2, which
 reads the payload tags and returns a route in a fraction of a millisecond.
 
-Figure~\ref{fig:methodology} gives an overview of the workflow, from environment data
-to the flown mission, with baseline planners and an evaluation module scoring each
-stage.
+Figure~\ref{fig:methodology} shows the flow of the process from the environment data to the implementation of the mission. Baseline planners, as
+well as an evaluation module, score each step in the process.
 
 \begin{figure}[!htbp]
 \centering
@@ -26,8 +25,8 @@ payload-aware route selection, with mission output, UAV control and evaluation}
 Figure~\ref{fig:architecture} shows the system architecture, which has five layers.
 The environment data layer fetches weather, terrain and OpenStreetMap layers and caches
 them on disk, so that a network failure falls back to the last good copy instead of
-stopping the planner. Module~1 turns these layers into a directed airspace graph whose
-edges carry a three-objective cost vector. Tier~1 (Module~2) computes the Pareto front
+stopping the planner. Module~1 transforms these layers into a directed graph of the
+airspace where the edges are linked with a cost vector having three objectives. Tier~1 (Module~2) computes the Pareto front
 over that graph and keeps it in a front store, together with what is needed to decide
 when it is stale. Tier~2 (Module~4) reads the operator's payload tags and returns one
 route from the stored front, or a HOLD advisory when the weather or the battery rules
@@ -55,79 +54,73 @@ energy and risk. Route $p$ dominates route $q$, written $p \prec q$, when $p$ is
 worse than $q$ on all three objectives and strictly better on at least one. The Pareto
 front $\mathcal{P}$ is the set of routes that no other route dominates.
 
-The code is organised into seven modules. The numbering follows the source files, so
-Module~3 holds the baselines and Module~4 holds Tier~2. The sections below describe each
-module's purpose, inputs, processing and outputs.
+There are seven modules in the code. Their numbers match the source files, which is why
+the baselines are Module~3 and Tier~2 is Module~4. For every module, the following
+sections state its objective, inputs, processing, and outputs.
 
 % ------------------------------------------------------------
 \section{AIRSPACE GRAPH BUILDER (MODULE 1)}\label{sec:m1}
 
-Module~1 builds the delivery airspace graph $G = (V, E)$. Its inputs are the region
-(centre, box size and lattice spacing), the environment layers described below and a
-weather snapshot $\omega$. Its output is a directed NetworkX~\cite{r5} graph whose nodes
-carry position and altitude and whose edges carry static features, a per-component risk
-breakdown and the cost vector $[d, \varepsilon, \rho]$. The weather go/no-go state is
-stored on the graph itself so that Tier~2 can read it. Two builders share one cost
-pipeline: a lattice builder over a real region, described below, and a seeded synthetic
-builder for controlled benchmarks (Section~\ref{sec:dataset}).
-Algorithm~\ref{alg:m1} summarises the lattice builder, and the subsections that follow
-give the rules behind each step.
+Module~1 builds the delivery airspace graph $G = (V, E)$ based on three parameters: the
+region itself (its center point, size of the box, and lattice spacing), environmental
+layers to be considered later, and a weather sample $\omega$. The result is a directed
+graph using the NetworkX library~\cite{r5}. All nodes have their coordinate data and
+height information, and all edges have their static features, component risk vector,
+and cost vector $[d, \varepsilon, \rho]$. The weather go/no-go state is also stored on the
+graph for Tier~2. Two builders share one cost pipeline: one lays a lattice over a real region (below); the other makes seeded synthetic graphs for controlled benchmarks
+(Section~\ref{sec:dataset}). Algorithm~\ref{alg:m1} gives an overview of the lattice
+constructor.
 
 \subsection{Environment data acquisition}
 
-Weather comes from the Open-Meteo forecast service~\cite{r20}: the 10\,m wind, gust,
-rain, visibility and WMO code, and the hourly 80\,m wind speed and direction. With no
-network the last cached snapshot is used, and with no cache the planner assumes calm
-air so that runs stay deterministic. Terrain comes from a chain of elevation providers
-tried in order (a local GeoTIFF, OpenTopography Copernicus 30\,m, Open-Meteo elevation,
-and flat ground as a last resort), each cached on disk. OpenStreetMap buildings,
-restricted zones, water and land use are fetched through a multi-endpoint Overpass
-client with retries, cached as GeoPackage files~\cite{r4} and indexed in a local metric
-frame with Shapely STRtree structures for fast height, distance, containment and
-segment-intersection queries.
+Weather information comes from the Open-Meteo forecasting service~\cite{r20}, which
+provides 10\,m wind, gusts, precipitation, visibility, and the WMO code, as well as
+hourly wind speed and direction at 80\,m. If there are any connection problems, the
+planner uses the last saved snapshot, and if there isn't one, it uses calm air to ensure
+repeatability of runs. Terrain information comes from the first available elevation
+source, queried in the following order: local GeoTIFF, OpenTopography Copernicus 30\,m,
+Open-Meteo elevation, and finally flat terrain; all answers get cached to disk.
+OpenStreetMap building, exclusion zones, water bodies, and land cover information is
+fetched through the multi-endpoint Overpass client, which retries in case of connection
+problems. This information is cached on disk as GeoPackage files~\cite{r4}, and an index
+is built using the Shapely STRtree in a local metric coordinate system.
 
 \subsection{Lattice generation and node selection}
 
-A UAV is not tied to roads, so the airspace is a regular lattice, not a road network.
-The region is covered by an $n \times n$ lattice in a local equirectangular frame centred
-on the region, with $n = \mathrm{round}(\mathit{box}/\mathit{spacing})$. The default
-6\,km box at 200\,m spacing gives 900 candidate nodes. A candidate does not enter the
-graph automatically. It has to pass a selection rule that combines four data sources: ground elevation from the DEM, the tallest building in
-the node's cell, the legal ceiling and restricted airspace. For node $k$ with ground
+Drones move through the airspace irrespective of the underlying road network; thus, the
+airspace is represented as a regular lattice structure. The area of interest is bounded
+by an $n \times n$ lattice in a local equirectangular projection system, whereby $n = \mathrm{round}(\mathit{box}/\mathit{spacing})$. A 6\,km bounding box with 200\,m spacing gives 900 candidate points. A candidate point becomes a node only if it meets a selection rule based on four variables: DEM ground elevation, the
+tallest building in the cell, the legal ceiling, and restricted airspace. For node $k$ with ground
 elevation $z_k$ and tallest building $b_k$ in its cell,
 \begin{equation}
   \mathrm{AGL}_k = \max\bigl(H_\mathrm{cruise},\; b_k + C\bigr), \qquad
   \mathrm{alt}_k = z_k + \mathrm{AGL}_k \label{eq:alt}
 \end{equation}
-with cruise height $H_\mathrm{cruise} = 60$\,m and clearance $C = 15$\,m. A building's
-height is read from its \texttt{height} tag, else from \texttt{building:levels} times
-3\,m, else from a default for its type. A node with $\mathrm{AGL}_k > 120$\,m is
+with cruise height $H_\mathrm{cruise} = 60$\,m and clearance $C = 15$\,m. A building's height is taken from its \texttt{height} tag; if there is none, from \texttt{building:levels} times 3\,m; otherwise, from the default value for the building type. A node with $\mathrm{AGL}_k > 120$\,m is
 blocked, because it cannot be flown legally under the Drone Rules, 2021~\cite{r21}. A
 node inside a restricted polygon (an aerodrome, military land, a prison, a protected area
-or a government site) is removed. Every surviving node stores its position in both
-frames, its ground elevation, the building height, density and mean height of its cell,
-its height above ground and its altitude above mean sea level.
+or a government site) is removed. Each of the remaining nodes keeps its position within
+each coordinate system, its ground elevation, its building height, its cell's density
+and average height, its height above the ground, and its height above mean sea level.
 
 \subsection{Edge construction and pruning}
 
 Each surviving node is linked to its eight neighbours in both directions, so the graph
-is directed from the start. Three filters then remove edges: any edge whose segment
-crosses a restricted polygon, any edge rejected by the optional \texttt{edge\_filter}
-hook (used by the simulation module for roof and terrain clearance), and every edge
-outside the largest strongly connected component, so that all remaining nodes can reach
-each other.
+is directed from the start. An edge is deleted if it intersects
+with the prohibited polygon, or if it fails the optional edge filtering hook (the simulation module performs its roof and terrain clearance test here). Then only the largest strongly connected component is kept; otherwise, the depot could become isolated on a subgraph.
 
-For each edge that survives, the module stores the horizontal haversine length $d_h$,
-the forward-azimuth bearing $\theta$, the grade $g = \Delta\mathrm{alt}/d_h$ and the
-three-dimensional length $d = \sqrt{d_h^2 + \Delta\mathrm{alt}^2}$.
+Every residual edge retains its horizontal haversine distance $d_h$, its forward bearing
+$\theta$, its slope $g = \Delta\mathrm{alt}/d_h$, and its 3D distance
+$d = \sqrt{d_h^2 + \Delta\mathrm{alt}^2}$.
 
 \subsection{Static risk terms}
 
-Static terms do not depend on the weather, so they are computed once per build. Each
-edge is sampled every 25\,m along the straight line between its two endpoint
-altitudes. At each sample the module knows the flight altitude, the ground height, the
-tallest roof directly below and the tallest roof within 30\,m. Table~\ref{tab:risk} lists all eleven risk components,
-static and weather-dependent, with the weight each carries in the edge score
+None of the static metrics depends on the weather, so they are computed
+only once per build. The edge is traversed at 25\,m intervals along the line connecting
+terminal altitudes, and the metrics calculated include the flying altitude, the altitude
+of the ground surface, the highest roof below the edge, and the highest roof within
+30\,m of the edge. All eleven components of the risk, both static and depending on the
+weather, are listed in Table~\ref{tab:risk} together with their weight in the score
 \begin{equation}
   \rho_\mathrm{edge} = \operatorname{clip}\Bigl(\sum_k w_k\,\rho_k,\; 0,\; 1\Bigr),
   \qquad \rho(e;\omega) = \rho_\mathrm{edge}\cdot\frac{d_h}{s} \label{eq:risk}
@@ -178,47 +171,48 @@ them is part of the evaluation work that remains in Phase~I.
 
 \subsection{Wind-aware energy model}
 
-For an edge on bearing $\theta_\mathrm{edge}$ and a wind of speed $v$ blowing from
-$\theta_\mathrm{from}$ (the meteorological convention), the headwind and crosswind
+Take an edge on bearing $\theta_\mathrm{edge}$ and a wind of speed $v$ coming from
+$\theta_\mathrm{from}$ (meteorological convention). Its headwind and crosswind
 components are
 \begin{equation}
   H\!W = v\cos(\theta_\mathrm{edge} - \theta_\mathrm{from}), \qquad
   C\!W = v\,\lvert\sin(\theta_\mathrm{edge} - \theta_\mathrm{from})\rvert \label{eq:hwcw}
 \end{equation}
-A positive $H\!W$ is a headwind. The energy proxy of the edge is
+Positive $H\!W$ means headwind. We write the edge's energy proxy as
 \begin{equation}
   \varepsilon = d\left(1 + \lvert g\rvert + \beta_h\frac{\max(0, H\!W)}{V_c}
   + \beta_c\frac{C\!W}{V_c}\right) \label{eq:energy}
 \end{equation}
-with cruise airspeed $V_c = 36$\,km/h, $\beta_h = 0.40$ and $\beta_c = 0.15$. A
-tailwind earns no credit. This is deliberate: it keeps $\varepsilon \geq d$ on every
-edge, and the Tier~1 heuristic relies on that bound. The wind speed is the 80\,m
-forecast when available, which is close to the 60--120\,m cruise band. Otherwise the
-10\,m value is lifted to cruise height with the power law
+with cruise airspeed $V_c = 36$\,km/h, $\beta_h = 0.40$ and $\beta_c = 0.15$.
+Tailwind is not credited intentionally to make sure that $\varepsilon \geq d$ for all
+edges, a requirement for the Tier~1 heuristic. For wind speed, 80\,m prediction is used
+wherever it is available, as 80\,m is near the 60--120\,m cruise
+band. Otherwise, the 10\,m value is increased to the cruising altitude using the power
+law
 \begin{equation}
   v_h = v_{10}\left(\frac{h}{10}\right)^{\alpha}, \qquad \alpha = 0.25
 \end{equation}
-following Peterson and Hennessey~\cite{r19}. A gust factor measured at 10\,m is applied
-to the wind at flight height.
+from Peterson and Hennessey~\cite{r19}, and the gust factor measured at 10\,m is then
+applied to this flight-height wind.
 
-Because of Equation~(\ref{eq:hwcw}), edge costs are directional: flying $u \rightarrow
-v$ and $v \rightarrow u$ cost different amounts under wind. This is why the graph is
-directed even though the lattice itself is symmetric.
+Equation~(\ref{eq:hwcw}) makes the edge costs directional. In wind, the transitions
+$u \rightarrow v$ and $v \rightarrow u$ have different costs, and hence even a symmetric
+lattice needs a directed graph.
 
 \subsection{Weather-dependent risk and the go/no-go gate}
 
-Four of the eleven risk components change with the weather: crosswind, gust excess,
-turbulence and the uniform rain and visibility term. Crosswind depends on the edge
-heading, so the same wind makes some corridors riskier than others, and a change of
-direction alone can move the low-risk end of the front to a different part of the map.
-The function \texttt{apply\_weather(G, $\omega$)} re-costs every edge from its stored
-static features, so a new snapshot never requires rebuilding the spatial layers.
+Only four of the eleven risk elements are sensitive to weather:
+cross-wind, gust excess, turbulence, and uniform rain/visibility element. Cross-wind is
+determined by edge heading, resulting in corridor-specific risk differences, and
+rotating the wind direction without changing its strength can move the low-risk zone of
+the front on the map. The function \texttt{apply\_weather(G, $\omega$)} re-calculates
+the costs of edges based on their static data, meaning that it is unnecessary to
+re-construct the spatial layers for the new snapshot.
 
-The weather gate sits on top of this. A mission is a no-go when the WMO code reports a
-thunderstorm (95--99), when rain reaches 7.5\,mm/h, when visibility falls below 1\,km,
-or when gusts exceed 45\,km/h, a provisional limit for an F450-class airframe. The
-reasons are written to the graph, and Tier~2 refuses to select a route while any reason
-is present.
+This is followed by the weather gate. A mission is no-go when the WMO index shows a thunderstorm (95--99), precipitation intensity reaches 7.5\,mm/h,
+visibility is less than 1\,km, and/or gusts are more than 45\,km/h, which is the
+provisional limit for an aircraft of the class F450. The reasons go onto the
+graph, and while any of them is present Tier~2 will not pick a route.
 
 \begin{algorithm}[p]
 \caption{Lattice airspace graph construction and costing (Module~1)}\label{alg:m1}
@@ -256,50 +250,48 @@ is present.
 % ------------------------------------------------------------
 \section{TIER 1 PARETO FRONT ENGINE (MODULE 2)}\label{sec:m2}
 
-Module~2 computes the exact set of non-dominated routes between a source and a target.
-Its inputs are the costed graph from Module~1, the two end nodes and an expansion cap.
-Its output is the Pareto front $\mathcal{P}$, as a list of cost vectors and node paths,
-together with diagnostics: whether the cap truncated the search, how many labels were
-expanded and generated, and the runtime.
+The Module~2 calculates the set of all non-dominated paths from a specific source to
+target. Using the costed graph from Module~1, the two end nodes and the expansion threshold, this module outputs the Pareto set
+$\mathcal{P}$ in the form of vectors with associated node paths. It also gives some
+diagnosis data such as if the expansion threshold stopped the procedure, how many labels
+were expanded and created, and the total computation time.
 
 \subsection{Labels and dominance}
 
-The engine follows NAMOA*~\cite{r17}. Every partial path is a label
-$(\mathit{node}, \mathbf{g}, \mathit{parent})$ held in a flat table, and a path is
-rebuilt at the end by walking parent ids. Nothing is copied when a label is pushed,
-which matters once the label count runs into the thousands. A new label $\mathbf{g}'$ at
-node $v$ is discarded if any existing label at $v$ weakly dominates it (is $\leq$ in
-every objective, within a small tolerance). Equal vectors count as dominated, so the
-front never contains duplicates. Labels that the new one dominates are marked dead and
-skipped when popped. No visited set is needed. Every edge has positive distance, so a
-path that revisits a node is dominated by its own earlier label at that node, and cycles
-die in the dominance check.
+Our algorithm uses NAMOA*~\cite{r17}. The partial path is represented by the label
+$(\mathit{node}, \mathbf{g}, \mathit{parent})$ in one flat table, while the full paths
+are reassembled after-the-fact using parent references. To avoid
+duplicating the path at each push operation---a task which becomes too
+expensive once we have thousands of labels---in our table we keep only the reference. A
+newly created label $\mathbf{g}'$ at the vertex $v$ is thrown out if there is already a
+label at $v$ that weakly dominates $\mathbf{g}'$, namely is less or equal to
+$\mathbf{g}'$ for each objective with a certain tolerance. Identical vectors are considered dominated, so no duplicate reaches the front. The labels that are dominated by the new arrival are labeled as dead and skipped
+on extraction. There is no need for the visited set since any loop will be dominated by
+an earlier label at the same node because all edges have positive lengths.
 
 \subsection{Admissible vector heuristic and pruning}
 
-The heuristic for node $v$ is
+The heuristic function for vertex $v$ can be expressed as
 \begin{equation}
   \mathbf{h}(v) = [h,\; h,\; 0]
 \end{equation}
-where $h$ is the great-circle distance from $v$ to the target. It is admissible for all
-three objectives. For distance, every edge has $d \geq d_h$, and the horizontal lengths
-of any path to the target add up to at least $h$. For energy,
-Equation~(\ref{eq:energy}) gives $\varepsilon \geq d$, so the same bound holds. For
-risk, $\rho \geq 0$. A label is pruned when the current front weakly dominates
-$\mathbf{g} + \mathbf{h}$. The check is made when the label is generated and again when
-it is popped, because the front may have improved in between. The open list is ordered
-by $\lVert\mathbf{g} + \mathbf{h}\rVert$, which tends to complete good routes early and
-so tightens the pruning sooner.
+where $h$ refers to the great-circle distance between vertex $v$ and the target vertex.
+The heuristic is admissible with respect to all the three criteria. For distance, all edges fulfill the condition $d \geq d_h$, and the total
+horizontal distance traveled to reach the target vertex is always equal to or greater
+than $h$. For energy, Equation~(\ref{eq:energy}) gives $\varepsilon \geq d$. On risk, $\rho \geq 0$. A label will
+be pruned when the current front weakly dominates $\mathbf{g} + \mathbf{h}$. This check occurs at both generation and extraction of the label, because the front might improve in between. Why do we sort the open list by
+$\lVert\mathbf{g} + \mathbf{h}\rVert$? Efficient paths finish early, and each efficient
+path improves the bound on pruning.
 
 \subsection{Truncation and front thinning}
 
-An expansion cap protects the planner from a runaway search. When the cap is hit, the
-result is flagged as truncated only if some live label could still improve the front.
-An optional $\varepsilon$-dominance step can cap very large fronts at $N$ routes while
-keeping the three single-objective extremes; it is off by default, so the benchmarks
-use the exact front.
+A ceiling on expansion avoids the problem of an unrestricted search. This solution is
+labeled as being truncated if at least one active label has the ability to improve the
+front. An optional $\varepsilon$-dominance phase can cap very large fronts at $N$ paths while keeping the three single-objective extreme points. We leave it off by default, so the benchmarks use the
+exact front.
 
-Algorithm~\ref{alg:tier1} gives the full procedure. Here $\preceq$ is weak dominance.
+Algorithm~\ref{alg:tier1} shows how the entire process is carried out, where $\preceq$
+represents weak dominance.
 
 \begin{algorithm}[p]
 \setstretch{1.58}% stretched to fill the page
@@ -334,11 +326,11 @@ Algorithm~\ref{alg:tier1} gives the full procedure. Here $\preceq$ is weak domin
 
 \subsection{Why an exact method}
 
-A population method is usually faster on a large graph. We chose an exact search because
-the same graph and weather always give the same front, because the interior routes that
-mixed payloads need are the ones a stochastic archive tends to miss
-(Section~\ref{sec:perf-front}), and because Tier~1 runs only once per region and weather
-window.
+However, on a large graph, population-based approaches tend to be more efficient. Still,
+we decided to keep using the exact search algorithm. The graph and weather conditions
+always provide the same result. Interior routes, which
+mixed payloads need, are the ones a stochastic archive tends to lose
+(Section~\ref{sec:perf-front}). And Tier~1 runs once per region and weather window.
 
 \subsection{Pareto front store and refresh}
 
@@ -348,9 +340,8 @@ SHA-256 hash of the static graph (never the weather-dependent costs), the weathe
 snapshot it was built for, a validity limit three hours after creation, the truncation
 flag and the search diagnostics.
 
-On each request the store lists the reasons the record cannot be reused
-: no record, a forced refresh, a different static graph, a
-different identity, expiry, or weather drift. Drift means the wind speed has moved by
+For each request, the store lists why the cache entry cannot be reused, such as no record present, a forced cache refresh, new static graph, different
+identity, expiration, or weather drift. Drift means the wind speed has moved by
 more than 10\,km/h, the direction has turned by more than 45$^\circ$ while the wind is
 above 10\,km/h, the gust has moved by more than 15\,km/h, or the go/no-go state has
 flipped. With no reason, Tier~2 runs against the stored front and no search happens.
@@ -415,7 +406,7 @@ Priority level $P_\mathrm{lvl}$ & 1--5 & Amplifier & Strengthens the dominant we
 
 \subsection{Weight derivation}
 
-From the tags, three weights are derived with no expert input:
+The three weights are determined from the tags without expert intervention:
 \begin{align}
   r_\mathrm{raw} &= 2F, \qquad d_\mathrm{raw} = 3U, \qquad e_\mathrm{raw} = 2W,
   \qquad S = r_\mathrm{raw} + d_\mathrm{raw} + e_\mathrm{raw} \label{eq:raw}\\
@@ -423,14 +414,15 @@ From the tags, three weights are derived with no expert input:
   w_\mathrm{dist} = \frac{d_\mathrm{raw}}{S}, \qquad
   w_\mathrm{energy} = \frac{e_\mathrm{raw}}{S} \label{eq:weights}
 \end{align}
-The multipliers (2 for fragility and payload weight, 3 for urgency) encode the
-assumption that, in medical delivery, urgency is more sensitive than fragility or
-payload weight. Payload weight is tied to energy because a heavier payload directly
-raises the power needed to hover and climb. No such direct physical link exists to risk
-or to distance.
+The urgency weight gets a multiplier of 3, whereas the remaining two weights get a
+multiplier of 2 since urgency is considered the most delicate among the three parameters
+in medical delivery. Energy is associated with the payload weight because the bigger the
+load, the greater the power needed for hovering and ascending; whereas, no such direct
+association exists between weight and risk/distance.
 
-Every weight depends on all three raw scores. Raising $F$ raises $w_\mathrm{risk}$ and
-lowers the other two at the same time, so one tag change moves the whole weight vector.
+All three raw scores play a role in every weight score. An increase in $F$ increases
+$w_\mathrm{risk}$ and simultaneously decreases the other two weights, meaning that a
+change in just one tag affects all the weight scores.
 This is the reason the formula is not a lookup table. There is no fixed list of payload
 types, and any of the $5 \times 3 \times 3 \times 5 = 225$ tag combinations gives a
 valid, different weighting.
@@ -504,21 +496,20 @@ route's energy proxy is converted to watt-hours with
 \begin{equation}
   E_\mathrm{Wh} = k_\mathrm{cal}\,\varepsilon\left(\frac{m_\mathrm{uav} + m_W}{m_\mathrm{uav}}\right)^{1.5} \label{eq:battery}
 \end{equation}
-where the exponent follows the way induced rotor power scales with weight. With the
+where the exponent shows the relationship between rotor power and weight. With the
 current values ($k_\mathrm{cal} = 6$\,Wh per unit of energy proxy,
 $m_\mathrm{uav} = 1.5$\,kg, a 74\,Wh battery and a 20\% reserve), a route is feasible
-when it needs at most 59.2\,Wh. Infeasible routes are removed before the argmax. These
-constants are marked as placeholders in the code and will be replaced by values
-calibrated in simulation.
+when it needs at most 59.2\,Wh. Routes failing to meet this condition are then removed
+before taking the argmax. The constants are noted as placeholders in the code and their
+actual values, calculated through simulation, will replace them.
 
 \subsection{Weather hold and decision record}
 
-If the weather gate reports any reason, or if no route on the front is battery-feasible,
-Tier~2 returns a HOLD advisory that says why, instead of a route. Otherwise it returns
-the feasible route with the highest score.
+When the weather gate gives any reason, or the battery rules out every path, Tier~2 returns a HOLD advice with the reason instead of a path. In all other situations, the
+feasible path with the best score is provided.
 
-Algorithm~\ref{alg:tier2} gives the full procedure. No search runs at this stage. The
-cost is one pass over the stored front, so the latency is a few milliseconds.
+Algorithm~\ref{alg:tier2} gives the whole process. No search operations are performed at
+this point. It needs only one scan through the saved front and takes just a few milliseconds.
 
 \begin{algorithm}[p]
 \setstretch{1.07}% stretched to fill the page
@@ -562,9 +553,8 @@ cost is one pass over the stored front, so the latency is a few milliseconds.
 % ------------------------------------------------------------
 \section{EVALUATION AND BENCHMARKING (MODULE 5)}\label{sec:m5}
 
-Module~5 measures how good a front is and how sensible the Tier~2 picks are. Every
-measure is computed per scenario, and the results are written to CSV and JSON so that
-each pass of the evaluation can be compared with the previous one.
+Module~5 considers two factors: (1) the quality of the front, and (2) the way in which
+Tier~2 makes its choices. Every measure is computed per scenario and written to CSV and JSON, so passes can be compared.
 
 \subsection{Front quality measures}
 
@@ -573,21 +563,18 @@ scenario is the non-dominated union of every route found by every method and
 repetition, and all measures are computed in the space normalised by its ideal and
 nadir points. The hypervolume (HV)~\cite{r18} is the volume dominated by a front and bounded by a
 reference point, here the normalised nadir padded by 10\%, $[1.1, 1.1, 1.1]$. It is
-computed exactly in three dimensions by slicing along the first objective and solving
-the two-dimensional problem on each slice. Larger is better. The inverted generational
+computed exactly in three dimensions by slicing along the first objective. Larger is better. The inverted generational
 distance (IGD) measures how well a front $A$ covers the reference front:
 \begin{equation}
   \mathrm{IGD}(A, \mathcal{R}) = \frac{1}{\lvert\mathcal{R}\rvert}\sum_{r \in \mathcal{R}} \min_{a \in A} \lVert r - a \rVert_2
 \end{equation}
 Smaller is better, and zero means that $A$ contains every reference point. The spread
 $\Delta$ measures how evenly the points are distributed and how far they reach toward
-the extremes of $\mathcal{R}$; smaller is better. Runtime and front size are recorded
-for every method.
+the extremes of $\mathcal{R}$; smaller is better.  Runtime and front size are also recorded.
 
 \subsection{Tier 2 evidence}
 
-We do not report a Tier~2 ``accuracy'', because there is no ground-truth label that
-says which route is correct for a payload. For each preset the module records the
+We do not report a Tier~2 ``accuracy'', as no ground-truth label says which route is correct for a payload. For each preset the module records the
 selected route's rank on each objective, whether it is an extreme or non-extreme point,
 the latency, and a rank-based payload-alignment score
 \begin{equation}
@@ -595,41 +582,34 @@ the latency, and a rank-based payload-alignment score
 \end{equation}
 where $K$ is the front size. Because $A$ uses ranks, it does not depend on the min-max
 utility that Tier~2 itself maximises. The same score is computed for four competing
-selection rules on the same front: the shortest route, the knee point (the point
-farthest from the line joining the distance and risk extremes), the largest NSGA-II
+selection rules on the same front: the shortest route, the knee point, the largest NSGA-II
 crowding distance~\cite{r8,r3}, and a fixed equal-weight utility in the style
 of~\cite{r1}.
 
 \subsection{Tag sweep and monotonicity}
 
-A sweep runs Tier~2 for all 225 tag combinations. It counts distinct selected routes
-and non-extreme picks, and it checks monotonicity: raising $F$ with the other tags
-fixed must never raise the selected route's risk, raising $U$ must never raise its
-distance, and raising $W$ must never raise its energy. The target is zero violations.
+The sweep performs Tier~2 for all 225 tag combinations, counting the different routes chosen and the non-extreme choices, and testing monotonicity. With all other tags constant, increasing $F$ must not lead to a riskier route, increasing $U$ to a longer route, or increasing $W$ to more energy.
 
 \subsection{The evaluation cycle}
 
-Benchmarking is a repeated cycle, not a single run: fix the scenarios, run every method,
-score the fronts, check the Tier~2 picks, fly the routes in simulation, analyse the weak
-spots, change the model and run everything again. One full pass covers four graphs
-under nine wind cases with MOPSO at 100 particles, 200 iterations and 30 repetitions,
-about 21.6 million particle updates in all.
+Benchmarking is performed as a loop operation. Scenarios are constant; each algorithm is
+tested; fronts are assessed, and Tier~2 solutions are studied; routes are flown through
+simulation; problems are evaluated; the model is updated, and the loop starts anew. One iteration covers four graphs with nine wind conditions, with MOPSO at 100 particles, 200 iterations and 30 runs, about 21.6 million particle iterations.
 
 % ------------------------------------------------------------
 \section{MISSION EXPORT AND DASHBOARD (MODULE 6)}\label{sec:m6}
 
 \subsection{Mission file generation}
 
-Module~6 writes the selected route as a QGC WPL~110 file and a QGroundControl
-\texttt{.plan} file, merging consecutive waypoints that keep the same bearing and slope.
-Route waypoints use frame~3 (\texttt{GLOBAL\_RELATIVE\_ALT}), measured from home, so
-the exporter writes
+Module~6 stores the selected path as QGC WPL~110 and QGroundControl \texttt{.plan} files. It merges adjacent waypoints having same bearing
+and slope values. The waypoints of the path are specified in frame~3
+(\texttt{GLOBAL\_RELATIVE\_ALT}), relative to home. Therefore, the altitude relative is
+calculated by the exporter as
 \begin{equation}
   \mathit{alt}_\mathrm{rel} = \mathit{alt}_\mathrm{AMSL} - H_\mathrm{home}
 \end{equation}
-with $H_\mathrm{home}$ the ground elevation under the first waypoint. The height above
-the local ground is never written into frame~3, because that would be wrong wherever
-the terrain varies.
+where $H_\mathrm{home}$ is the ground altitude below the first waypoint. The altitude
+above the ground is never written into frame~3 because the ground level varies.
 
 \subsection{Operator dashboard}
 
@@ -642,11 +622,9 @@ different runs.
 \section{SIMULATION AND SITL VALIDATION (MODULE 7)}\label{sec:m7}
 
 A route that scores well on the graph may still be hard to fly, so Module~7 checks the
-flight itself. It flies the Tier~2 route through a three-dimensional model of the
-delivery area in Gazebo Harmonic~\cite{r24}, with ArduCopter running in
+flight itself. It flies the Tier~2 route through a 3-D model of the delivery area in Gazebo Harmonic~\cite{r24}, with ArduCopter running in
 software-in-the-loop~\cite{r23}, and compares the flown track with the plan.
-Communication with the autopilot uses MAVLink~\cite{r7}. The simulation code imports the
-planner modules directly; nothing is copied. Figure~\ref{fig:sim} shows the pipeline.
+Communication with the autopilot uses MAVLink~\cite{r7}.  Figure~\ref{fig:sim} shows the pipeline.
 
 \begin{figure}[!htbp]
 \centering
@@ -661,17 +639,12 @@ roads, the depot and destination pads, and a manifest. Its hash is written into 
 graph, the front, the mission file and the world, and the runner refuses to fly if they
 do not match. Before NAMOA* runs, a clearance checker passed in as \texttt{edge\_filter}
 removes every edge that passes less than 15\,m above a buffered roof or the terrain, or
-goes above 120\,m above ground. The Gazebo world has its origin at the depot pad, where
-SITL also places home, so a mission altitude means the same height in the planner, the
-world and the autopilot.
+goes above 120\,m above ground. The Gazebo world's origin is the depot pad, where SITL also places home, so altitudes agree everywhere.
 
 \subsection{Mission sequence}
 
-Figure~\ref{fig:sequence} follows one mission from the operator's tags to the flown
-route. Tier~1 runs only when the stored front is stale or missing. Tier~2 then returns
-either a HOLD advisory or a selection that is exported as a mission file. The runner uploads and reads back the mission, arms, switches to AUTO and
-logs telemetry until landing. An evaluator then computes the cross-track error, the
-minimum clearance, any rule breach and the landing offset from the pad.
+Figure~\ref{fig:sequence} follows one mission from tags to flown route. Tier~1 runs only when the stored front is stale or missing. Tier~2 then returns a HOLD advisory or a selection exported as a mission file. The runner uploads and reads back the mission, arms, switches to AUTO and
+logs telemetry until landing. Afterward, the evaluator assesses cross-track error, minimum clearance, rules infringements, and landing offset.
 
 \begin{figure}[!htbp]
 \centering

@@ -4,46 +4,43 @@
 
 \section{SOCIAL IMPACT}
 
-The people who gain most from drone delivery are those far from a hospital or cut off
-by an emergency: patients in rural clinics waiting for blood or antivenom, towns
-isolated by a flood, and hospitals that send samples to a central laboratory every day.
-Zipline's network in Rwanda~\cite{r16} and the hospital sample flights in
-Switzerland~\cite{r12} show that such services already exist. What our work adds is a
-way for each flight to suit its cargo. Urgent antivenom can take the shortest corridor
-and a fragile sample a calmer one, without the operator knowing how the planner works.
+Drone delivery helps most the people who live far from a hospital or are cut off by an
+emergency. Rural healthcare logistics considerations would be in cases where there was a
+need for blood or an antivenom in a clinic, a town surrounded by floods, or regular
+delivery of samples from a hospital to a laboratory in one day. Similar services already exist, such as Zipline drones in Rwanda~\cite{r16} and hospital samples flights in Switzerland~\cite{r12}. The suggested method adds a way for
+each flight to adapt to the particular cargo, where urgent antivenom would fly through
+the shortest path while fragile cargo would use another path. This advantage is important since there might be a situation where no specialists in
+planning will be available. The launch of a drone from a district hospital or a relief
+camp will be conducted either by a nurse or volunteers instead of a specialist in
+planning. This person needs only to provide four simple answers about the cargo
+characteristics (frangible, weight, urgency, and importance), after which all other
+decisions will be made automatically.
 
-This matters most where trained staff are scarce. The person launching a drone at a
-district hospital or a relief camp is likely to be a nurse or a volunteer, not a
-route-planning expert. Our system asks four simple questions about the payload (how
-fragile, how heavy, how urgent, how important) and handles the rest.
+Underneath, there are people who do not want the drone to fly above their heads. Every
+edge cost considers aspects such as population, restricted areas, water distance, and
+building distance. All nodes that exceed the statutory limit are disregarded, and
+adverse weather conditions make it impossible for flights if there are storms, rainfall,
+poor visibility, and high winds. There is no way that the planner will go through a
+crowded market just to save a few seconds.
 
-A delivery drone also flies over people who never agreed to it. Population exposure,
-restricted zones, water and building proximity are part of every edge's cost, nodes
-above the legal ceiling are removed, and a weather gate stops flights in storms, heavy
-rain, poor visibility or strong gusts, so the planner does not route over a crowded
-market to save a few seconds.
-
-Every Tier~2 decision is recorded with its tags, weights, route and any HOLD reason, so
-it can be reproduced later. The benefit depends on honest limits, though. The fragility tag is a precaution, not a proven protection~\cite{r13,r14,r15},
-and until the risk weights are calibrated, the risk numbers should be read as rankings
-between routes, not as probabilities of harm. Outdoor flights in Phase~II will follow
-the Drone Rules, 2021~\cite{r21}.
+All decisions made at Tier~2 level are saved along with the corresponding tags, weights,
+route, and any HOLD reason. The fragility tag
+is a precaution and has not been shown to protect anything~\cite{r13,r14,r15}. Until
+proper risk weights are set, the derived risk values will act as relative rankings of
+the routes rather than probabilities of harm. Phase~II outdoor flights will follow the
+Drone Rules, 2021~\cite{r21}.
 
 \section{SUSTAINABILITY}
 
-For short, light deliveries, a small electric drone replaces a road trip by van or
-motorcycle and produces no exhaust where it flies. The planner adds to this in two
-ways. Its energy objective sees wind direction, which alone changed the energy of the
-cheapest route by 27.5\% in our study, so it can avoid strong headwinds. And the payload
-weight tag gives energy more weight when the load is heavy, which is when battery use
-matters most. The feasibility filter refuses routes that would eat into the 20\%
-battery reserve, which protects both the mission and the battery's life.
+For the short-distance flights of light payloads, an electric-powered drone may be
+substituted for van or motorcycle transport without exhaust emission during travel. The
+planner helps in two major ways. Firstly, its energy goal considers the wind direction,
+which alone changed the energy of the cheapest route by 27.5\%, implying that headwinds
+may be avoided. Secondly, the payload weight label gives more weight to energy criteria
+for heavy payloads. Flights whose battery energy is exhausted to less than the 20\%
+reserve level are excluded, thereby assuring both the success of the flight and battery
+longevity.
 
-The system is also light on computing. Tier~1 runs on an ordinary laptop CPU with no
-GPU or cloud service, once per region and weather window, and its front is reused by
-every mission until it expires. Tier~2 takes a fraction of a millisecond and can run on
-a Raspberry Pi on board.
-
-Everything the system depends on is open data or open-source software, so there are no
-licence fees, and with all constants in one file and about 265 offline tests it can be
-recalibrated as flight data comes in.
+The computational demand is low as well. Tier~1 runs on an ordinary laptop CPU with no
+GPU or cloud service, once per region and weather window. Tier~2 takes a fraction of a
+millisecond and can run on a Raspberry Pi on board. Everything the system depends on is open data or open-source software, so there are no licence fees.

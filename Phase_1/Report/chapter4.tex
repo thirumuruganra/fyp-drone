@@ -2,10 +2,11 @@
 
 \chapter{EXPERIMENTAL RESULTS AND PERFORMANCE ANALYSIS}\label{cha:results}
 
-This chapter describes the data the system runs on, the hardware and software used, the
-experiments carried out so far and what their results show. The numbers come from the
-first pass of the evaluation cycle in Section~\ref{sec:m5}, from a controlled wind
-experiment, from the ablation runner and from the first SITL flights. They are
+This chapter contains the information that forms the basis of the system, both the
+hardware and software, the experiments carried out thus far, and the conclusions made
+from them. The quantitative results come from four different places: the first run of
+the evaluation loop (refer Section~\ref{sec:m5}), wind experiment, the ablation runner,
+and the very first SITL flights. They are
 preliminary in a specific sense: MOPSO was run at reduced settings, the risk weights and
 battery constants are not yet calibrated, and the synthetic density labels have a known
 defect. Each caveat is stated next to the result it affects.
@@ -48,21 +49,19 @@ The synthetic graphs come from the seeded builder of Section~\ref{sec:m1}. Each 
 jittered grid of about 1.3\,km spacing with 8-neighbour directed edges, seeded Gaussian
 hills for terrain, obstacle discs, and seeded wind between 12 and 28\,km/h with a gust
 factor of 1.4. The three scales (50, 200 and 500 nodes) were chosen to cover a sanity
-check, a mid-sized core case and a stress case. Because every draw comes from the seed,
-anyone can regenerate the exact graph from the seed and the code.
+check, a mid-sized core case and a stress case. Every draw comes from the seed, so the graphs are reproducible.
 
-There is one known defect in this data. The obstacle density labels (5\%, 20\% and
-40\%) do not reach the graph builder. The benchmark runner scales the final risk instead,
-so the three scenarios differ in size and seed, but not in obstacle coverage as the
-labels suggest. Fixing this is part of the next pass, and every benchmark number will be
-recomputed after it.
+There is one known defect in this data. The density obstacle labels (5\%, 20\% and
+40\%) do not affect the graph builder at all; rather, the benchmark runner rescales the
+end risk value. As a result, the scenarios vary in size and seeds and not in obstacle
+density regardless of the labels. This is corrected in the next pass, and all benchmark
+values are recalculated.
 
 \subsection{Real-region lattice}
 
-The real-region lattice is built from four public data sources, listed in
-Table~\ref{tab:sources}. The method is region-agnostic; we use one coastal urban
-neighbourhood as the example region. The default 6\,km box at 200\,m spacing gives 900
-candidate nodes, of which 893 remain after node selection and connectivity pruning in the fixture run, linked by
+Four public data sources feed the real-region lattice (Table~\ref{tab:sources}).
+Nothing in the method ties it to one place; our example is a coastal urban
+neighbourhood. The default 6\,km box at 200\,m spacing has 900 candidate nodes, of which 893 remain after node selection and connectivity pruning in the fixture run, linked by
 6,752 directed edges.
 
 \begin{table}[!htbp]
@@ -86,18 +85,19 @@ Water and land use & OpenStreetMap via Overpass, coastline & Water fraction, pop
 \end{tabular}
 \end{table}
 
-Public Overpass servers sometimes reset or time out, so for repeatable offline runs the
-project includes fixture layers, hand-made test data shaped like the real region. The
-ablation in Section~\ref{sec:perf-ablation} used these fixtures; they show how each
-layer acts on the planner but are not real-world measurements.
+Public Overpass server sometimes resets or times out. For the offline and replicable
+experiments, the project offers fixture layers that represent manually created test data
+mimicking the real region. The ablation from Section~\ref{sec:perf-ablation} was done
+using such fixtures showing how each layer affects the planner rather than providing
+metrics available in reality.
 
 \subsection{Payload tag space and simulation bundle}
 
-Tier~2 is evaluated over all 225 tag combinations, with four reference presets
-(Table~\ref{tab:presets}) that stand for risk-dominated, distance-dominated,
-energy-dominated and balanced deliveries. For simulation, a 1.5\,km region is frozen
-into a bundle whose hash ties the planner graph, the stored front, the mission file and
-the Gazebo world together.
+We evaluate Tier~2 on all 225 tag combinations. Four reference presets
+(Table~\ref{tab:presets}) stand in for deliveries led by risk, by distance and by
+energy, and one balanced delivery. For simulation we freeze a 1.5\,km region into a
+bundle, and its hash binds the planner graph, stored front, mission file and Gazebo
+world to each other.
 
 \section{ECOSYSTEM}\label{sec:ecosystem}
 
@@ -175,7 +175,7 @@ that Tier~1 is exact.
 
 \subsection{Tier 1 front quality against the baselines}\label{sec:perf-front}
 
-Table~\ref{tab:bench} gives the first-pass benchmark.
+The first-pass benchmark is in Table~\ref{tab:bench}.
 
 \begin{table}[!htbp]
 \centering
@@ -207,9 +207,10 @@ $\Delta$ lower are better)}\label{tab:bench}
 \end{tabular}
 \end{table}
 
-NAMOA* has an IGD of zero in every scenario, so its front contains every point of the
-reference front. That is what an exact method should give, and it confirms that the
-pruning rules do not throw away non-dominated routes. MOPSO recovers 12 of the 16 routes
+NAMOA* achieves a perfect zero inverted generational distance (IGD) for all three cases,
+with all reference points found on the front of NAMOA*. This is the best that can be
+achieved by an exact algorithm and indicates clearly that no solution is lost through
+pruning rules. MOPSO recovers 12 of the 16 routes
 on S2 and 38 of the 115 on S3, and its HV is close to that of NAMOA*, with a gap of
 0.0004 on S2 and 0.009 on S3.
 
@@ -273,24 +274,26 @@ Calm & 36 & 869 & 24.41 & 0.07 & (26.78, 26.92, 0.11) & 4\\
 
 The first observation is that direction alone matters a great deal. At the same speed,
 the cheapest route on the front needs 24.58 energy units with the wind from the
-south-west and 31.34 with it from the north-east, a difference of 27.5\%. A planner that
-used wind speed without direction would assign both cases the same cost.
+south-west and 31.34 with it from the north-east, a difference of 27.5\%. A planning
+algorithm using wind speed independent of its direction will cost both situations
+equally.
 
-Risk and energy also respond to different properties of the wind. Opposite directions
-(0$^\circ$ and 180$^\circ$, or 45$^\circ$ and 225$^\circ$) give the same minimum risk,
-because crosswind depends only on the axis of the wind. They give very different minimum
-energy, because the headwind penalty depends on which way along that axis the drone is
-flying. This is what Equation~(\ref{eq:hwcw}) predicts, and it is why the model
-needs both components.
+The two goals depend on different criteria. When the wind is rotated 180$^\circ$ (from
+0$^\circ$ to 180$^\circ$ or from 45$^\circ$ to 225$^\circ$), the lowest risk remains the
+same because of the crosswind, which depends only on the wind's axis. Minimum energy
+cannot be considered separately from the direction of the wind: the headwind cost is
+conditional on the direction of the movement of the drone with respect to the relevant
+axis. Both of them derive from Equation~(\ref{eq:hwcw}), which explains why headwind and
+crosswind are two separate cases.
 
-Wind also changes the shape of the front. The front shrinks from 36 routes in calm air
-to between 6 and 14, and the four presets land on only two distinct routes. Under a
-steady wind, edges with strong crosswind are both costlier and riskier, so energy and
-risk become correlated and fewer real trade-offs are left. The fragile medical pick is
-the lowest-risk option on every windy front, but its energy varies from 26.87 to 33.63
-with direction. Figure~\ref{fig:wind-sweep} repeats the experiment in 15$^\circ$ steps.
-The minimum energy moves between 24.6 and 31.6 units, a 28.5\% swing, and the front holds
-between 6 and 15 routes.
+The pattern of the front also depends on the state of the wind. In calm conditions, 36
+routes are possible; under 8 wind directions, the number of available routes is 6--14,
+while the four presets give rise to just two unique routes. The reasoning here is that
+in wind, highly crosswind-unfavorable edges become not only expensive but risky, leading
+to a coincidence of costs and risks. The most sensitive case -- fragile medical pick --
+always provides the safest path in wind, although the energy consumption of the route is
+wind-dependent (26.87--33.63). Repeating the run in 15$^\circ$ steps (Figure~\ref{fig:wind-sweep}) gives a
+minimum energy of 24.6 to 31.6 units, a 28.5\% swing, with 6 to 15 routes on the front.
 
 \begin{figure}[!htbp]
 \centering
@@ -322,19 +325,15 @@ $\rho_\mathrm{edge}$ & 0.225 & 0.170 & 0.038 & 0.170 & 0.225 & 0.170 & 0.038 & 0
 \end{tabular}
 \end{table}
 
-East-bound edges fly into the wind and cost 27.8\% more energy per kilometre than
-west-bound edges, which fly with it and cost exactly their distance, since a tailwind
-earns no credit. North- and south-bound edges take the full crosswind and carry six
-times the risk score of east-west edges (0.225 against 0.038); the 0.038 left on the
-east-west edges comes only from the gust term. On this flat lattice the front still has
-a single route, because the straight diagonal is best on every objective. Trade-offs
-appear only when the wind interacts with terrain, buildings or restricted zones, which
-is what the ablation shows.
+Flying east, into the wind, costs 27.8\% more energy per kilometre than flying west,
+which costs exactly the distance because a tailwind earns no credit. For north and south
+facing edges, the entire crosswind is present, and the risk score is six times that of
+east-west edges (0.225 compared to 0.038). The value of 0.038 is only that of the gust
+term for east-west edges. Still, the front on the flat lattice has only one route, as the straight diagonal is best for all goals. There is no trade-off resulting from the wind alone.
 
 \subsection{Contribution of each risk layer}\label{sec:perf-ablation}
 
-Table~\ref{tab:ablation} gives the result of E4. These runs used the fixture layers, so
-the numbers describe how each layer acts on the planner, not real-world values.
+E4 test results are tabulated in Table~\ref{tab:ablation}. The experiments used fixture layers, so the values show how the layers affect the planner.
 
 \begin{table}[!htbp]
 \centering
@@ -355,11 +354,11 @@ No buildings & 190 & 8.32 & 8.82 & 8.85 & 12.26 & 0.192\\
 \end{tabular}
 \end{table}
 
-In this setting wind is the largest single driver of risk. Removing it lowers the mean
-edge risk from 0.199 to 0.061 and the risk of the safest route from 8.85 to 0.10, and it
-lowers the minimum energy by 11\%. Terrain mostly drives the size of the front. Without
+Wind matters most here: turning it off lowers the mean edge risk
+from 0.199 to 0.061, the safest path risk from 8.85 to 0.10, and the minimum energy by
+11\%. Terrain, on the other hand, mostly controls how many routes there are. Without
 grades there are far fewer distinct trade-offs, 56 routes against 196, because altitude
-changes are what separate otherwise similar paths. Buildings raise the upper end of the
+changes are what separate otherwise similar paths. Buildings raise the top limit of the
 risk range.
 
 \subsection{Tier 2 selection}\label{sec:perf-tier2}
@@ -388,28 +387,22 @@ are the selected route's position on each objective within the front, where 1 is
 \end{tabular}
 \end{table}
 
-On the 115-route S3 front, the four presets choose four different routes, and three of
-them are non-extreme points. Disaster relief takes the minimum-energy route, which
-matches its dominant weight.
+On the 115-route S3 front, the four presets take four separate routes, three of which are represented by non-extreme points. Disaster relief uses the minimum energy path, consistent with its dominant weight.
 
-The emergency medicine pick deserves a closer look. It is only the 22nd-shortest route,
-yet it is just 1.9\% longer than the shortest route on the front. Its weights are
-dominated by distance, but not entirely, so the utility accepts a very small distance
-penalty for a lower risk. A single-objective planner cannot make that trade, and a
-fixed-weight planner would make the same trade for every payload.
+The emergency medicine preset deserves a special consideration. It is merely the
+22nd shortest route, yet it is just 1.9\% longer than the shortest route in the front.
+While the distance is the key factor in the setting of its weights, it is not the only
+one; therefore, the utility function sacrifices some distance for smaller risk. A single
+objective planner cannot do that kind of tradeoff, and a fixed weights planner would
+make the same tradeoff for each payload.
 
-The fragile medical and emergency picks show the size of the trade-off Tier~2 is
-choosing between. The fragile route is 10.5\% longer than the emergency route (41.02
-against 37.11) and carries 71\% less cumulative risk (1.92 against 6.56). The fragile
-pick is 25th of 115 on risk rather than first, because its distance and energy weights
-are not zero, and the routes with even lower risk cost much more distance. Mixed cargo
-lands between the two on every objective, which is what its balanced weights ask for.
-Every selection took about 0.14\,ms on S3, thousands of times inside the one-second
-target.
+The fragile medical and emergency routes show the gap between Tier~2 options. The fragile route is 10.5\% longer than the emergency one
+(41.02 versus 37.11), and it has 71\% less risk (1.92 versus 6.56). It ranks 25th out of
+115 on risk instead of 1st, because both distance and energy coefficients are still positive and the more cautious paths are much longer.
+Mixed cargo is in an intermediate position with respect to all criteria, as expected from its balanced weights. Selections on S3
+took about 0.14\,ms, against a target of one second.
 
-On the smaller S2 front, emergency medicine and disaster relief share the
-minimum-energy route, the same pattern as in the wind experiment: front size limits how
-many distinct choices Tier~2 can make.
+On the smaller S2 front, emergency medicine and disaster relief take the same minimal energy path, as in the wind example: small fronts leave Tier~2 fewer paths.
 
 Figure~\ref{fig:osm-routes} shows the four presets on a 2\,km lattice (11-route front) with
 OpenStreetMap roads drawn underneath for reference. The fragile medical and mixed cargo

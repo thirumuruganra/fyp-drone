@@ -5,41 +5,36 @@
 Unmanned aerial vehicles (UAVs) are a practical option for last-mile delivery where
 ground transport is slow or impossible: medical supplies for remote clinics, emergency
 drug drops after a disaster, and diagnostic samples that should not spend an hour
-shaking in the back of a van. In each case the UAV flies from a dispatch hub to a
-delivery point through airspace that has buildings, terrain, restricted zones and wind
-in it. A good route has to balance three things that pull against each other: how far
-the drone flies, how much battery it uses, and how much of the flight is spent in risky
-air.
+shaking in the back of a van. Every one of these flights goes from a dispatch hub to a
+delivery point, and the air in between holds buildings, hills, restricted zones and
+wind. Three things compete when we choose the route: the distance flown, the battery
+spent, and the share of the trip spent in risky air. Improve one and another usually
+gets worse.
 
-Multi-objective path planning was built for this kind of conflict. A multi-objective
-planner keeps distance, energy and risk separate during the search and returns a
-Pareto-optimal front, which is a set of routes where none can be improved on one
-objective without getting worse on another~\cite{r11}. The front tells the operator
-which trade-offs exist. It does not say which route to fly.
+Multi-objective path planning was designed for exactly this. Such a planner carries
+distance, energy and risk separately through the search and hands back a Pareto-optimal
+front, a set of routes where no route can gain on one objective without losing on
+another~\cite{r11}. The front lists the trade-offs on offer. Which one to fly is left
+open.
 
-The usual shortcut is to fold the three objectives into one weighted sum and run an
-ordinary planner such as A* on the resulting scalar cost. The operator picks the
-weights before each flight to express what the mission cares about. For one fixed
-mission type this works. It stops working once the payload changes, because emergency
-medicine needs a very different weight profile from a fragile blood sample or a box of
-relief supplies~\cite{r1}. Re-tuning the weights and running the search again between
-missions is slow, needs someone who understands the planner, and is hard to justify in
-the middle of an emergency.
+Most systems take a shortcut here. They merge the three objectives into one weighted
+sum, give the scalar cost to a plain planner such as A*, and let the operator set the
+weights before each flight. If every mission is the same kind, that is fine. Change the
+payload and it breaks: emergency medicine wants a very different weighting from a
+fragile blood sample, and both differ from a box of relief supplies~\cite{r1}.
+The process of re-tuning and re-running the search algorithm between flights consumes
+time, and in the event of an emergency, nobody with the experience of the planner is
+available.
 
-This project proposes a Payload-Aware Two-Tier UAV Route Planning system that removes
-that step. Tier~1 builds the Pareto front for a delivery region once, with an exact
-multi-objective graph search over a three-dimensional airspace lattice whose edge costs
-depend on terrain, buildings, restricted zones and the direction of the wind. The front
-is stored and reused until the graph changes, the front expires or the weather drifts.
-Tier~2 runs per mission. It reads four payload tags entered by the operator, turns them
-into objective weights with a fixed formula, scores every route on the stored front and
-returns the best one in well under a millisecond. The chosen route is exported as an
-ArduPilot mission and flown in a Gazebo and ArduPilot software-in-the-loop (SITL)
-simulation.
-
-This report covers Phase~I: the software system, its benchmarks against
-single-objective A* and MOPSO, and the first simulated flights. Phase~II moves the same
-software onto a physical quadcopter.
+Our Payload-Aware Two-Tier UAV Route Planning system takes that step away. Tier~1
+builds the Pareto front for a delivery region once by using an exact multi objective
+graph search over 3D airspace lattice. This lattice is used because its edge costs
+depend on terrain, buildings, restricted zones and the way the wind blows. We keep that front until the
+graph changes, the front expires or the weather drifts. Tier~2 runs for each mission.
+The operator enters four payload tags, a fixed formula turns them into objective
+weights, every stored route is scored, and the top one comes back in well under a
+millisecond. This is then exported as an ArduPilot mission and flown in a Gazebo and
+ArduPilot software-in-the-loop (SITL) simulation.
 
 \section{MOTIVATION}
 
@@ -49,7 +44,7 @@ work motivate this project, and their routing needs do not agree with each other
 Fragile medical samples such as tissue biopsies and blood specimens must arrive intact,
 and an operator will want them kept out of rough air when a smoother corridor exists.
 The priority is low flight risk: little time in turbulent or crosswind-exposed corridors
-and few sudden altitude changes. A somewhat longer but much calmer route is better.
+and few sudden altitude changes. We would take a longer route if in case the air is calmer.
 
 Emergency medicine such as insulin or antivenom has a strict time window. The priority
 is the shortest route, so that transit time is as low as possible, and risk and energy
@@ -79,25 +74,27 @@ wrong on any windy day, and so does any payload-aware choice built on top of it.
 
 \subsection{Building a front versus choosing from it}
 
-Pareto fronts for routing are built either by exact graph search, such as
-NAMOA*~\cite{r17}, which keeps every non-dominated partial path at each node, or by
-population methods such as NSGA-II~\cite{r8} and MOPSO~\cite{r6}, which are faster on
-large spaces but stochastic. Building the front is well studied. Picking one route from
-it gets far less attention: the usual options are a crowding-distance rule~\cite{r8,r3},
-an entropy criterion followed by a hand-set weighted sum~\cite{r1}, or a person. None of
-them looks at what the drone is carrying. Payload does appear in the literature as
-continuous mass inside the energy model~\cite{r10}, which changes the costs, not the
-choice between trade-offs. What is missing is any use of payload metadata to
-\emph{select} a point on a precomputed front.
+A routing front can be built in two ways. Exact Graph Search algorithms like
+NAMOA*~\cite{r17} keep all non-dominated paths at each node. Conversely, other
+algorithms like NSGA-II~\cite{r8} and MOPSO~\cite{r6} perform better on large search
+spaces but use random procedures. Typical route selection strategies involve the use of crowding distance
+technique~\cite{r8,r3}, an entropy criterion coupled with a weighted sum~\cite{r1}, or
+even manual intervention. None of these techniques consider the payload being
+delivered by the drone. In the energy model~\cite{r10}, payload is expressed through
+mass which impacts edge cost without affecting the relative trade-offs. Our
+investigation suggests that no algorithm has considered the payload metadata for
+selecting a particular point on the Pareto front.
 
 \subsection{Evidence from real deployments}
 
-Real deployments show where payload matters, and also how thin the public evidence
-still is. Swiss Post flew laboratory samples between hospitals on Matternet quadrotors
-until two incidents in 2019 led it to suspend the service. In January a short circuit
-cut power to the GPS and the drone made an emergency landing on Lake Z\"{u}rich. In May
-a parachute tether snagged on the airframe and the 22-pound drone fell into woods near a
-group of kindergarten children~\cite{r12}. Both were equipment failures, so they say
+Usage of services highlights the instances in which payload is significant, but the
+available information is scant. Swiss Post used the Matternet drones for transporting
+laboratory samples from one hospital to another and then discontinued its service after
+two incidents occurred in 2019. First incident was in January when the drone faced an
+electrical fault, which resulted in an interruption of power supply to the GPS system,
+and the drone had to land in Lake Zurich urgently. Second incident happened in May when
+parachute of the drone got entangled in its frame, resulting in a descent into trees
+near some children playing in kindergarten~\cite{r12}. Both were equipment failures, so they say
 nothing about route choice. They do show that laboratory samples are routinely flown
 over water and populated ground, where the choice of corridor has consequences.
 
@@ -127,6 +124,7 @@ being carried. When the payload changes, an expert has to re-tune the weights an
 because no explicit mapping exists from a payload description to the trade-off it
 implies. In the field, that expert is not available.
 
+\newpage
 \subsection{Formal statement}
 
 We are given:
@@ -149,27 +147,27 @@ fragile, $F = 5$; the delivery is not urgent, $U = 1$''). Selection must be
 deterministic and reproducible, and it must finish within one second of the tags being
 entered. Three further conditions follow from the gaps identified in
 Chapter~\ref{cha:lit}. The selected route must depend on $(F, W, U, P_\mathrm{lvl})$ and
-not on the geometry of the front alone. The front must be reused across missions
-between refreshes instead of being rebuilt each time. The map from
-$(F, W, U, P_\mathrm{lvl})$ to $p^*$ must be an explicit formula, not a set of rules
-written by an expert and not a lookup table.
+not on the geometry of the front alone. The front needs to be reusable during multiple
+missions before the next refresh instead of constructing it from scratch each time.
+Lastly, the conversion from $(F, W, U, P_\mathrm{lvl})$ to $p^*$ needs to be stated in
+terms of a mathematical formula; anything else is unacceptable.
 
 \subsection{Weather dependence}
 
-The edge costs depend on the weather. Writing $\omega$ for a weather snapshot (wind
-speed, wind direction, gust, rain and visibility), the cost of an edge is
+Weather affects the cost of edges. Let $\omega$ be a measurement of wind speed and
+direction, gusts, precipitation, and visibility. An edge then costs
 $\mathbf{c}(e;\omega) = [d(e),\, \varepsilon(e;\omega),\, \rho(e;\omega)]$ and the
-front becomes $\mathcal{P}(\omega)$. Distance stays the same, but energy and risk
-change with how the wind meets each edge. The selection problem itself does not change.
-What changes is that a stored front is only valid while $\omega$ stays close to the
-snapshot it was built for. That is why the front is refreshed on a schedule and on
-weather drift. When $\omega$ crosses the go/no-go limits, no route is selected at all
-and the mission is held.
+front becomes $\mathcal{P}(\omega)$. The distance will always be constant, while energy
+and risk depend on the intersection angle of the wind with each edge. Selection is done
+as before. However, the difficulty is that an old front can be used only for as long as
+$\omega$ does not deviate too much from the measurements it was built for; therefore,
+the front must be updated by time or when the weather deviates. If $\omega$ is outside
+the go/no-go limits, then there is no selection and the mission is rescheduled.
 
 \subsection{Inputs, outputs and success criteria}
 
-Table~\ref{tab:ps-io} lists what the system takes in, what it returns and how each part
-is judged.
+Table~\ref{tab:ps-io} specifies the inputs, the outputs, and the tests each of them
+needs to pass.
 
 \begin{table}[!htbp]
 \centering
@@ -204,21 +202,21 @@ Simulation criteria & Cross-track error, clearance margin and landing offset of 
 
 \subsection{Scope}
 
-Phase~I, covered by this report, delivers the full software system and its simulation.
-Phase~II moves the system onto a Pixhawk-equipped
-F450 quadcopter with a Raspberry Pi~5 companion computer and validates it with outdoor
-flights. The Tier~1 front is treated as valid for a bounded window. It is rebuilt when
-the window expires or when the weather drifts past set thresholds, and every mission
-inside the window is served by Tier~2 alone. The project does not cover multi-UAV
-coordination, avoidance of moving obstacles during flight, or real-time replanning.
+This report covers Phase~I which delivers the complete software system and its
+simulation. In Phase~II the same system is transferred onto a Pixhawk-equipped F450
+quadcopter with a Raspberry Pi~5 companion computer and is tested in outdoor flights. A
+Tier~1 front is trusted only for a bounded window. Once the window runs out, or the
+weather moves past set thresholds, it is rebuilt; until then Tier~2 alone serves every
+mission. Multi-UAV coordination, dodging moving obstacles and real-time replanning are
+outside our scope.
 
 \section{ORGANIZATION OF THE REPORT}
 
-The report has six chapters, followed by the references and three appendices. Chapter~\ref{cha:intro} sets out the motivation, background and
-problem. Chapter~\ref{cha:lit} reviews the closest papers, the gaps in them and our
-research objectives. Chapter~\ref{cha:method} describes the architecture and its seven
-modules with the algorithms behind them. Chapter~\ref{cha:results} covers the datasets,
-the hardware and software, the experiments and what the results show. Chapter~\ref{cha:social} discusses the social impact and sustainability
-of the work. Chapter~\ref{cha:conclusion} concludes and lists the work planned for the
-rest of Phase~I and for Phase~II. The references follow, and the appendices give the
-main configuration parameters, the automated test suites and the code organisation.
+There are six chapters, then the references and three appendices.
+Chapter~\ref{cha:intro} gives the motivation and the problem. Chapter~\ref{cha:lit}
+reviews various near papers, what they leave out, and the objectives that we took from
+that. Chapter~\ref{cha:method} explains the architecture and its seven modules including
+the algorithms inside them. Chapter~\ref{cha:results} covers datasets, hardware and
+software, the experiments run so far and their results. Chapter~\ref{cha:social} looks
+at social impact and sustainability, and Chapter~\ref{cha:conclusion} looks at the plan
+for the rest of Phase~I and for Phase~II.
