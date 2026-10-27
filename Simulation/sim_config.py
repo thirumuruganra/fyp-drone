@@ -47,6 +47,10 @@ SIM_TILE_M = 250.0              # building meshes merged per tile (fewer entitie
 SIM_VEHICLE_MODEL = "iris_with_ardupilot"   # from ardupilot_gazebo/models; no gimbal / GStreamer plugins
 SIM_VEHICLE_SPAWN_Z = 0.195              # as in ardupilot_gazebo iris_runway.sdf
 SIM_MAX_FRONT_MARKERS = 20      # Tier 1 front routes drawn as thin lines
+SIM_SELECTED_MARKER_WIDTH_M = 0.12   # Tier 2 pick line; thinner than the Iris (~0.5 m) so the drone stays visible on it
+SIM_FRONT_MARKER_WIDTH_M = 0.08
+SIM_SELECTED_MARKER_TRANSPARENCY = 0.5   # 0 opaque .. 1 invisible
+SIM_FRONT_MARKER_TRANSPARENCY = 0.6
 # GUI camera follow offsets (x, y, z metres from the vehicle) written to worlds/<id>/gui.config.
 SIM_CAMERA_VIEWS = {"takeoff": (-4.0, -6.0, 3.0),      # beside the depot pad (~8 m), then "follow" from
                     "follow": (-6.0, -8.0, 8.0),       # tight chase view through the flight

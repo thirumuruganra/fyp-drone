@@ -287,7 +287,7 @@ def build_world(region_id: str, *, regions_root: Optional[Path] = None, worlds_r
 
 # ── route markers ────────────────────────────────────────────────────────────
 
-def _segment_visual(name: str, p0, p1, width: float, rgba) -> str:
+def _segment_visual(name: str, p0, p1, width: float, rgba, transparency: float = 0.0) -> str:
     p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
     d = p1 - p0
     length = float(np.linalg.norm(d))
@@ -297,6 +297,7 @@ def _segment_visual(name: str, p0, p1, width: float, rgba) -> str:
     yaw = math.atan2(d[1], d[0])
     pitch = -math.asin(max(-1.0, min(1.0, d[2] / length)))
     return (f'      <visual name="{name}"><cast_shadows>false</cast_shadows>'
+            f'<transparency>{transparency:.2f}</transparency>'
             f'<pose>{mid[0]:.3f} {mid[1]:.3f} {mid[2]:.3f} 0 {pitch:.5f} {yaw:.5f}</pose>'
             f'<geometry><box><size>{length:.3f} {width:.3f} {width:.3f}</size></box></geometry>'
             f'<material><ambient>{_rgba(rgba)}</ambient><diffuse>{_rgba(rgba)}</diffuse>'
@@ -304,15 +305,21 @@ def _segment_visual(name: str, p0, p1, width: float, rgba) -> str:
 
 
 def route_markers_sdf(selected_xyz: Sequence, front_xyz: Sequence[Sequence] = (), *,
-                      name: str = "route_markers", selected_width: float = 0.8,
-                      front_width: float = 0.25, max_front: int = scfg.SIM_MAX_FRONT_MARKERS) -> str:
-    """Visual-only static model: selected route (thick red) + up to max_front front routes (thin blue)."""
+                      name: str = "route_markers", selected_width: float = scfg.SIM_SELECTED_MARKER_WIDTH_M,
+                      front_width: float = scfg.SIM_FRONT_MARKER_WIDTH_M,
+                      max_front: int = scfg.SIM_MAX_FRONT_MARKERS) -> str:
+    """Visual-only static model: selected route (red) + up to max_front front routes (blue).
+
+    Lines are thinner than the vehicle and translucent: the drone flies along the line's axis, so a
+    wide opaque marker would hide it."""
     vis = []
     for k, route in enumerate(list(front_xyz)[:max_front]):
         for s in range(len(route) - 1):
-            vis.append(_segment_visual(f"front{k}_{s}", route[s], route[s + 1], front_width, FRONT_RGBA))
+            vis.append(_segment_visual(f"front{k}_{s}", route[s], route[s + 1], front_width, FRONT_RGBA,
+                                       scfg.SIM_FRONT_MARKER_TRANSPARENCY))
     for s in range(len(selected_xyz) - 1):
-        vis.append(_segment_visual(f"sel_{s}", selected_xyz[s], selected_xyz[s + 1], selected_width, SELECTED_RGBA))
+        vis.append(_segment_visual(f"sel_{s}", selected_xyz[s], selected_xyz[s + 1], selected_width, SELECTED_RGBA,
+                                   scfg.SIM_SELECTED_MARKER_TRANSPARENCY))
     return (f'<?xml version="1.0"?>\n<sdf version="1.9">\n  <model name="{name}">\n    <static>true</static>\n'
             f'    <link name="link">\n' + "".join(vis) + "    </link>\n  </model>\n</sdf>\n")
 

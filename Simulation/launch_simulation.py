@@ -140,7 +140,9 @@ def wait_for_enter(start_file: Path, stop: threading.Event) -> None:
         start_file.touch()
 
 
-def prepare_args(region_id: str) -> list:
+def prepare_args(region_id: str, custom: list | None = None) -> list:
+    if custom:
+        return ["--strict", "--region-id", region_id, *custom]
     if region_id == "smoke_offline":
         return ["--offline", "--region-id", region_id]
     if region_id == scfg.SIM_REGION_ID:
@@ -170,6 +172,12 @@ def main(argv=None) -> int:
     parser.add_argument("--spacing-m", type=float, default=scfg.SIM_SPACING_M)
     parser.add_argument("--preset", default="mixed_cargo")
     parser.add_argument("--dest-index", type=int, default=0)
+    parser.add_argument("--center", nargs=2, type=float, metavar=("LAT", "LON"),
+                        help="NEW region: lattice centre (with --region-id; prepared on first launch)")
+    parser.add_argument("--depot", nargs=2, type=float, metavar=("LAT", "LON"), help="NEW region: depot pad")
+    parser.add_argument("--dest", nargs=2, type=float, action="append", metavar=("LAT", "LON"),
+                        help="NEW region: delivery pad (repeat for several)")
+    parser.add_argument("--box-m", type=float, help="NEW region: box size in metres")
     parser.add_argument("--scene-only", action="store_true", help="show world and route markers without flying")
     parser.add_argument("--view", choices=sorted(scfg.SIM_CAMERA_VIEWS), default="takeoff",
                         help="takeoff: pad shot, then follow at 6 m; follow: close chase; wide: distant chase")
@@ -180,6 +188,8 @@ def main(argv=None) -> int:
                         help="Windows path of QGroundControl.exe (env FYP_QGC_EXE)")
     parser.add_argument("--terrain-res-m", type=float, default=scfg.SIM_DISPLAY_TERRAIN_RES_M,
                         help="Gazebo terrain mesh step; display only, planner uses the bundle DEM")
+    parser.add_argument("--no-route-markers", action="store_true",
+                        help="do not draw the Tier 1 front / Tier 2 route lines in Gazebo (clean footage)")
     parser.add_argument("--no-sky", action="store_true", help="lighter rendering (WSLg / software GL)")
     parser.add_argument("--render-engine", choices=("ogre", "ogre2"), help="pass ogre if WSLg shows a black window")
     parser.add_argument("--vehicle-model", default=scfg.SIM_VEHICLE_MODEL)
@@ -206,8 +216,18 @@ def main(argv=None) -> int:
     if not args.scene_only and not binary.is_file():
         raise RuntimeError(f"ArduCopter SITL not built: {binary} (README Phase 0, or set FYP_ARDUPILOT_DIR)")
 
-    if not (_paths.REGIONS_DIR / args.region_id / "manifest.json").exists():
-        subprocess.run([sys.executable, str(sim / "prepare_sim_region.py"), *prepare_args(args.region_id)],
+    custom = []
+    for flag, val in (("--center", args.center), ("--depot", args.depot), ("--box-m", args.box_m)):
+        if val is not None:
+            custom += [flag, *map(str, val if isinstance(val, list) else [val])]
+    for dest in args.dest or []:
+        custom += ["--dest", *map(str, dest)]
+    if (_paths.REGIONS_DIR / args.region_id / "manifest.json").exists():
+        if custom:
+            print(f"[Launch] region '{args.region_id}' already exists: --center/--depot/--dest/--box-m ignored "
+                  f"(pick a new --region-id, or delete regions/{args.region_id})", flush=True)
+    else:
+        subprocess.run([sys.executable, str(sim / "prepare_sim_region.py"), *prepare_args(args.region_id, custom)],
                        cwd=sim, check=True)
     from gazebo_world_builder import build_world
     from sim_region import RegionBundle
@@ -235,6 +255,7 @@ def main(argv=None) -> int:
             gazebo = subprocess.Popen(["bash", str(sim / "gazebo/launch_region.sh"), args.region_id,
                                        str(mission), *gz_extra], cwd=sim, stdout=gz_log,
                                       stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                      env={**os.environ, **({"NO_ROUTE_MARKERS": "1"} if args.no_route_markers else {})},
                                       start_new_session=True)
             children.append(gazebo)
             director = camera_director(sim, world, args.vehicle_model, args.view)

@@ -7,6 +7,8 @@
 #   gazebo/launch_region.sh thiru_demo missions/20261018_224344_thiru_demo_dest0_fragile_medical
 #   gazebo/launch_region.sh thiru_demo "" --render-engine ogre     # WSLg / VM rendering fallback
 #
+# NO_ROUTE_MARKERS=1 (any non-empty value) skips spawning the route markers (clean footage).
+#
 # Needs: Gazebo Harmonic+ (gz) and ardupilot_gazebo built (see Simulation/README.md); gazebo/env.sh
 # puts it on GZ_SIM_SYSTEM_PLUGIN_PATH / GZ_SIM_RESOURCE_PATH. Then start SITL in another terminal
 # with the sim_vehicle.py line this script prints (its --custom-location MUST match the world origin),
@@ -66,7 +68,7 @@ wait_for_world() {
   return 1
 }
 
-if [[ -n "$MISSION" ]]; then
+if [[ -n "$MISSION" && -z "${NO_ROUTE_MARKERS:-}" ]]; then
   MARKERS="$(cd "$MISSION" && pwd)/route_markers.sdf"
   echo "Waiting for world $WORLD_NAME to spawn route markers …"
   wait_for_world || true
