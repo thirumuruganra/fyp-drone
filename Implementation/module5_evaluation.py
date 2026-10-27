@@ -7,6 +7,11 @@ Hypervolume and IGD use a reference front constructed from the union of all
 candidate method outputs for one scenario, then filtered to non-dominated
 points. The HV reference point is the scenario-wise nadir point padded by 10%.
 All HV/IGD/spread values are computed in normalized objective space.
+
+Extra indicators: GD, IGD+ (Pareto-compliant IGD), additive epsilon I_eps+,
+Zitzler set coverage C(A, B), HV ratio and the share of the reference front a
+method found.  Stochastic methods are scored per run against the same
+reference (evaluate_runs / summarize_runs -> mean +- std).
 """
 
 from __future__ import annotations
@@ -18,7 +23,8 @@ import time
 
 import numpy as np
 
-from module2_tier1_moastar import pareto_dominates, update_pareto_front
+from module2_tier1_moastar import pareto_dominates, update_pareto_front, weakly_dominates
+from module3_baselines import route_cost
 from module4_tier2_payload import PAYLOAD_PRESETS, TierTwoSelector
 
 
@@ -31,15 +37,21 @@ def ensure_finite(points: np.ndarray) -> np.ndarray:
     return arr
 
 
-def nondominated_routes(routes: list[tuple[list[float], list]]) -> list[tuple[list[float], list]]:
+def nondominated_routes(routes: list[tuple[list[float], list]],
+                        tol: float = 1e-9) -> list[tuple[list[float], list]]:
+    """
+    Non-dominated, de-duplicated routes.  Dominance is tested within `tol`, so a
+    route that ties another up to float noise (costs summed in another order,
+    e.g. MOPSO re-costing vs NAMOA labels) cannot survive next to a route that
+    beats it in the other objectives.
+    """
     front: list[tuple[list[float], list]] = []
-    seen_costs: list[list[float]] = []
     for costs, path in routes:
         cost_vec = [float(x) for x in costs]
-        if any(np.allclose(cost_vec, seen, atol=1e-9) for seen in seen_costs):
-            continue
-        seen_costs.append(cost_vec)
-        update_pareto_front(front, cost_vec, list(path))
+        if any(weakly_dominates(g, cost_vec, tol) for g, _ in front):
+            continue                                   # dominated or duplicate
+        front = [(g, p) for g, p in front if not weakly_dominates(cost_vec, g, tol)]
+        front.append((cost_vec, list(path)))
     return front
 
 
@@ -122,6 +134,59 @@ def igd(approx_points: np.ndarray, reference_front: np.ndarray) -> float:
     return float(np.mean(distances))
 
 
+def gd(approx_points: np.ndarray, reference_front: np.ndarray) -> float:
+    """Generational Distance: mean distance approx point -> nearest reference point."""
+    approx = ensure_finite(approx_points)
+    ref = ensure_finite(reference_front)
+    if len(approx) == 0:
+        return float("inf")
+    return float(np.mean([np.linalg.norm(ref - p, axis=1).min() for p in approx]))
+
+
+def igd_plus(approx_points: np.ndarray, reference_front: np.ndarray) -> float:
+    """
+    IGD+ (Ishibuchi et al. 2015): like IGD, but only the part of a that is worse
+    than r counts, d+(r, a) = ||max(a - r, 0)||.  Weakly Pareto compliant.
+    """
+    approx = ensure_finite(approx_points)
+    ref = ensure_finite(reference_front)
+    if len(approx) == 0:
+        return float("inf")
+    return float(np.mean([
+        np.linalg.norm(np.maximum(approx - r, 0.0), axis=1).min() for r in ref
+    ]))
+
+
+def additive_epsilon(approx_points: np.ndarray, reference_front: np.ndarray) -> float:
+    """
+    Additive epsilon indicator I_eps+(A, R): smallest shift eps so that every
+    reference point is weakly dominated by some a - eps.  0 = A covers R.
+    """
+    approx = ensure_finite(approx_points)
+    ref = ensure_finite(reference_front)
+    if len(approx) == 0:
+        return float("inf")
+    return float(max((approx - r).max(axis=1).min() for r in ref))
+
+
+def set_coverage(a_points: np.ndarray, b_points: np.ndarray) -> float:
+    """Zitzler C(A, B): share of B weakly dominated by at least one point of A."""
+    a = ensure_finite(a_points)
+    b = ensure_finite(b_points)
+    if len(b) == 0:
+        return 0.0
+    covered = sum(1 for q in b if np.any(np.all(a <= q + 1e-12, axis=1)))
+    return float(covered / len(b))
+
+
+def reference_share(points: np.ndarray, reference_front: np.ndarray, atol: float = 1e-9) -> float:
+    """Share of reference-front points a method found exactly."""
+    pts = ensure_finite(points)
+    ref = ensure_finite(reference_front)
+    found = sum(1 for r in ref if np.any(np.all(np.isclose(pts, r, atol=atol), axis=1)))
+    return float(found / len(ref))
+
+
 def spread_delta(points: np.ndarray, reference_front: np.ndarray | None = None) -> float:
     """
     NSGA-II-style spread metric on normalized points sorted by distance.
@@ -167,43 +232,256 @@ def build_reference_front(method_routes: dict[str, list[tuple[list[float], list]
     return objective_matrix(nondominated_routes(all_routes))
 
 
+def reference_context(method_routes: dict[str, list[tuple[list[float], list]]]) -> dict:
+    """Reference front, normalization bounds and HV reference point for one scenario."""
+    reference_front = build_reference_front(method_routes)
+    ideal, nadir = normalization_bounds(reference_front)
+    ref_norm = normalize(reference_front, ideal, nadir)
+    hv_ref = reference_point_for(ref_norm)
+    return {
+        "reference_front": reference_front,
+        "ideal": ideal,
+        "nadir": nadir,
+        "ref_norm": ref_norm,
+        "hv_ref": hv_ref,
+        "hv_reference_front": hypervolume(ref_norm, hv_ref),
+    }
+
+
+def metric_row(routes: list[tuple[list[float], list]], ctx: dict) -> dict:
+    """Every front-quality indicator of one route set against a reference context."""
+    front = nondominated_routes(routes)
+    norm = normalize(objective_matrix(front), ctx["ideal"], ctx["nadir"])
+    ref_norm = ctx["ref_norm"]
+    hv = hypervolume(norm, ctx["hv_ref"])
+    return {
+        "front_size": len(front),
+        "hypervolume": hv,
+        "hv_ratio": hv / ctx["hv_reference_front"] if ctx["hv_reference_front"] > 0 else 0.0,
+        "igd": igd(norm, ref_norm),
+        "igd_plus": igd_plus(norm, ref_norm),
+        "gd": gd(norm, ref_norm),
+        "epsilon_add": additive_epsilon(norm, ref_norm),
+        "reference_share": reference_share(norm, ref_norm),
+        "spread_delta": spread_delta(norm, ref_norm),
+        "diversity_extent": diversity_extent(norm),
+    }
+
+
 def evaluate_method_set(
     method_routes: dict[str, list[tuple[list[float], list]]],
     runtimes: dict[str, float],
 ) -> tuple[list[dict], dict]:
     """Return per-method metric rows plus reference metadata."""
-    reference_front = build_reference_front(method_routes)
-    ideal, nadir = normalization_bounds(reference_front)
-    ref_norm = normalize(reference_front, ideal, nadir)
-    hv_ref = reference_point_for(ref_norm)
+    ctx = reference_context(method_routes)
 
     rows = []
     for method, routes in method_routes.items():
-        front = nondominated_routes(routes)
-        costs = objective_matrix(front)
-        norm = normalize(costs, ideal, nadir)
-        rows.append({
-            "method": method,
-            "front_size": len(front),
-            "runtime_s": float(runtimes.get(method, 0.0)),
-            "hypervolume": hypervolume(norm, hv_ref),
-            "igd": igd(norm, ref_norm),
-            "spread_delta": spread_delta(norm, ref_norm),
-            "diversity_extent": diversity_extent(norm),
-        })
+        row = {"method": method, "runtime_s": float(runtimes.get(method, 0.0))}
+        row.update(metric_row(routes, ctx))
+        rows.append(row)
 
     metadata = {
-        "reference_front_size": int(len(reference_front)),
-        "ideal": ideal.tolist(),
-        "nadir": nadir.tolist(),
-        "hv_reference_point_normalized": hv_ref.tolist(),
+        "reference_front_size": int(len(ctx["reference_front"])),
+        "ideal": ctx["ideal"].tolist(),
+        "nadir": ctx["nadir"].tolist(),
+        "hv_reference_point_normalized": ctx["hv_ref"].tolist(),
+        "hv_reference_front": ctx["hv_reference_front"],
         "notes": (
             "Reference front = non-dominated union of all method outputs for the scenario. "
-            "HV/IGD/spread use normalized objective space; HV reference point = normalized "
-            "scenario nadir padded by 10%."
+            "HV/IGD/IGD+/GD/eps/spread use normalized objective space; HV reference point = "
+            "normalized scenario nadir padded by 10%."
         ),
     }
     return rows, metadata
+
+
+def evaluate_runs(
+    method_routes: dict[str, list[tuple[list[float], list]]],
+    run_groups: dict[str, list[list[tuple[list[float], list]]]],
+    run_runtimes: dict[str, list[float]] | None = None,
+) -> list[dict]:
+    """
+    Score every run of a stochastic method on its own, against the same reference
+    as evaluate_method_set(method_routes); method_routes must already hold the
+    pooled runs so the reference covers them.
+    """
+    ctx = reference_context(method_routes)
+    rows = []
+    for method, runs in run_groups.items():
+        times = (run_runtimes or {}).get(method, [])
+        for idx, routes in enumerate(runs):
+            if not routes:
+                continue
+            row = {"method": method, "run": idx,
+                   "runtime_s": float(times[idx]) if idx < len(times) else 0.0}
+            row.update(metric_row(routes, ctx))
+            rows.append(row)
+    return rows
+
+
+RUN_SUMMARY_METRICS = ("front_size", "runtime_s", "hypervolume", "hv_ratio", "igd", "igd_plus",
+                       "gd", "epsilon_add", "reference_share", "spread_delta")
+
+
+def summarize_runs(run_rows: list[dict], group_keys: tuple[str, ...] = ("method",)) -> list[dict]:
+    """Mean, std (ddof=1), min, max of every run metric per group."""
+    groups: dict[tuple, list[dict]] = {}
+    for row in run_rows:
+        groups.setdefault(tuple(row.get(k) for k in group_keys), []).append(row)
+    out = []
+    for key, rows in groups.items():
+        summary = dict(zip(group_keys, key))
+        summary["runs"] = len(rows)
+        for metric in RUN_SUMMARY_METRICS:
+            vals = np.array([float(r[metric]) for r in rows if metric in r], dtype=float)
+            if len(vals) == 0:
+                continue
+            summary[f"{metric}_mean"] = float(vals.mean())
+            summary[f"{metric}_std"] = float(vals.std(ddof=1)) if len(vals) > 1 else 0.0
+            summary[f"{metric}_min"] = float(vals.min())
+            summary[f"{metric}_max"] = float(vals.max())
+        out.append(summary)
+    return out
+
+
+def coverage_rows(method_routes: dict[str, list[tuple[list[float], list]]],
+                  methods: tuple[str, ...] | None = None) -> list[dict]:
+    """Pairwise Zitzler coverage C(A, B) for the given methods (default: all)."""
+    names = list(methods) if methods else list(method_routes)
+    fronts = {m: objective_matrix(nondominated_routes(method_routes[m]))
+              for m in names if method_routes.get(m)}
+    return [
+        {"method_a": a, "method_b": b, "coverage": set_coverage(fronts[a], fronts[b])}
+        for a in fronts for b in fronts if a != b
+    ]
+
+
+def front_robustness(
+    G_eval,
+    routes: list[tuple[list[float], list]],
+    eval_front: list[tuple[list[float], list]],
+) -> dict:
+    """
+    How a front built under one weather holds up under another.
+
+    routes are re-costed on G_eval (same topology, other edge costs) and compared
+    with eval_front, the front built on G_eval.  Returns the share of re-costed
+    routes still non-dominated, the HV they keep (ratio, eval-front bounds) and
+    the additive epsilon gap.
+    """
+    recosted = []
+    for _g, path in routes:
+        try:
+            recosted.append((route_cost(G_eval, list(path)), list(path)))
+        except ValueError:
+            continue                          # an edge missing in G_eval: route infeasible
+    if not recosted or not eval_front:
+        return {"routes": len(routes), "feasible": len(recosted), "still_nondominated": 0.0,
+                "hv_kept": 0.0, "epsilon_add": float("inf")}
+    eval_costs = objective_matrix(eval_front)
+    rec_costs = objective_matrix(recosted)
+    nondom = sum(
+        1 for c in rec_costs
+        if not any(pareto_dominates(e.tolist(), c.tolist()) for e in eval_costs)
+    )
+    ideal, nadir = normalization_bounds(eval_costs)
+    eval_norm = normalize(eval_costs, ideal, nadir)
+    rec_norm = normalize(rec_costs, ideal, nadir)
+    hv_ref = reference_point_for(eval_norm)
+    hv_eval = hypervolume(eval_norm, hv_ref)
+    return {
+        "routes": len(routes),
+        "feasible": len(recosted),
+        "still_nondominated": float(nondom / len(recosted)),
+        "hv_kept": float(hypervolume(rec_norm, hv_ref) / hv_eval) if hv_eval > 0 else 0.0,
+        "epsilon_add": additive_epsilon(rec_norm, eval_norm),
+    }
+
+
+def tier2_vs_weighted(
+    pareto_front: list[tuple[list[float], list]],
+    weighted_routes: dict[str, list[tuple[list[float], list]]],
+) -> list[dict]:
+    """
+    Tier 2 pick vs a weighted-sum A* re-search with the same preset weights.
+
+    weighted_routes maps preset name -> that preset's weighted-sum A* routes.
+    The gap is measured in the front's own normalized objective space.
+    """
+    selector = TierTwoSelector(pareto_front)
+    costs = selector.costs
+    ideal, nadir = normalization_bounds(costs)
+    rows = []
+    for name, tags in PAYLOAD_PRESETS.items():
+        routes = weighted_routes.get(name)
+        if not routes:
+            continue
+        selected, *_ = selector.select(tags["F"], tags["W"], tags["U"], tags["P"])
+        w_cost, w_path = routes[0]
+        t2_norm = normalize(np.array([selected[0]]), ideal, nadir)[0]
+        w_norm = normalize(np.array([w_cost]), ideal, nadir)[0]
+        rows.append({
+            "preset": name,
+            "same_path": list(selected[1]) == list(w_path),
+            "objective_gap": float(np.linalg.norm(t2_norm - w_norm)),
+            "weighted_on_front": bool(np.any(np.all(np.isclose(costs, w_cost, atol=1e-6), axis=1))),
+            "weighted_dominated_by_front": any(pareto_dominates(c.tolist(), list(w_cost)) for c in costs),
+        })
+    return rows
+
+
+def amortization_rows(t_tier1: float, t_tier2: float, t_weighted: float, t_mopso: float,
+                      n_max: int = 100) -> list[dict]:
+    """
+    Cumulative planning time for n missions on one origin-destination pair:
+    two-tier = one Tier 1 front + n Tier 2 picks; weighted-sum A* and MOPSO
+    re-search once per mission.
+    """
+    return [
+        {"missions": n,
+         "two_tier_s": t_tier1 + n * t_tier2,
+         "weighted_astar_s": n * t_weighted,
+         "mopso_s": n * t_mopso}
+        for n in range(1, n_max + 1)
+    ]
+
+
+def area_profile(G) -> dict:
+    """Descriptive statistics of a lattice graph (real-area characterization)."""
+    nodes = list(G.nodes(data=True))
+    edges = [d for *_, d in G.edges(data=True)]
+
+    def node_vals(key):
+        return np.array([float(d.get(key, 0.0)) for _, d in nodes], dtype=float)
+
+    def edge_vals(key):
+        return np.array([float(d.get(key, 0.0)) for d in edges], dtype=float)
+
+    def stat(arr, fn):
+        return float(fn(arr)) if len(arr) else 0.0
+
+    info = G.graph
+    return {
+        "nodes": G.number_of_nodes(),
+        "edges": G.number_of_edges(),
+        "n_buildings": int(info.get("n_buildings", 0)),
+        "n_restricted_zones": int(info.get("n_restricted_zones", 0)),
+        "n_water_zones": int(info.get("n_water_zones", 0)),
+        "blocked_nodes": int(info.get("blocked_nodes", 0)),
+        "nfz_nodes": int(info.get("nfz_nodes", 0)),
+        "nfz_edges": int(info.get("nfz_edges", 0)),
+        "elevation_provider": str(info.get("elevation_provider", "")),
+        "ground_min_m": stat(node_vals("ground_elev_m"), np.min),
+        "ground_max_m": stat(node_vals("ground_elev_m"), np.max),
+        "bldg_density_mean": stat(node_vals("bldg_density"), np.mean),
+        "bldg_h_max_m": stat(node_vals("bldg_h_m"), np.max),
+        "agl_mean_m": stat(node_vals("agl_m"), np.mean),
+        "water_edge_mean": stat(edge_vals("water"), np.mean),
+        "population_edge_mean": stat(edge_vals("population"), np.mean),
+        "rho_mean": stat(edge_vals("rho"), np.mean),
+        "rho_max": stat(edge_vals("rho"), np.max),
+    }
 
 
 def objective_ranks(costs: np.ndarray, selected_cost: list[float]) -> dict[str, int]:
@@ -395,12 +673,23 @@ def tier2_sweep(pareto_front: list[tuple[list[float], list]]) -> list[dict]:
     return rows
 
 
-def monotonicity_violations(sweep_rows: list[dict]) -> list[dict]:
-    """Find simple adjacent monotonicity violations across the full tag sweep."""
-    by_tags = {(r["F"], r["W"], r["U"], r["P"]): r for r in sweep_rows}
+def monotonicity_violations(sweep_rows: list[dict],
+                            group_keys: tuple[str, ...] = ("scenario",)) -> list[dict]:
+    """
+    Find simple adjacent monotonicity violations across the full tag sweep.
+
+    Rows are compared only within one group (default: one scenario front), so a
+    sweep that mixes several fronts gives no false violations.  Missing group
+    keys count as one group.
+    """
+    def group_of(row):
+        return tuple(row.get(k) for k in group_keys)
+
+    by_tags = {group_of(r) + (r["F"], r["W"], r["U"], r["P"]): r for r in sweep_rows}
     violations = []
     for row in sweep_rows:
         F, W, U, P = row["F"], row["W"], row["U"], row["P"]
+        group = group_of(row)
         checks = [
             ("F", F < 5, (F + 1, W, U, P), "risk"),
             ("W", W < 3, (F, W + 1, U, P), "energy"),
@@ -409,9 +698,12 @@ def monotonicity_violations(sweep_rows: list[dict]) -> list[dict]:
         for field, enabled, next_key, objective in checks:
             if not enabled:
                 continue
-            nxt = by_tags[next_key]
+            nxt = by_tags.get(group + next_key)
+            if nxt is None:
+                continue
             if nxt[objective] > row[objective] + 1e-9:
                 violations.append({
+                    **dict(zip(group_keys, group)),
                     "field": field,
                     "from_tags": f"F={F},W={W},U={U},P={P}",
                     "to_tags": f"F={next_key[0]},W={next_key[1]},U={next_key[2]},P={next_key[3]}",
@@ -465,8 +757,9 @@ def write_csv(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         return
+    fieldnames = list(dict.fromkeys(key for row in rows for key in row))
     with path.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, restval="")
         writer.writeheader()
         writer.writerows(rows)
 

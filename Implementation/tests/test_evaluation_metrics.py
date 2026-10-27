@@ -11,14 +11,25 @@ sys.path.insert(0, str(IMPLEMENTATION_DIR))
 
 from module3_baselines import is_valid_route, route_cost, single_objective_astar, weighted_sum_astar
 from module5_evaluation import (
+    additive_epsilon,
+    area_profile,
     build_reference_front,
+    evaluate_runs,
+    front_robustness,
+    gd,
     hypervolume,
     igd,
+    igd_plus,
+    monotonicity_violations,
     payload_alignment_score,
+    reference_share,
     risk_component_shares,
     nondominated_points,
+    set_coverage,
     spread_delta,
+    summarize_runs,
     tier2_sweep,
+    tier2_vs_weighted,
 )
 
 
@@ -32,6 +43,14 @@ class EvaluationMetricTests(unittest.TestCase):
         front = nondominated_points(points)
         self.assertEqual(len(front), 2)
         self.assertFalse(any(np.allclose(p, [2.0, 2.0, 2.0]) for p in front))
+
+    def test_reference_drops_float_noise_ties(self):
+        exact = [([7.86329, 9.29768, 16.82034], ["a"])]
+        noisy = [([7.86329 - 9e-16, 9.30224, 16.92413], ["b"]),     # beaten, ties on distance
+                 ([7.86329 + 1e-15, 9.29768, 16.82034], ["c"])]     # duplicate of the exact point
+        ref = build_reference_front({"namoa": exact, "mopso": noisy})
+        self.assertEqual(len(ref), 1)
+        self.assertAlmostEqual(igd(np.array([exact[0][0]]), ref), 0.0)
 
     def test_hypervolume_single_point(self):
         points = np.array([[0.2, 0.3, 0.4]])
@@ -122,6 +141,110 @@ class Tier2EvidenceTests(unittest.TestCase):
         rows = risk_component_shares(G, [("route", ([0.0, 0.0, 3.0], ["s", "a", "t"]))])
         self.assertAlmostEqual(sum(row["share"] for row in rows), 1.0)
         self.assertEqual({row["component"] for row in rows}, {"building", "wind"})
+
+
+class ExtendedIndicatorTests(unittest.TestCase):
+    REF = np.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+    MID = np.array([[0.5, 0.5, 0.0]])
+
+    def test_gd_and_igd_plus_known_values(self):
+        self.assertAlmostEqual(gd(self.MID, self.REF), np.sqrt(0.5))
+        self.assertAlmostEqual(igd(self.MID, self.REF), np.sqrt(0.5))
+        self.assertAlmostEqual(igd_plus(self.MID, self.REF), 0.5)
+
+    def test_igd_plus_zero_when_approx_dominates_reference(self):
+        self.assertAlmostEqual(igd_plus(np.zeros((1, 3)), self.REF), 0.0)
+
+    def test_additive_epsilon(self):
+        self.assertAlmostEqual(additive_epsilon(self.MID, self.REF), 0.5)
+        self.assertAlmostEqual(additive_epsilon(self.REF, self.REF), 0.0)
+
+    def test_set_coverage(self):
+        self.assertAlmostEqual(set_coverage(self.MID, self.REF), 0.0)
+        self.assertAlmostEqual(set_coverage(np.zeros((1, 3)), self.REF), 1.0)
+        self.assertAlmostEqual(set_coverage(self.REF, self.REF), 1.0)
+
+    def test_reference_share(self):
+        self.assertAlmostEqual(reference_share(self.REF[:1], self.REF), 0.5)
+
+    def test_evaluate_runs_scores_each_run_against_pooled_reference(self):
+        run_a = [([1.0, 2.0, 3.0], [0, 1])]
+        run_b = [([3.0, 2.0, 1.0], [0, 2])]
+        method_routes = {"exact": run_a + run_b, "mopso": run_a + run_b}
+        rows = evaluate_runs(method_routes, {"mopso": [run_a, run_b]}, {"mopso": [0.1, 0.3]})
+        self.assertEqual([r["run"] for r in rows], [0, 1])
+        self.assertTrue(all(r["hv_ratio"] < 1.0 for r in rows))
+        self.assertAlmostEqual(rows[1]["runtime_s"], 0.3)
+
+    def test_summarize_runs_mean_std(self):
+        rows = [{"method": "m", "hypervolume": 1.0}, {"method": "m", "hypervolume": 3.0}]
+        summary = summarize_runs(rows)[0]
+        self.assertEqual(summary["runs"], 2)
+        self.assertAlmostEqual(summary["hypervolume_mean"], 2.0)
+        self.assertAlmostEqual(summary["hypervolume_std"], np.sqrt(2.0))
+
+
+class GroupedMonotonicityTests(unittest.TestCase):
+    @staticmethod
+    def _row(scenario, F, risk):
+        return {"scenario": scenario, "F": F, "W": 1, "U": 1, "P": 1,
+                "distance": 1.0, "energy": 1.0, "risk": risk}
+
+    def test_no_false_violation_across_scenarios(self):
+        rows = [self._row("A", 1, 5.0), self._row("A", 2, 4.0),
+                self._row("B", 1, 1.0), self._row("B", 2, 9.0)]
+        violations = monotonicity_violations(rows)
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0]["scenario"], "B")
+
+    def test_rows_without_scenario_form_one_group(self):
+        rows = [{k: v for k, v in self._row("A", F, r).items() if k != "scenario"}
+                for F, r in ((1, 1.0), (2, 2.0))]
+        self.assertEqual(len(monotonicity_violations(rows)), 1)
+
+
+class RobustnessAndProfileTests(unittest.TestCase):
+    def _graph(self, a_cost, b_cost):
+        G = nx.DiGraph(n_buildings=3, elevation_provider="test")
+        for node in ("s", "a", "b", "t"):
+            G.add_node(node, ground_elev_m=2.0, bldg_h_m=10.0, bldg_density=0.2, agl_m=60.0)
+        for path, cost in ((("s", "a", "t"), a_cost), (("s", "b", "t"), b_cost)):
+            for u, v in zip(path[:-1], path[1:]):
+                G.add_edge(u, v, distance=cost, energy=cost, risk=cost, rho=0.5, water=0.0)
+        return G
+
+    def test_front_robustness_counts_routes_dominated_under_new_costs(self):
+        calm_front = [([2.0, 2.0, 2.0], ["s", "a", "t"]), ([2.0, 2.0, 2.0], ["s", "b", "t"])]
+        G_wind = self._graph(1.0, 3.0)
+        wind_front = [([2.0, 2.0, 2.0], ["s", "a", "t"])]
+        out = front_robustness(G_wind, calm_front, wind_front)
+        self.assertEqual(out["feasible"], 2)
+        self.assertAlmostEqual(out["still_nondominated"], 0.5)
+
+    def test_front_robustness_skips_routes_missing_in_new_graph(self):
+        G = self._graph(1.0, 1.0)
+        out = front_robustness(G, [([1.0, 1.0, 1.0], ["s", "t"])], [([2.0, 2.0, 2.0], ["s", "a", "t"])])
+        self.assertEqual(out["feasible"], 0)
+
+    def test_area_profile(self):
+        profile = area_profile(self._graph(1.0, 2.0))
+        self.assertEqual(profile["nodes"], 4)
+        self.assertEqual(profile["n_buildings"], 3)
+        self.assertAlmostEqual(profile["rho_mean"], 0.5)
+        self.assertAlmostEqual(profile["bldg_h_max_m"], 10.0)
+
+    def test_tier2_vs_weighted_flags_identical_route(self):
+        front = [
+            ([1.0, 10.0, 10.0], [0, 1]),
+            ([10.0, 1.0, 10.0], [0, 2]),
+            ([10.0, 10.0, 1.0], [0, 3]),
+            ([4.0, 4.0, 4.0], [0, 4]),
+        ]
+        weighted = {name: [front[3]] for name in ("fragile_medical", "mixed_cargo")}
+        rows = tier2_vs_weighted(front, weighted)
+        self.assertEqual({r["preset"] for r in rows}, set(weighted))
+        self.assertTrue(all(r["weighted_on_front"] for r in rows))
+        self.assertTrue(all(r["same_path"] == (r["objective_gap"] == 0.0) for r in rows))
 
 
 if __name__ == "__main__":
