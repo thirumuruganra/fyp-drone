@@ -129,21 +129,25 @@ def print_banner(step: int, title: str) -> None:
     print(f"╚{bar}╝")
 
 
-def load_environment(args):
-    """(elevation providers, layer kwargs for the builder), honouring --offline and --no-*."""
+def load_environment(args, center=(cfg.CENTER_LAT, cfg.CENTER_LON), use_fixtures=True):
+    """
+    (elevation providers, layer kwargs for the builder), honouring --offline and --no-*.
+    use_fixtures=False never falls back to the hand-made Thiruvanmiyur fixtures
+    (other regions: cached / live data only).
+    """
     providers = None
     if not args.no_terrain:
         providers = default_elevation_providers()
-        if args.offline:      # cached DEM first, hand-made fixture DEM as the last resort
+        if args.offline and use_fixtures:   # cached DEM first, hand-made fixture DEM last
             providers.append(LocalRasterProvider(os.path.join(FIXTURE_DIR, FIXTURE_DEM)))
 
     layer_kwargs: dict = {}
     if not (args.no_buildings and args.no_risk_layers):
         try:
-            layers = fetch_osm_layers(cfg.CENTER_LAT, cfg.CENTER_LON, offline=args.offline,
-                                      fixture_dir=FIXTURE_DIR if args.offline else None)
+            layers = fetch_osm_layers(center[0], center[1], offline=args.offline,
+                                      fixture_dir=FIXTURE_DIR if args.offline and use_fixtures else None)
             layer_kwargs = build_layer_indexes(
-                layers, LocalFrame(cfg.CENTER_LAT, cfg.CENTER_LON),
+                layers, LocalFrame(*center),
                 buildings=not args.no_buildings, risk_layers=not args.no_risk_layers,
                 manual_nfz=args.manual_nfz or None)
         except ImportError as exc:

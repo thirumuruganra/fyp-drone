@@ -16,6 +16,8 @@ __pycache__/
 tmp/
 Implementation/__pycache__/
 Implementation/cache/
+Implementation/outputs/benchmarks_real/cases/
+Implementation/outputs/benchmarks_real_smoke/
 Implementation/pareto_front_storage/fronts/
 
 # Simulation generated artefacts

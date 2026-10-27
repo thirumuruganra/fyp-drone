@@ -150,6 +150,37 @@ SYN_TERRAIN_HILLS = 4
 SYN_TERRAIN_AMP_M = 220.0         # hill height range upper bound
 SYN_TERRAIN_SIGMA_FRAC = 0.09     # hill width as a fraction of the grid span
 
+# ── Real-area benchmark (run_real_benchmarks.py) ───────────────────────────
+# Lattice centres of six Chennai areas with different structure.  Each area gets
+# its own cached OSM layers (OSM_FETCH_RADIUS_M) and DEM; boxes may overlap.
+BENCHMARK_AREAS = (
+    {"id": "thiruvanmiyur", "name": "Thiruvanmiyur", "center": (12.9830, 80.2594),
+     "note": "coastal mixed residential"},
+    {"id": "t_nagar", "name": "T. Nagar", "center": (13.0418, 80.2341),
+     "note": "dense commercial core"},
+    {"id": "guindy", "name": "Guindy", "center": (13.0120, 80.2050),
+     "note": "park, campus, airport edge (restricted zones)"},
+    {"id": "anna_nagar", "name": "Anna Nagar", "center": (13.0850, 80.2101),
+     "note": "planned grid residential"},
+    {"id": "velachery", "name": "Velachery", "center": (12.9720, 80.2180),
+     "note": "lake and wetland edge (water)"},
+    {"id": "sholinganallur", "name": "Sholinganallur", "center": (12.9010, 80.2279),
+     "note": "OMR IT parks, tall and sparse"},
+)
+# Fixed wind cases (speed km/h, direction FROM in degrees): reproducible, not live.
+BENCHMARK_WIND_CASES = {
+    "calm": (0.0, 0.0),
+    "sw_monsoon": (25.0, 225.0),
+    "ne_monsoon": (25.0, 45.0),
+}
+# Origin-destination straight-line distance bands (m); None = no upper bound.
+BENCHMARK_OD_BANDS_M = {
+    "short": (1500.0, 2500.0),
+    "medium": (3000.0, 4000.0),
+    "long": (5000.0, None),
+}
+BENCHMARK_SCALING_BOX_M = (2000.0, 4000.0, 6000.0)
+
 # ── Battery / payload (Tier 2 feasibility, Phase 5) — PLACEHOLDER ──────────
 M_UAV_KG = 1.5                    # F450 airframe + battery
 BATTERY_WH = 74.0                 # 4S 5000 mAh
