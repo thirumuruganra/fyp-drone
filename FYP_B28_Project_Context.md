@@ -14,7 +14,9 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 **Guide:** Dr. Sujaudeen N, Asst. Professor, CSE
 
-## Status (2026-10-17)
+## Status (2026-10-28)
+
+- M5 extended (2026-10-28, not committed): real Chennai-area benchmark `run_real_benchmarks.py` (6 areas, 3 winds, 3 OD bands, scaling 2/4/6 km) + new indicators (IGD+, GD, I_ε+, ref share, Zitzler C, per-run MOPSO mean ± std) + defects 4/5/6 fixed + synthetic rerun at report scale (30 × 100 × 200). Details + numbers: § Dataset and Benchmarking.
 
 - Phase 1 report (`Phase_1/Report/ug-project-report.tex`, UCS2717 template) draft done. Ch1 → end App C ≈ 66 pp (user target). TOC fits 3 pp (vi–viii); TOC spacing `1.35` in `Thesis.cls` `\tableofcontents` (was 1.5) so App B + C entries stay on page viii, no spill page. Algorithms = full-page `[p]` floats.
 - Review 0 done (FYP_B27.pdf). Review 1 done (Phase 1 Report, Review 1 Report, Review 1 PPT).
@@ -30,12 +32,12 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 - `Implementation/` built:
   - M1: shared wind-aware cost pipeline. `LatticeAirspaceBuilder` (200 m lattice, 6 km box, Thiruvanmiyur) + DEM terrain + OSM buildings → node altitude. 11-component weighted risk, hard restricted zones, weather go/no-go gate.
   - M2: NAMOA* hardened (`truncated` flag, `g+h` pruning, no per-push copy) + `ParetoStore` (JSON fronts, 3 h expiry, weather-drift refresh).
-  - M3 baselines (A* ×3, compact MOPSO). M4 Tier 2: validation, battery feasibility filter (`select_detailed`), weather HOLD, `SelectionResult`, JSON/CSV export. M5 metrics (HV, IGD, spread, Tier 2 evidence, 225-tag sweep). Ablation (`run_ablation.py`). `mission_export.py` (frame 3 = AMSL − home AMSL), Tkinter dashboard.
+  - M3 baselines (A* ×3, compact MOPSO). M4 Tier 2: validation, battery feasibility filter (`select_detailed`), weather HOLD, `SelectionResult`, JSON/CSV export. M5 metrics (HV, IGD, IGD+, GD, I_ε+, spread, coverage, Tier 2 evidence, 225-tag sweep, wind robustness, area profile) + runners `run_benchmarks.py` (synthetic) / `run_real_benchmarks.py` (real areas). Ablation (`run_ablation.py`). `mission_export.py` (frame 3 = AMSL − home AMSL), Tkinter dashboard.
   - Env: `env_data.py` (Open-Meteo weather, DEM provider chain, OSM layers), `overpass_client.py` (multi-endpoint Overpass w/ retry; Kumi mirror + env extra endpoints; see `OVERPASS_NOTES.md`). API keys via `<repo>/.env` (`load_dotenv()` in entry scripts only).
 - `Simulation/` built (2026-10-06): Gazebo Harmonic + ArduPilot SITL city sim. Frozen region bundle → world + clearance-checked lattice → Tier 1 cached / Tier 2 → `.plan`/`.waypoints` → pymavlink fly → eval (cross-track, clearance, landing offset). Read `Simulation/README.md`. Run in WSL2. 2026-10-19: `launch_simulation.py` one-command WSL run, default region `thiru_demo`, `gui.config` follow cam, `iris_with_ardupilot`, `sea_polygons` split-offset fix (buffer, single-sided). Gazebo flight WSL 2026-10-19: thiru_demo real data, fragile_medical, landed+disarmed, xtrack RMSE 0.22 m (max 1.11), vert 0.19 m, landing offset 0.5 m, min roof clr 49.67 m, 0 violations, RTF 0.69 vs old pipeline 0.33. SITL overrides `RNGFND1_TYPE 0`, `PLND_ENABLED 0` needed (SITL rangefinder = height above home → no land detect on raised pad).
   - Verified: `sitl_mission_runner.py` flown vs real ArduCopter SITL 4.8.0-dev (built-in `quad`, fixture bundle): upload/read-back/AUTO/land OK, cross-track RMSE 0.11–0.13 m, landing offset ≤ 0.02 m.
   - NOT run: Gazebo itself, live OSM/Open-Meteo bundle build, world load/real-time-factor gate. Needs WSL machine.
-- Tests: `Implementation/tests` ~221, `Simulation/tests` 45 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
+- Tests: `Implementation/tests` 244 (all pass 2026-10-28, `PYTHONUTF8=1`), `Simulation/tests` 45 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
 - Not built: calibrated risk weights, real battery model, live-OSM-verified Review 2 results, Mission Planner/QGC import check, Gazebo flights, hardware flights.
 
 ### Open Defects (from `Implementation/IMPLEMENTATION_AUDIT_2026-10-06.md`; re-verified 2026-10-07 by grep)
@@ -44,13 +46,13 @@ Still open:
 1. `dashboard.py` builds `TierTwoSelector(front)` w/o `no_go_reasons` → bypasses weather HOLD.
 2. Dashboard loads synthetic `airspace_graph.pkl`, OSM demo overwrites shared `pareto_front.pkl` → graph/front mismatch. No file picker.
 3. `run_all_presets()` calls `select()` → ignores battery filter. Only `select_detailed()` filters. Use `--payload`/`--preset`.
-4. `module5_evaluation.monotonicity_violations` keys rows by F/W/U/P only; `run_benchmarks.py` mixes scenarios → false violations. Group by scenario.
-5. `run_benchmarks.py` omits `obstacle_density=density`; `_apply_density_risk()` scales final risk instead → S1/S2/S3 density labels not real obstacle coverage.
-6. Phase 6 gaps: no real-lattice benchmark, no calm-vs-windy comparison, MOPSO repeats pooled (no per-repeat HV/IGD/spread mean ± std). Report-scale run not done.
+4. ~~monotonicity mixes scenarios~~ FIXED 2026-10-28: `monotonicity_violations(rows, group_keys=("scenario",))` groups by scenario/case. Synthetic + real = 0 violations.
+5. ~~density label ignored~~ FIXED 2026-10-28: `build_scenario` passes `obstacle_density`, `_apply_density_risk` deleted. Synthetic numbers changed vs Review 2 / Phase 1 (old numbers in reports not regenerated).
+6. ~~no real-lattice benchmark / calm-vs-windy / pooled MOPSO~~ FIXED 2026-10-28: `run_real_benchmarks.py`, wind robustness, per-run MOPSO mean ± std. Synthetic report scale done (30 × 100 × 200). Real areas ran medium budget (10 × 50 × 100); `--report-scale` real run NOT done.
 7. Battery constants PLACEHOLDER (`config.py` ~l.153), `NO_GO_GUST_KMH` PLACEHOLDER. Risk weights uncalibrated. Default 6 km route → mixed-cargo battery HOLD expected.
 8. Offline OSM fixtures hand-made, not real evidence. Live OSM fetch intermittent (resets/504). Failed fetch falls back to empty layers → exit 0 ≠ real OSM. Check console layer counts.
 
-Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`.
+Fixed since audit: mission altitude frame (#3 in audit) — `mission_export.py` now `alt_amsl_m − home_alt_amsl`. Reference-front float-noise bug (2026-10-28): `nondominated_routes` used strict dominance → MOPSO point tied with NAMOA* within ~1e-15 on one objective but worse on another survived → NAMOA* IGD > 0. Now tolerance dominance (`weakly_dominates`, tol 1e-9). NAMOA* IGD = I_ε+ = 0 in every untruncated case.
 
 **Repo layout (no spaces in paths):** `Abstract/`, `Initial Screening PPT/`, `Review_0/`, `Review_1/` (`Report/`, `PPT/`, `diagrams/`), `Review_2/` (`Report/`, `PPT/`, `diagrams/`), `Phase_1/` (guidelines PDFs, poster, `Report/` = Phase 1 report on UCS2717 template), `Reference_Papers/`, `Implementation/` (planner), `Simulation/` (Gazebo + SITL, imports `Implementation/`), this file at root. `AGENTS.md` = agent guidance (`CLAUDE.md` points to it).
 
@@ -192,38 +194,64 @@ Only emergency medicine picks extreme, correct for it. Others pick intermediate 
 
 ## Dataset and Benchmarking
 
-### Dataset: Synthetic Airspace Graph
+### Datasets
 
-- Benchmark dataset: synthetic grid airspace graph from `AirspaceGraphBuilder._build_synthetic_graph`.
-- Real-geography dataset: Thiruvanmiyur lattice (`run_demo_osm.py`, `Simulation/`), OSM buildings + DEM + live weather. Real lattice benchmark not yet run (defect 6).
+- **Synthetic:** `AirspaceGraphBuilder._build_synthetic_graph` (seeded terrain + obstacles, `obstacle_density` real since defect 5 fix). Runner `run_benchmarks.py` → `Implementation/outputs/benchmarks/`.
+- **Real Chennai areas (2026-10-28):** `LatticeAirspaceBuilder` 200 m lattice, 6 km box, cached OSM (buildings / restricted / water / landuse, `cache/osm_{lat:.4f}_{lon:.4f}_4500.gpkg`) + OpenTopography DEM + roads (display only). Runner `run_real_benchmarks.py` → `Implementation/outputs/benchmarks_real/`. `--prepare` = network fetch + guard (area rejected if buildings = 0 or DEM provider flat); main run offline from caches → reproducible. Per-case JSON resume in `outputs/benchmarks_real/cases/` (git-ignored, `--force` redo). Areas in `config.BENCHMARK_AREAS`.
 - Edge costs: **distance** (3-D geodesic), **energy** (wind-aware, grade-aware, payload-mass-aware proxy; battery constants PLACEHOLDER), **risk** (11-component weighted score, 0–1, cumulative exposure).
-- Obstacles/threats simulated programmatically → reproducible.
-- Other papers' datasets unavailable (custom/proprietary/unreleased: Chokkalingam, Datsko, Ntakolia). Building own synthetic env is field standard.
+- Other papers' datasets unavailable (custom/proprietary/unreleased: Chokkalingam, Datsko, Ntakolia).
 
-### Scenarios
+### Synthetic scenarios
 
-| Scenario | Nodes | Obstacle Density | Purpose |
-|---|---|---|---|
-| S1 small sparse | ~50 | 5% | sanity/unit |
-| S2 medium urban | ~200 | 20% | core |
-| S3 large dense | ~500 | 40% | scalability stress |
+S1/S2/S3 (~50/200/500 nodes) × obstacle density 5/20/40% = 9 scenarios (`S1_50_d05` … `S3_500_d40`). Report scale: MOPSO 30 reps × swarm 100 × 200 iters, parallel processes (`--workers`, default cpu − 1).
 
-Stochastic baselines (MOPSO): 30 runs, mean ± std.
+| Scenario | NAMOA* front | MOPSO run HV ratio mean |
+|---|---|---|
+| S1 d05/d20/d40 | 5 / 1 / 1 | 1.00 / 0.98 / 1.00 |
+| S2 d05/d20/d40 | 5 / 3 / 1 | 1.00 / 1.00 / 1.00 |
+| S3 d05/d20/d40 | 6 / 7 / 28 | 0.98 (std 0.008) / 1.00 / 1.00 |
+
+- Synthetic fronts small (1–28) → MOPSO at report scale recovers them ~fully. Synthetic graphs = sanity check, not the discriminating benchmark. Real areas = main evidence.
+- NAMOA* untruncated everywhere, IGD = 0, I_ε+ = 0. MOPSO run time 27–460 s mean vs NAMOA* ≤ 0.35 s.
+- Tier 2 sweep: 2025 rows, 21 distinct picks, 771 non-extreme, 0 monotonicity violations, latency median 0.013 ms.
+
+### Real-area benchmark
+
+| id | Character | Nodes | Buildings | NFZ nodes | Ground (m) | NAMOA* front median | NAMOA* time median (s) |
+|---|---|---|---|---|---|---|---|
+| thiruvanmiyur | coastal mixed residential | 891 | 30976 | 5 | −3.2–21.8 | 31.5 | 0.19 |
+| t_nagar | dense commercial core | 889 | 73040 | 11 | 0.5–23.3 | 29.5 | 0.18 |
+| guindy | park / IIT / NFZ-heavy | 781 | 75540 | 114 | 1.0–58.9 | 10 | 0.03 |
+| anna_nagar | planned grid residential | 891 | 81532 | 9 | 4.3–23.0 | 12 | 0.14 |
+| velachery | lake / wetland | 804 | 59503 | 91 | 0.6–23.1 | 18 | 0.24 |
+| sholinganallur | OMR IT parks, tall + sparse | 786 | 20850 | 114 | −0.5–17.3 | 42 | 0.75 |
+
+- Cases: 6 areas × 3 winds (`calm` 0, `sw_monsoon` 25 km/h from 225°, `ne_monsoon` 25 km/h from 45°) × 3 OD bands (short 1.5–2.5 km, medium 3–4 km, long ≥ 5 km; same seeded pairs across winds + methods) = 54 + scaling (box 2/4/6 km, `sw_monsoon`, farthest pair) = 72 runs total.
+- Budget run: medium default MOPSO 10 × 50 × 100, `max_explored` 300k. `--report-scale` = 30 × 100 × 200 (NOT run on real areas). `--smoke` tiny.
+- Key numbers: 0 NAMOA* truncated; NAMOA* HV ≥ every MOPSO run in 54/54 cases; NAMOA* HV ratio 1.0, IGD = I_ε+ = 0. MOPSO pooled HV ratio mean 0.9986, per-run 0.9953 (min 0.752), per-run IGD+ mean 0.0025. NAMOA* front median 21.
+- Runtime: NAMOA* median 0.14 s vs MOPSO 77 s per run (~540×). Tier 2 latency median 0.028 ms.
+- Tier 2: non-extreme share 0.73, distinct routes per case mean 2.26, same path as weighted-sum A* (same weights) 0.71 → Tier 2 reproduces tuned weighted result w/o re-search most of the time; 0 monotonicity violations.
+- Wind robustness (calm NAMOA* front re-costed on windy graph, share still non-dominated, sw / ne): thiruvanmiyur 0.60/0.66, t_nagar 0.50/0.51, guindy 0.37/0.46, anna_nagar 0.30/0.62, velachery 0.69/0.72, sholinganallur 0.34/0.35; mean 0.51. → calm front not reusable under monsoon wind; supports ParetoStore weather-drift refresh. Wind raises min front energy ~8–21% vs calm.
 
 ### Baselines
 
-- Single-objective A* (distance only)
-- Single-objective A* (energy only)
-- Single-objective A* (risk only)
-- Compact MOPSO-style baseline in `module3_baselines.py`; report-scale swarm/repetition settings not run yet.
+- Single-objective A* (distance / energy / risk)
+- Weighted-sum A* per payload preset (same weights as Tier 2)
+- Compact MOPSO (`module3_baselines.py`), seeded, per-run rows + pooled row (`mopso_pooled`)
 
-### Metrics
+### Metrics (`module5_evaluation.py`)
 
-- Hypervolume (HV), higher better
-- Pareto Spread (Δ)
-- IGD vs reference front = union of all non-dominated solutions across methods + repetitions, per scenario
+- Reference front = tolerance-aware (`weakly_dominates`, tol 1e-9) non-dominated union of all methods + runs, per case. Normalized objective space; HV ref point = nadir + 10%.
+- HV, HV ratio, IGD, IGD+ (Pareto-compliant), GD, additive ε (I_ε+), reference share, spread Δ, diversity extent, Zitzler coverage C.
+- Per-run MOPSO mean ± std (`evaluate_runs`, `summarize_runs`) scored vs same reference.
+- `front_robustness` (calm front under wind), `tier2_vs_weighted`, `amortization_rows` (Tier 1 once + Tier 2 per mission vs re-search), `area_profile`, `risk_component_shares`, grouped `monotonicity_violations`.
 - Tier 2 evidence: selected objective ranks, point type, non-extreme picks, latency. Avoid fake "accuracy" labels.
-- Computation time: Tier 1 precompute vs MOPSO
+
+### Figures
+
+- Synthetic (`outputs/benchmarks/`): `benchmark_{hv,igd,igd_plus,epsilon,spread,front_size,runtime}.png`, `benchmark_fronts_2d.png`, `benchmark_fronts_3d.png` (3-D front per scenario, all methods), `benchmark_graphs.png` (terrain + obstacle term per edge + NAMOA* front + preset picks).
+- Real (`outputs/benchmarks_real/`): `real_{hv,igd,igd_plus,epsilon,spread,front_size,runtime}.png`, `real_scaling_runtime.png`, `real_wind_sensitivity.png`, `real_tier2.png`, `real_amortization.png`, `real_fronts_2d.png`, `real_fronts_3d.png`, `real_area_maps.png` (edge ρ + roads + front + picks), `real_terrain_maps.png` (DEM + buildings + water + restricted + roads + nodes + front + picks).
+- 3-D airspace per area (`outputs/benchmarks_real/airspace_3d/<id>_{world,cells}.png`, from `plot_airspace_3d.py --offline --lat --lon`): world = 2 km window OSM buildings + roads on DEM; cells = 6 km lattice bars (`bldg_h_m`) + flight surface. Note: `plot_airspace_3d` lattice skips restricted-zone removal (900 nodes) → display only, not the benchmark graph.
 
 ## Objectives
 
