@@ -322,7 +322,10 @@ def main(argv=None) -> int:
                                  f"the --custom-location printed in worlds/{meta['region_id']}/sitl_command.txt")
         # Home only moves on arming: the vehicle itself must also stand on the depot pad
         # (after a delivery it sits on the destination pad until Gazebo + SITL are restarted).
+        end = time.time() + 60.0
         while link.position is None:
+            if time.time() > end:
+                raise PreflightError("SITL never reported GLOBAL_POSITION_INT within 60 s (EKF not ready?)")
             link.recv({"GLOBAL_POSITION_INT"}, timeout=2.0)
         dp = haversine_m(link.position[0], link.position[1], depot["lat"], depot["lon"])
         if dp > scfg.SIM_HOME_TOL_H_M or abs(link.position[2]) > scfg.SIM_HOME_TOL_V_M:
