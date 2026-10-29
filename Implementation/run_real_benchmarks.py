@@ -67,19 +67,27 @@ from module5_evaluation import (
     amortization_rows,
     area_profile,
     front_robustness,
+    metric_row,
     monotonicity_violations,
+    reference_context,
     risk_component_shares,
     summarize_runs,
+    tier2_evidence,
+    tier2_sweep,
+    tier2_vs_weighted,
     write_csv,
     write_json,
 )
 from run_ablation import draw_edge_map
 from run_benchmarks import (MOPSO, draw_terrain_panel, evaluate_suite, finish_terrain_figure,
                             plot_fronts_2d, plot_fronts_3d, plot_metric_bars, run_method_suite,
-                            terrain_figure)
+                            terrain_figure, weighted_preset_results)
 from run_demo_osm import load_environment
 
 SCALING_WIND = "sw_monsoon"
+# Tier 2 weight formula id stored per case; a cached case with another id gets its
+# Tier 2-dependent parts recomputed (refresh_tier2) instead of a full re-run.
+TIER2_FORMULA = f"priority_sharpen_gamma_{cfg.PRIORITY_SHARPEN_GAMMA}"
 TABLES = ("metrics", "mopso_runs", "coverage", "tier2", "sweep", "tier2_vs_weighted",
           "risk_shares", "timing")
 PLOT_METHODS = ("namoa", MOPSO, "astar_distance", "astar_energy", "astar_risk")
@@ -156,31 +164,45 @@ def _xy(G, n):
     return np.array([G.nodes[n]["x_m"], G.nodes[n]["y_m"]], dtype=float)
 
 
-def pick_od_pairs(G: nx.DiGraph, bands: dict, seed: int, tries: int = 20_000) -> dict:
+def land_nodes(G: nx.DiGraph, water_zones=None) -> set:
+    """Nodes not over water (OSM water + sea polygons built from the coastline)."""
+    nodes = list(G.nodes)
+    if water_zones is None or not len(water_zones):
+        return set(nodes)
+    xy = np.array([_xy(G, n) for n in nodes])
+    wet = water_zones.contains(xy[:, 0], xy[:, 1])
+    return {n for n, w in zip(nodes, wet) if not w}
+
+
+def pick_od_pairs(G: nx.DiGraph, bands: dict, seed: int, tries: int = 20_000,
+                  allowed: set | None = None) -> dict:
     """
-    One seeded (source, target) per distance band, both in the largest SCC.
+    One seeded (source, target) per distance band, both in the largest SCC and both
+    in `allowed` (land nodes). Wet draws are rejected, not removed from the pool, so
+    the seeded draw sequence — and every pair already on land — stays the same.
     A band with no pair inside the box is skipped.
     """
     nodes = _largest_scc(G)
     rng = np.random.default_rng(seed)
     xy = np.array([_xy(G, n) for n in nodes])
+    ok = np.array([allowed is None or n in allowed for n in nodes])
     pairs = {}
     for label, (lo, hi) in bands.items():
         hi = np.inf if hi is None else hi
         for _ in range(tries):
             i, j = rng.integers(0, len(nodes), size=2)
             d = float(np.linalg.norm(xy[i] - xy[j]))
-            if i != j and lo <= d <= hi:
+            if i != j and lo <= d <= hi and ok[i] and ok[j]:
                 pairs[label] = (nodes[i], nodes[j], d)
                 break
         else:
-            print(f"[Real] No {label} pair ({lo:.0f}-{hi:.0f} m) in this lattice; skipped")
+            print(f"[Real] No {label} land pair ({lo:.0f}-{hi:.0f} m) in this lattice; skipped")
     return pairs
 
 
-def farthest_pair(G: nx.DiGraph) -> tuple:
-    """Deterministic farthest pair of the largest SCC (corner to corner)."""
-    nodes = _largest_scc(G)
+def farthest_pair(G: nx.DiGraph, allowed: set | None = None) -> tuple:
+    """Deterministic farthest pair of the largest SCC (corner to corner), land nodes only."""
+    nodes = [n for n in _largest_scc(G) if allowed is None or n in allowed]
     xy = np.array([_xy(G, n) for n in nodes])
     a = int(np.argmin(xy.sum(axis=1)))            # south-west-most
     b = int(np.argmax(np.linalg.norm(xy - xy[a], axis=1)))
@@ -210,10 +232,18 @@ def run_case(G, area, box_m, wind, od, pair, args, cases_dir: Path) -> dict:
     if path.exists() and not args.force:
         with path.open() as fh:
             case = json.load(fh)
-        if case.get("settings") == suite_settings(args):
-            print(f"[Real] {key}: cached")
-            return case
-        print(f"[Real] {key}: cached with other settings, re-running")
+        same_pair = [case.get("source"), case.get("target")] == [int(pair[0]), int(pair[1])]
+        if case.get("settings") == suite_settings(args) and same_pair:
+            if case.get("tier2_formula") == TIER2_FORMULA:
+                print(f"[Real] {key}: cached")
+                return case
+            if refresh_tier2(case, G):
+                write_json(path, case)
+                print(f"[Real] {key}: cached, Tier 2 tables refreshed ({TIER2_FORMULA})")
+                return case
+            print(f"[Real] {key}: new weighted routes change the reference front, re-running")
+        else:
+            print(f"[Real] {key}: cached with other settings or OD pair, re-running")
 
     source, target, od_m = pair
     print(f"\n[Real] {key} | {G.number_of_nodes()} nodes | {source} -> {target} ({od_m:.0f} m)")
@@ -231,13 +261,7 @@ def run_case(G, area, box_m, wind, od, pair, args, cases_dir: Path) -> dict:
     front = suite["method_routes"]["namoa"]
     picks = {}
     if front:
-        selector = TierTwoSelector(front)
-        share_routes = []
-        for name, tags in PAYLOAD_PRESETS.items():
-            selected, *_ = selector.select(tags["F"], tags["W"], tags["U"], tags["P"])
-            picks[name] = [int(n) for n in selected[1]]
-            share_routes.append((name, selected))
-        result["risk_shares"] = [dict(r, **labels) for r in risk_component_shares(G, share_routes)]
+        picks, result["risk_shares"] = _preset_picks(G, front, labels)
 
     runtimes = suite["runtimes"]
     weighted = [t for m, t in runtimes.items() if m.startswith("astar_weighted_")]
@@ -258,6 +282,7 @@ def run_case(G, area, box_m, wind, od, pair, args, cases_dir: Path) -> dict:
     case = {
         "key": key,
         "settings": suite_settings(args),
+        "tier2_formula": TIER2_FORMULA,
         "labels": labels,
         "source": int(source), "target": int(target),
         "namoa_front": _jsonable_front(front),
@@ -279,6 +304,67 @@ def run_case(G, area, box_m, wind, od, pair, args, cases_dir: Path) -> dict:
     }
     write_json(path, case)
     return case
+
+
+def _preset_picks(G, front, labels: dict) -> tuple[dict, list]:
+    """Tier 2 pick per payload preset (node paths) + the picks' risk component shares."""
+    selector = TierTwoSelector(front)
+    picks, share_routes = {}, []
+    for name, tags in PAYLOAD_PRESETS.items():
+        selected, *_ = selector.select(tags["F"], tags["W"], tags["U"], tags["P"])
+        picks[name] = [int(n) for n in selected[1]]
+        share_routes.append((name, selected))
+    return picks, [dict(r, **labels) for r in risk_component_shares(G, share_routes)]
+
+
+def refresh_tier2(case: dict, G) -> bool:
+    """
+    Recompute the Tier 2-dependent parts of a cached case from its stored NAMOA* front:
+    weighted-sum A* rows, Tier 2 evidence / sweep / vs-weighted, preset picks, risk
+    shares, Tier 2 timing.  NAMOA* and MOPSO results are kept (they do not depend on
+    Tier 2).  Returns False if the new weighted routes would change the reference
+    front — then every metric row would move and the caller re-runs the case.
+    """
+    labels = case["labels"]
+    front = _front_from_json(case["namoa_front"])
+    if not front:
+        case["tier2_formula"] = TIER2_FORMULA
+        return True
+    weighted = weighted_preset_results(G, case["source"], case["target"], front)
+    routes = {m: [(g, []) for g in pts] for m, pts in case["fronts"].items()}
+    routes.update({r.method: r.routes for r in weighted.values()})
+    ctx = reference_context(routes)
+    ref = case["reference"]
+    if (len(ctx["reference_front"]) != ref["reference_front_size"]
+            or not np.allclose(ctx["ideal"], ref["ideal"]) or not np.allclose(ctx["nadir"], ref["nadir"])):
+        return False
+
+    tables = case["tables"]
+    new_rows = {}
+    for r in weighted.values():
+        row = {"method": r.method, "runtime_s": float(r.runtime_s)}
+        row.update(metric_row(r.routes, ctx))
+        row.update(labels, expanded="", truncated=False)
+        new_rows[r.method] = row
+    tables["metrics"] = [new_rows.pop(r["method"], r) for r in tables["metrics"]] + list(new_rows.values())
+
+    tables["tier2"] = [dict(r, **labels) for r in tier2_evidence(front)]
+    tables["sweep"] = [dict(r, **labels) for r in tier2_sweep(front)]
+    for row in tables["sweep"]:
+        row.pop("path", None)
+    tables["tier2_vs_weighted"] = [dict(r, **labels) for r in
+                                   tier2_vs_weighted(front, {p: r.routes for p, r in weighted.items()})]
+    case["picks"], tables["risk_shares"] = _preset_picks(G, front, labels)
+
+    timing = tables["timing"][0]
+    t_tier2 = float(np.median([r["selection_latency_ms"] for r in tables["sweep"]])) / 1000.0
+    t_mopso = timing["t_mopso_run_s"]
+    timing.update(t_tier2_s=t_tier2,
+                  t_weighted_astar_s=float(np.mean([r.runtime_s for r in weighted.values()])),
+                  breakeven_missions_vs_mopso=(timing["t_tier1_s"] / (t_mopso - t_tier2)
+                                               if t_mopso > t_tier2 else None))
+    case["tier2_formula"] = TIER2_FORMULA
+    return True
 
 
 def suite_settings(args) -> dict:
@@ -338,8 +424,9 @@ def run_area(area, args, cases_dir: Path, tables: dict, extras: dict) -> None:
     extras["profiles"].append({"area": area["id"], "name": area["name"], "box_m": int(box_m),
                                "note": area["note"], **area_profile(base)})
 
+    water = env[1].get("water_zones")                         # endpoints on land only
     graphs = weather_graphs(base, area, args.winds)
-    pairs = pick_od_pairs(base, args.od_bands, seed=args.seed)
+    pairs = pick_od_pairs(base, args.od_bands, seed=args.seed, allowed=land_nodes(base, water))
     cases = []
     for od, pair in pairs.items():
         fronts = {}
@@ -359,7 +446,8 @@ def run_area(area, args, cases_dir: Path, tables: dict, extras: dict) -> None:
     for scale_box in args.scaling_boxes:
         G = base if scale_box == box_m else build_area_graph(area, scale_box, args.spacing_m, env, True)
         G = weather_graphs(G, area, [SCALING_WIND])[SCALING_WIND]
-        cases.append(run_case(G, area, scale_box, SCALING_WIND, "far", farthest_pair(G), args, cases_dir))
+        cases.append(run_case(G, area, scale_box, SCALING_WIND, "far",
+                              farthest_pair(G, land_nodes(G, water)), args, cases_dir))
 
     for case in cases:
         for name in TABLES:

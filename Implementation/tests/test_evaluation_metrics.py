@@ -176,6 +176,16 @@ class ExtendedIndicatorTests(unittest.TestCase):
         self.assertTrue(all(r["hv_ratio"] < 1.0 for r in rows))
         self.assertAlmostEqual(rows[1]["runtime_s"], 0.3)
 
+    def test_write_csv_removes_stale_file_when_empty(self):
+        import tempfile
+        from module5_evaluation import write_csv
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "violations.csv"
+            write_csv(path, [{"a": 1}])
+            self.assertTrue(path.exists())
+            write_csv(path, [])
+            self.assertFalse(path.exists())
+
     def test_summarize_runs_mean_std(self):
         rows = [{"method": "m", "hypervolume": 1.0}, {"method": "m", "hypervolume": 3.0}]
         summary = summarize_runs(rows)[0]

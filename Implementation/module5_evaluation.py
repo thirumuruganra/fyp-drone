@@ -756,6 +756,7 @@ def risk_component_shares(
 def write_csv(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
+        path.unlink(missing_ok=True)          # no rows: never leave a previous run's table behind
         return
     fieldnames = list(dict.fromkeys(key for row in rows for key in row))
     with path.open("w", newline="") as fh:

@@ -89,6 +89,19 @@ def run_namoa(G, source, target, max_explored: int):
     return routes, time.perf_counter() - t0, engine.diagnostics()
 
 
+def weighted_preset_results(G, source, target, front) -> dict:
+    """Weighted-sum A* per payload preset, with the same (priority-sharpened) weights as Tier 2."""
+    scales = objective_scales_from_extremes(G, source, target)
+    selector = TierTwoSelector(front)
+    out = {}
+    for preset_name, tags in PAYLOAD_PRESETS.items():
+        wr, wd, we = selector._derive_amplified_weights(tags["F"], tags["W"], tags["U"], tags["P"])
+        out[preset_name] = weighted_sum_astar(
+            G, source, target, {"distance": wd, "energy": we, "risk": wr},
+            method_name=f"astar_weighted_{preset_name}", scales=scales)
+    return out
+
+
 def run_method_suite(G, source, target, *, max_explored: int, mopso_repetitions: int,
                      swarm_size: int, iterations: int, archive_size: int, seed: int,
                      workers: int = 1) -> dict:
@@ -117,16 +130,7 @@ def run_method_suite(G, source, target, *, max_explored: int, mopso_repetitions:
 
     weighted_by_preset = {}
     if namoa_routes:
-        scales = objective_scales_from_extremes(G, source, target)
-        selector = TierTwoSelector(namoa_routes)
-        for preset_name, tags in PAYLOAD_PRESETS.items():
-            wr, wd, we = selector._derive_amplified_weights(tags["F"], tags["W"], tags["U"], tags["P"])
-            result = weighted_sum_astar(
-                G, source, target,
-                {"distance": wd, "energy": we, "risk": wr},
-                method_name=f"astar_weighted_{preset_name}",
-                scales=scales,
-            )
+        for preset_name, result in weighted_preset_results(G, source, target, namoa_routes).items():
             method_routes[result.method] = result.routes
             runtimes[result.method] = result.runtime_s
             diagnostics[result.method] = {"expanded": "", "truncated": False}
