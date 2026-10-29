@@ -222,7 +222,7 @@ S1/S2/S3 (~50/200/500 nodes) × obstacle density 5/20/40% = 9 scenarios (`S1_50_
 | S3 d05/d20/d40 | 6 / 7 / 28 | 0.98 (std 0.008) / 1.00 / 1.00 |
 
 - Synthetic fronts small (1–28) → MOPSO at report scale recovers them ~fully. Synthetic graphs = sanity check, not the discriminating benchmark. Real areas = main evidence.
-- NAMOA* untruncated everywhere, IGD = 0, I_ε+ = 0. MOPSO run time 27–460 s mean (2026-10-28 run) vs NAMOA* ≤ 0.35 s. 2026-10-29 rerun (sharpening) same quality numbers but wall time 48–2764 s (S3_500_d05 outlier) = machine load / sleep during run, not code → quote the 2026-10-28 times.
+- NAMOA* untruncated everywhere, IGD = 0, I_ε+ = 0. MOPSO run time 25–457 s mean per scenario (S3 ≈ 370–460 s) vs NAMOA* ≤ 0.18 s (clean rerun 2026-10-29, machine kept awake; 2026-10-28 run gave 27–460 s). An earlier 2026-10-29 run had inflated wall times (S3_500_d05 2764 s) from machine sleep/load → discarded.
 - Tier 2 sweep (sharpening): 2025 rows, 21 distinct picks, 773 non-extreme (old bonus: 771), 0 monotonicity violations, latency median 0.012 ms.
 
 ### Real-area benchmark
