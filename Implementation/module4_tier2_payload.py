@@ -24,9 +24,13 @@ What this module does:
 
   3. Min-max normalises each Pareto point's objectives (Eq. 3.8).
 
-  4. High-priority amplification: if P ≥ 4, the dominant weight (whichever
-     of w_risk / w_dist / w_energy is largest) is amplified by 0.1× itself,
-     then all three weights are renormalised back to sum to 1.0.
+  4. High-priority sharpening: if P ≥ 4, every weight is raised to
+     γ = config.PRIORITY_SHARPEN_GAMMA (1.07) and renormalised to sum to 1.0:
+         w_k ← w_k^γ / Σ_j w_j^γ
+     The dominant concern gains, the smallest loses, with no "which weight is
+     largest" switch.  Raising one tag leaves the ratio of the other two weights
+     unchanged, so the pick stays monotonic in F / W / U (the earlier +0.1 × w_max
+     bonus switched objective at ties and broke this).
 
   5. Computes a utility score for every Pareto point (Eq. 3.9):
          score(p_i) = w_dist × (1 − d̃_i) + w_energy × (1 − ẽ_i) + w_risk × (1 − ρ̃_i)
@@ -248,14 +252,8 @@ class TierTwoSelector:
     def _derive_amplified_weights(self, F: int, W: int, U: int, P: int) -> tuple[float, float, float]:
         w_risk, w_dist, w_energy = derive_weights(F, W, U)
         if P >= 4:
-            w_max = max(w_risk, w_dist, w_energy)
-            bonus = 0.1 * w_max
-            if w_risk == w_max:
-                w_risk += bonus
-            elif w_dist == w_max:
-                w_dist += bonus
-            else:
-                w_energy += bonus
+            gamma = config.PRIORITY_SHARPEN_GAMMA
+            w_risk, w_dist, w_energy = w_risk ** gamma, w_dist ** gamma, w_energy ** gamma
             total = w_risk + w_dist + w_energy
             w_risk, w_dist, w_energy = w_risk / total, w_dist / total, w_energy / total
         return w_risk, w_dist, w_energy

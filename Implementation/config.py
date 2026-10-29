@@ -113,6 +113,11 @@ SEA_OFFSET_M = 10_000.0               # coastline → sea polygon (sea is on the
 DENSITY_REF = 0.30                    # building plan-area ratio at which density saturates
 COMM_HEIGHT_REF_M = 30.0              # mean building height at which the canyon term saturates
 
+# ── Tier 2 priority (P ≥ 4): weights sharpened w_k^γ / Σ w_j^γ ─────────────
+# γ = 1.07 keeps emergency_medicine (F1 W1 U3 P5) at w_dist ≈ 0.714 (old +0.1·w_max
+# bonus gave 0.712). Power map, not a max-weight bonus → pick monotonic in F / W / U.
+PRIORITY_SHARPEN_GAMMA = 1.07
+
 # ── Weather go/no-go gate (stored on the graph, respected by Tier 2) ───────
 NO_GO_WEATHER_CODES = (95, 96, 97, 98, 99)   # WMO thunderstorm
 NO_GO_PRECIP_MM_H = PRECIP_HEAVY_MM_H
