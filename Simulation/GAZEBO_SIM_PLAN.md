@@ -30,7 +30,7 @@ Repo facts that drive the work (paths relative to `Implementation/`):
   - `fetch_elevations(coords, …)` (:482): takes a list of points; `ElevationGrid` (:288) samples bilinearly.
 - `SelectionResult.path` (`module4_tier2_payload.py:93`) is a list of `{node, lat, lon, alt_amsl_m, agl_m}`. `select_detailed(graph=G)` writes `outputs/tier2/selection_*.json`.
 - `mission_export.py` has the altitude bug recorded as audit defect #3. It writes `agl_m` into frame 3, which is height above home, and the frame-0 home row also carries AGL. Its collinear merge works in degree space.
-- `run_demo_osm.py` has no CLI for centre, depot or destination. `pick_distant_pair` chooses them at random. The graph pickle goes to `pareto_front_storage/airspace_graph_osm.pkl`, and `pareto_store.run_region(G, depot, points)` accepts `(lat, lon)` pairs.
+- `run_demo_osm.py` has no CLI for centre, depot or destination. `pick_distant_pair` chooses them at random. The graph pickle goes to `pareto_front_storage/airspace_graph.pkl` (same pair as the front pickle, read by the dashboard), and `pareto_store.run_region(G, depot, points)` accepts `(lat, lon)` pairs.
 
 ## Altitude / frame contract (single source of truth)
 

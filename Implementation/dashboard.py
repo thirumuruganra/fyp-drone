@@ -48,7 +48,7 @@ def select_payload_route(
     write_outputs: bool = True,
 ) -> SelectionResult:
     validate_payload_tags(F, W, U, P)
-    selector = TierTwoSelector(pareto_front)
+    selector = TierTwoSelector(pareto_front, no_go_reasons=G.graph.get("no_go_reasons"))
     return selector.select_detailed(
         F,
         W,

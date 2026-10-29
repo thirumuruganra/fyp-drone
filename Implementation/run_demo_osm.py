@@ -176,7 +176,7 @@ def run_module1_osm(args):
         G.graph["road_geometries"] = list(roads.geometry)
     except ImportError as exc:
         print(f"[Demo] Road overlay skipped ({exc}); pip install geopandas shapely osmnx")
-    builder.save(path="pareto_front_storage/airspace_graph_osm.pkl")
+    builder.save()                      # same default pair as engine.save(): the dashboard loads both
 
     alts = [d["alt_amsl_m"] for _, d in G.nodes(data=True)]
     grounds = [d["ground_elev_m"] for _, d in G.nodes(data=True)]
@@ -213,15 +213,14 @@ def run_module2_osm(G, source, target, args):
 
     # Reuse the stored front while the weather is representative; rebuild on drift,
     # expiry, a changed graph or --refresh (pareto_store.py).
-    record, rebuilt, _ = ParetoStore().get_or_build(
+    record, _, _ = ParetoStore().get_or_build(
         G, source, target, refresh=args.refresh, front_max=args.front_max)
     pareto_front = front_from_record(record)
     engine = TierOneEngine(G, source, target)
     engine.pareto_front = pareto_front
     engine.truncated = record["truncated"]
     engine.print_summary()
-    if rebuilt:
-        engine.save()
+    engine.save()                       # also on reuse: the graph pickle was just overwritten
 
     fig3d = engine.visualise_3d()
     if fig3d:
@@ -262,8 +261,8 @@ def run_module4_osm(pareto_front, G, source, target, selection_request=None):
         return selector, {name: result}
 
     results  = selector.run_all_presets()
-    if selector.no_go:
-        print(f"[Demo] {selector.hold_advisory()} — Tier 2 plots skipped")
+    if not results:                     # weather NO-GO, or no preset fits the battery
+        print("[Demo] Tier 2 HOLD for every preset — Tier 2 plots skipped")
         return selector, results
 
     fig1 = selector.visualise_route_comparison(results)

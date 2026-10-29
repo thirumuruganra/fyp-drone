@@ -444,7 +444,8 @@ class TierTwoSelector:
         Returns
         -------
         results : dict  name → (g_vector, path, w_risk, w_dist, w_energy, scores)
-                  (empty, after a HOLD advisory, when the weather gate is NO-GO)
+                  (empty, after a HOLD advisory, when the weather gate is NO-GO;
+                  presets with no battery-feasible route are printed as HOLD and left out)
         """
         if self.no_go:
             print("\n" + "=" * 118)
@@ -464,10 +465,14 @@ class TierTwoSelector:
         results = {}
         for name, tags in PAYLOAD_PRESETS.items():
             F, W, U, Plvl = tags["F"], tags["W"], tags["U"], tags["P"]
-            selected, wr, wd, we, scores = self.select(F, W, U, Plvl)
-            g, path = selected
-            route_idx = self.selected_index(selected)
-            point_type = self.classify_point(route_idx)
+            res = self.select_detailed(F, W, U, Plvl, write_outputs=False)   # battery-filtered
+            if res.hold_advisory:
+                print(f"  {name:<24} {F:>2} {W:>2} {U:>2} {Plvl:>2}  {res.hold_advisory}")
+                continue
+            wr, wd, we = res.weights["risk"], res.weights["distance"], res.weights["energy"]
+            route_idx, point_type = res.selected_index, res.point_type
+            g, path = self.pareto_front[route_idx]
+            scores = np.array(res.normalised_scores)
             results[name] = (g, path, wr, wd, we, scores)
             print(f"  {name:<24} {F:>2} {W:>2} {U:>2} {Plvl:>2}"
                   f"  {wr:>7.3f} {wd:>7.3f} {we:>7.3f}"
@@ -714,6 +719,8 @@ if __name__ == "__main__":
     # ── Instantiate and run Tier 2 ───────────────────────────────────────
     selector = TierTwoSelector(pareto_front)
     results  = selector.run_all_presets()
+    if not results:
+        raise SystemExit("[Module 4] HOLD for every preset — no plots")
 
     # ── Save visualisations ──────────────────────────────────────────────
     fig1 = selector.visualise_route_comparison(results)

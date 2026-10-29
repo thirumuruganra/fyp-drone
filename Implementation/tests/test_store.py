@@ -223,6 +223,20 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(record["truncated"])
         self.assertEqual(record["diagnostics"]["max_explored"], 5)
 
+    def test_raised_cap_or_changed_thinning_rebuilds(self):
+        G = lattice(box_m=2200.0)
+        t = G.number_of_nodes() - 1
+        quiet_get(self.store, G, 0, t, max_explored=5, now=T0)
+        _, rebuilt, _ = quiet_get(self.store, G, 0, t, max_explored=5, now=T0)
+        self.assertFalse(rebuilt)                                    # same cap: reuse
+        record, rebuilt, reasons = quiet_get(self.store, G, 0, t, now=T0)
+        self.assertTrue(rebuilt)
+        self.assertTrue(any("search cap raised" in r for r in reasons))
+        self.assertFalse(record["truncated"])
+        _, rebuilt, reasons = quiet_get(self.store, G, 0, t, now=T0, front_max=3)
+        self.assertTrue(rebuilt)
+        self.assertTrue(any("front_max changed" in r for r in reasons))
+
     def test_thinning_is_off_by_default_and_opt_in(self):
         G = random_graph(1, extra_edges=45)
         full, *_ = quiet_get(self.store, G, 0, 11, now=T0, location="r1")

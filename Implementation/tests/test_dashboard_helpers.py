@@ -39,6 +39,17 @@ class DashboardHelperTests(unittest.TestCase):
 
         self.assertTrue(result.hold_advisory or result.path)
 
+    def test_select_payload_route_holds_on_weather_no_go(self):
+        G = nx.DiGraph(no_go_reasons=["thunderstorm (WMO code 95)"])
+        G.add_node("s", lat=12.0, lon=80.0, agl_m=40.0)
+        G.add_node("t", lat=12.001, lon=80.001, agl_m=45.0)
+        front = [([0.1, 0.1, 0.1], ["s", "t"])]
+
+        result = select_payload_route(G, front, 3, 1, 2, 3, write_outputs=False)
+
+        self.assertIn("HOLD", result.hold_advisory)
+        self.assertEqual(result.path, [])
+
 
 if __name__ == "__main__":
     unittest.main()

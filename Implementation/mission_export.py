@@ -30,7 +30,7 @@ MAV_CMD_NAV_RETURN_TO_LAUNCH = 20
 DEFAULT_AGL_M = 60.0
 MAX_AGL_M = 120.0
 BEARING_TOL_DEG = 2.0
-ALT_SLOPE_TOL_M = 0.5
+ALT_SLOPE_TOL_M = 0.5        # m per DEGREE of lat/lon (≈ exact-match); per-metre 0.5 would merge real climbs
 
 
 @dataclass

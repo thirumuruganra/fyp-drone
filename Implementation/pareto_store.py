@@ -13,6 +13,8 @@ get_or_build() reuses the record unless it is
     • built on a different static graph (graph_hash)
     • built for a different caller-supplied identity (extra_identity, e.g. the
       simulation region bundle hash and clearance settings)
+    • thinned with a different front_max, or truncated and now asked for with a
+      higher max_explored
     • expired (valid_until)
     • stale: the weather drifted past a threshold since the record was built
         |Δ wind speed| > 10 km/h       |Δ direction| > 45° when the wind > 10 km/h
@@ -142,7 +144,8 @@ class ParetoStore:
 
     def staleness(self, record: Optional[dict], G: nx.DiGraph, weather: WeatherSnapshot,
                   refresh: bool = False, now: Optional[datetime] = None,
-                  extra_identity: Optional[dict] = None) -> list:
+                  extra_identity: Optional[dict] = None, front_max: Optional[int] = None,
+                  max_explored: Optional[int] = None) -> list:
         """Reasons the record cannot be reused (empty list = reuse it)."""
         if record is None:
             return ["no stored front"]
@@ -151,6 +154,11 @@ class ParetoStore:
         reasons = []
         if record.get("graph_hash") != graph_hash(G):
             reasons.append("static graph changed")
+        if record.get("front_max") != front_max:
+            reasons.append(f"front_max changed ({record.get('front_max')} → {front_max})")
+        built_cap = record.get("diagnostics", {}).get("max_explored", 0)
+        if record.get("truncated") and max_explored is not None and max_explored > built_cap:
+            reasons.append(f"truncated front, search cap raised ({built_cap} → {max_explored})")
         if extra_identity is not None and record.get("identity") != extra_identity:
             reasons.append("identity changed")
         if _now(now) > _parse(record["valid_until"]):
@@ -188,7 +196,8 @@ class ParetoStore:
             weather = WeatherSnapshot.from_dict(G.graph["weather"]) if "weather" in G.graph \
                 else WeatherSnapshot.calm()
         record = self.load(location, source, target)
-        reasons = self.staleness(record, G, weather, refresh, now, extra_identity)
+        reasons = self.staleness(record, G, weather, refresh, now, extra_identity,
+                                 front_max=front_max, max_explored=max_explored)
         if not reasons:
             if verbose:
                 print(f"[Store] Reusing stored front ({len(record['front'])} routes, built "

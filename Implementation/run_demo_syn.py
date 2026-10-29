@@ -118,8 +118,8 @@ def run_module4(pareto_front, G=None, source=None, target=None):
 
     selector = TierTwoSelector(pareto_front, no_go_reasons=(G.graph.get("no_go_reasons") if G is not None else None))
     results  = selector.run_all_presets()
-    if selector.no_go:
-        print(f"[Demo] {selector.hold_advisory()} — Tier 2 plots skipped")
+    if not results:                     # weather NO-GO, or no preset fits the battery
+        print("[Demo] Tier 2 HOLD for every preset — Tier 2 plots skipped")
         return selector, results
 
     fig1 = selector.visualise_route_comparison(results)
