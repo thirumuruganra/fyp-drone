@@ -14,7 +14,14 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 
 **Guide:** Dr. Sujaudeen N, Asst. Professor, CSE
 
-## Status (2026-10-28)
+## Status (2026-10-29)
+
+- Tier 2 P ≥ 4 rule changed (2026-10-29, not committed): `+0.1 × w_max` bonus → weight sharpening `w^1.07` renormalised. Fixes 6 real-area U-monotonicity violations; preset picks unchanged. Details § Step 2.
+- **Submitted reports frozen (user, 2026-10-29):** Review 2 + Phase 1 reports already submitted → never edit them for these changes. They keep old `+0.1 × w_max` rule + old synthetic numbers. Carry into NEXT review's report/PPT instead:
+  - Tier 2 P ≥ 4 sharpening (formula, why: monotonicity break at weight ties, 6 → 0 violations, alternatives simulated).
+  - Real Chennai-area benchmark (6 areas, winds, OD bands, land-only endpoints, key numbers § Real-area benchmark).
+  - New M5 indicators (IGD+, GD, I_ε+, coverage, per-run MOPSO mean ± std), reference-front tolerance fix.
+  - Synthetic numbers after density fix (defect 5) — differ from submitted reports.
 
 - M5 extended (2026-10-28, not committed): real Chennai-area benchmark `run_real_benchmarks.py` (6 areas, 3 winds, 3 OD bands, scaling 2/4/6 km) + new indicators (IGD+, GD, I_ε+, ref share, Zitzler C, per-run MOPSO mean ± std) + defects 4/5/6 fixed + synthetic rerun at report scale (30 × 100 × 200). Details + numbers: § Dataset and Benchmarking.
 
@@ -37,7 +44,7 @@ SSN College of Engineering, Dept. of CSE. Agent-facing canonical context: why, n
 - `Simulation/` built (2026-10-06): Gazebo Harmonic + ArduPilot SITL city sim. Frozen region bundle → world + clearance-checked lattice → Tier 1 cached / Tier 2 → `.plan`/`.waypoints` → pymavlink fly → eval (cross-track, clearance, landing offset). Read `Simulation/README.md`. Run in WSL2. 2026-10-19: `launch_simulation.py` one-command WSL run, default region `thiru_demo`, `gui.config` follow cam, `iris_with_ardupilot`, `sea_polygons` split-offset fix (buffer, single-sided). Gazebo flight WSL 2026-10-19: thiru_demo real data, fragile_medical, landed+disarmed, xtrack RMSE 0.22 m (max 1.11), vert 0.19 m, landing offset 0.5 m, min roof clr 49.67 m, 0 violations, RTF 0.69 vs old pipeline 0.33. SITL overrides `RNGFND1_TYPE 0`, `PLND_ENABLED 0` needed (SITL rangefinder = height above home → no land detect on raised pad).
   - Verified: `sitl_mission_runner.py` flown vs real ArduCopter SITL 4.8.0-dev (built-in `quad`, fixture bundle): upload/read-back/AUTO/land OK, cross-track RMSE 0.11–0.13 m, landing offset ≤ 0.02 m.
   - NOT run: Gazebo itself, live OSM/Open-Meteo bundle build, world load/real-time-factor gate. Needs WSL machine.
-- Tests: `Implementation/tests` 244 (all pass 2026-10-28, `PYTHONUTF8=1`), `Simulation/tests` 45 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
+- Tests: `Implementation/tests` 248 (all pass 2026-10-29, `PYTHONUTF8=1`), `Simulation/tests` 45 collected. Local Windows run: 2 Implementation errors (`test_ablation` smoke, `test_risk` gate) = cp1252 `UnicodeEncodeError` on print, not logic → set `PYTHONUTF8=1`. `test_world_builder` needs `trimesh`; `test_dashboard_helpers` needs Tk. Last full pass: audit 2026-10-06 (193 pass, Tk missing).
 - Not built: calibrated risk weights, real battery model, live-OSM-verified Review 2 results, Mission Planner/QGC import check, Gazebo flights, hardware flights.
 
 ### Open Defects (from `Implementation/IMPLEMENTATION_AUDIT_2026-10-06.md`; re-verified 2026-10-07 by grep)
@@ -46,7 +53,7 @@ Still open:
 1. `dashboard.py` builds `TierTwoSelector(front)` w/o `no_go_reasons` → bypasses weather HOLD.
 2. Dashboard loads synthetic `airspace_graph.pkl`, OSM demo overwrites shared `pareto_front.pkl` → graph/front mismatch. No file picker.
 3. `run_all_presets()` calls `select()` → ignores battery filter. Only `select_detailed()` filters. Use `--payload`/`--preset`.
-4. ~~monotonicity mixes scenarios~~ FIXED 2026-10-28: `monotonicity_violations(rows, group_keys=("scenario",))` groups by scenario/case. Synthetic + real = 0 violations.
+4. ~~monotonicity mixes scenarios~~ FIXED 2026-10-28: `monotonicity_violations(rows, group_keys=("scenario",))` groups by scenario/case. Synthetic + real = 0 violations (real had 6 genuine ones from the old P ≥ 4 `+0.1 × w_max` bonus → replaced by priority sharpening 2026-10-29, see § Step 2).
 5. ~~density label ignored~~ FIXED 2026-10-28: `build_scenario` passes `obstacle_density`, `_apply_density_risk` deleted. Synthetic numbers changed vs Review 2 / Phase 1 (old numbers in reports not regenerated).
 6. ~~no real-lattice benchmark / calm-vs-windy / pooled MOPSO~~ FIXED 2026-10-28: `run_real_benchmarks.py`, wind robustness, per-run MOPSO mean ± std. Synthetic report scale done (30 × 100 × 200). Real areas ran medium budget (10 × 50 × 100); `--report-scale` real run NOT done.
 7. Battery constants PLACEHOLDER (`config.py` ~l.153), `NO_GO_GUST_KMH` PLACEHOLDER. Risk weights uncalibrated. Default 6 km route → mixed-cargo battery HOLD expected.
@@ -149,7 +156,7 @@ Answers Review 0 panel critique: "no correlation between Tier 1 factors and Tier
 | Fragility `F` (1–5) | `w_risk` | fragile → low-vibration/turbulence corridors → min risk |
 | Weight class `W` (1–3) | `w_energy` | heavier → more hover/lift power → min energy |
 | Urgency `U` (1–3) | `w_distance` | time-critical → shortest path |
-| Priority `P` (1–5) | dominant-weight amplifier | `P ≥ 4`: largest weight += `0.1 × w_max`, renormalise to sum 1.0 |
+| Priority `P` (1–5) | weight sharpener | `P ≥ 4`: `w_k ← w_k^γ / Σ w_j^γ`, γ = 1.07 (dominant concern gains, smallest loses) |
 
 ### Step 2 — Weight Derivation (no expert tuning)
 
@@ -163,7 +170,10 @@ w_distance = d_raw / (r_raw + d_raw + e_raw)
 w_energy   = e_raw / (r_raw + d_raw + e_raw)
 ```
 
-Priority amplification (`P ≥ 4`): `w_max = max(w_risk, w_distance, w_energy)` += `0.1 × w_max`, renormalise. Flat additive score bonus tried first, rejected: shifts all scores equally, never moves argmax. `P < 4`: weights untouched.
+Priority sharpening (`P ≥ 4`, since 2026-10-29): `w_k ← w_k^γ / Σ_j w_j^γ`, γ = `config.PRIORITY_SHARPEN_GAMMA` = 1.07. `P < 4`: weights untouched. γ chosen so emergency_medicine (F1 W1 U3 P5) keeps w_distance ≈ 0.714 (old formula 0.712).
+- History: flat additive score bonus tried first, rejected (shifts all scores equally, never moves argmax). Then `w_max += 0.1 × w_max`, renormalise (Review 2 / Phase 1 reports describe this one). Replaced: picks objective by "largest weight" → switches at ties (F=1 W=3: U=1 raw 2,3,6 boosts energy; U=2 raw 2,6,6 tie → distance) → energy:risk 3.3 → 3.0, not proportional → 6 real-area U-monotonicity violations (U 1→2 picked route +2 cm longer; thiruvanmiyur 6 km far, guindy long sw + ne).
+- Why sharpening fixes it: power map on all weights, no switch. One tag changes one raw weight → ratio of other two unchanged → argmax monotonic in F / W / U.
+- Alternatives simulated on 72 real fronts × 225 tags (16,200 picks): skip boost at ties = 6 violations left (still switches boost → none); always boost distance = 0, but 2.1% picks change + fragile high-priority boosts distance not risk; drop boost = 0, but P never matters; sharpen = 0, fewest picks changed (1.2%). Preset picks unchanged in all variants (only emergency_medicine has P ≥ 4).
 
 ### Step 3 — Utility Scoring
 
@@ -212,26 +222,28 @@ S1/S2/S3 (~50/200/500 nodes) × obstacle density 5/20/40% = 9 scenarios (`S1_50_
 | S3 d05/d20/d40 | 6 / 7 / 28 | 0.98 (std 0.008) / 1.00 / 1.00 |
 
 - Synthetic fronts small (1–28) → MOPSO at report scale recovers them ~fully. Synthetic graphs = sanity check, not the discriminating benchmark. Real areas = main evidence.
-- NAMOA* untruncated everywhere, IGD = 0, I_ε+ = 0. MOPSO run time 27–460 s mean vs NAMOA* ≤ 0.35 s.
-- Tier 2 sweep: 2025 rows, 21 distinct picks, 771 non-extreme, 0 monotonicity violations, latency median 0.013 ms.
+- NAMOA* untruncated everywhere, IGD = 0, I_ε+ = 0. MOPSO run time 27–460 s mean (2026-10-28 run) vs NAMOA* ≤ 0.35 s. 2026-10-29 rerun (sharpening) same quality numbers but wall time 48–2764 s (S3_500_d05 outlier) = machine load / sleep during run, not code → quote the 2026-10-28 times.
+- Tier 2 sweep (sharpening): 2025 rows, 21 distinct picks, 773 non-extreme (old bonus: 771), 0 monotonicity violations, latency median 0.012 ms.
 
 ### Real-area benchmark
 
 | id | Character | Nodes | Buildings | NFZ nodes | Ground (m) | NAMOA* front median | NAMOA* time median (s) |
 |---|---|---|---|---|---|---|---|
-| thiruvanmiyur | coastal mixed residential | 891 | 30976 | 5 | −3.2–21.8 | 31.5 | 0.19 |
+| thiruvanmiyur | coastal mixed residential | 891 | 30976 | 5 | −3.2–21.8 | 27 | 0.42 |
 | t_nagar | dense commercial core | 889 | 73040 | 11 | 0.5–23.3 | 29.5 | 0.18 |
 | guindy | park / IIT / NFZ-heavy | 781 | 75540 | 114 | 1.0–58.9 | 10 | 0.03 |
 | anna_nagar | planned grid residential | 891 | 81532 | 9 | 4.3–23.0 | 12 | 0.14 |
 | velachery | lake / wetland | 804 | 59503 | 91 | 0.6–23.1 | 18 | 0.24 |
 | sholinganallur | OMR IT parks, tall + sparse | 786 | 20850 | 114 | −0.5–17.3 | 42 | 0.75 |
 
-- Cases: 6 areas × 3 winds (`calm` 0, `sw_monsoon` 25 km/h from 225°, `ne_monsoon` 25 km/h from 45°) × 3 OD bands (short 1.5–2.5 km, medium 3–4 km, long ≥ 5 km; same seeded pairs across winds + methods) = 54 + scaling (box 2/4/6 km, `sw_monsoon`, farthest pair) = 72 runs total.
+- Cases: 6 areas × 3 winds (`calm` 0, `sw_monsoon` 25 km/h from 225°, `ne_monsoon` 25 km/h from 45°) × 3 OD bands (short 1.5–2.5 km, medium 3–4 km, long ≥ 5 km; same seeded pairs across winds + methods; both endpoints on land via `land_nodes` = not in OSM water / coastline sea) = 54 + scaling (box 2/4/6 km, `sw_monsoon`, farthest pair) = 72 runs total.
 - Budget run: medium default MOPSO 10 × 50 × 100, `max_explored` 300k. `--report-scale` = 30 × 100 × 200 (NOT run on real areas). `--smoke` tiny.
-- Key numbers: 0 NAMOA* truncated; NAMOA* HV ≥ every MOPSO run in 54/54 cases; NAMOA* HV ratio 1.0, IGD = I_ε+ = 0. MOPSO pooled HV ratio mean 0.9986, per-run 0.9953 (min 0.752), per-run IGD+ mean 0.0025. NAMOA* front median 21.
-- Runtime: NAMOA* median 0.14 s vs MOPSO 77 s per run (~540×). Tier 2 latency median 0.028 ms.
-- Tier 2: non-extreme share 0.73, distinct routes per case mean 2.26, same path as weighted-sum A* (same weights) 0.71 → Tier 2 reproduces tuned weighted result w/o re-search most of the time; 0 monotonicity violations.
-- Wind robustness (calm NAMOA* front re-costed on windy graph, share still non-dominated, sw / ne): thiruvanmiyur 0.60/0.66, t_nagar 0.50/0.51, guindy 0.37/0.46, anna_nagar 0.30/0.62, velachery 0.69/0.72, sholinganallur 0.34/0.35; mean 0.51. → calm front not reusable under monsoon wind; supports ParetoStore weather-drift refresh. Wind raises min front energy ~8–21% vs calm.
+- Land-only fix (2026-10-28): first run drew endpoints from any SCC node → Thiruvanmiyur sea (292 / 891 nodes wet) = all 9 main cases + 2 scaling had an endpoint at sea; guindy long (river), velachery 4 km far, sholinganallur 2/4/6 km far (marsh) too. 18 cases rerun; numbers below = after fix.
+- Key numbers: 0 NAMOA* truncated; NAMOA* HV ≥ every MOPSO run in 54/54 cases; NAMOA* HV ratio 1.0, IGD = I_ε+ = 0. MOPSO pooled HV ratio mean 0.9985, per-run 0.9952 (min 0.752), per-run IGD+ mean 0.0026. NAMOA* front median 22.5.
+- Runtime: NAMOA* median 0.20 s vs MOPSO 77.5 s per run (~390×). Tier 2 latency median 0.035 ms.
+- Tier 2: non-extreme share 0.76, distinct routes per case mean 2.19, same path as weighted-sum A* (same weights) 0.69 → Tier 2 reproduces tuned weighted result w/o re-search most of the time.
+- Tier 2 monotonicity: 0 violations (2026-10-29, priority sharpening). Old `+0.1 × w_max` formula gave 6 (U 1→2 at P ≥ 4 picked route +2 cm longer; cause + fix in § Step 2). Cached cases refreshed via `refresh_tier2` (case `tier2_formula` id ≠ current → Tier 2 tables, weighted A* rows, picks, risk shares recomputed from stored NAMOA* front; NAMOA*/MOPSO kept; full re-run only if new weighted routes change the reference front — 0 / 72 did). Preset-level shares unchanged (non-extreme 0.76, same-as-weighted 0.69).
+- Wind robustness (calm NAMOA* front re-costed on windy graph, share still non-dominated, sw / ne): thiruvanmiyur 0.46/0.46, t_nagar 0.50/0.51, guindy 0.41/0.47, anna_nagar 0.30/0.62, velachery 0.69/0.72, sholinganallur 0.34/0.35; mean 0.48. → calm front not reusable under monsoon wind; supports ParetoStore weather-drift refresh. Wind raises min front energy ~8–21% vs calm.
 
 ### Baselines
 
@@ -367,7 +379,7 @@ Principal contribution: formula-driven mapping from payload metadata to objectiv
 |---|---|
 | Deterministic A*/Dijkstra Tier 1 (not NSGA-II/MOPSO) | Reproducible, precomputable, no stochastic variance |
 | Utility scoring over full front (not extreme picks) | Non-extreme picks for mixed payloads; answers panel |
-| Four-tag schema (fragility, weight, urgency, priority) | Maps to three objectives; priority amplifies dominant weight; covers all three mission types |
+| Four-tag schema (fragility, weight, urgency, priority) | Maps to three objectives; priority sharpens weights toward dominant concern; covers all three mission types |
 | OSM airspace graph | Reproducible, public; real geography + controlled benchmarks |
 | ArduPilot SITL before real flight | Validate before hardware risk; sim = primary eval, flights = confirmation |
 | Gazebo Harmonic + ArduPilot SITL city sim (`Simulation/`) | 3-D buildings/terrain check flyability, not just graph math. Planner code imported, not copied. |
