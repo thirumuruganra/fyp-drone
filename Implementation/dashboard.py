@@ -9,7 +9,6 @@ route map, and exports a QGC WPL mission file.
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 

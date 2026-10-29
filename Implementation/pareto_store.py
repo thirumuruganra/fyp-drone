@@ -33,7 +33,7 @@ import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional
 
 import networkx as nx
 

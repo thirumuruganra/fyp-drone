@@ -37,7 +37,6 @@ import networkx as nx
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D          # noqa: F401
 from collections import defaultdict
 
 from module1_graph_builder import haversine_km

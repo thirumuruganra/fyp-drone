@@ -36,7 +36,6 @@ from matplotlib.collections import LineCollection
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config as cfg
-from env_data import WeatherSnapshot
 from module1_graph_builder import LatticeAirspaceBuilder
 from module2_tier1_moastar import TierOneEngine
 from module5_evaluation import write_csv, write_json

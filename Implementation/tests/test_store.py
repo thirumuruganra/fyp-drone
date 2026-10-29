@@ -16,7 +16,7 @@ import config as cfg
 import pareto_store
 from env_data import WeatherSnapshot
 from module1_graph_builder import LatticeAirspaceBuilder, apply_weather
-from module2_tier1_moastar import TierOneEngine, pareto_dominates
+from module2_tier1_moastar import TierOneEngine
 from pareto_store import (ParetoStore, front_from_record, graph_hash, run_region, snap_to_node,
                           weather_drift)
 from test_tier1_front import random_graph

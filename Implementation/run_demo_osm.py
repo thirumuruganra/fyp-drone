@@ -65,7 +65,6 @@ from pareto_store import ParetoStore, front_from_record
 from module4_tier2_payload   import (
     TierTwoSelector,
     PAYLOAD_PRESETS,
-    PRESET_COLOURS,
     validate_payload_tags,
 )
 
